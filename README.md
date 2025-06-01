@@ -2,6 +2,7 @@
 
 ... in development
 
+current development in devel branch
 
 ## Goals
 
