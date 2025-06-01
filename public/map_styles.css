@@ -1,0 +1,77 @@
+
+
+svg .normal {
+    fill: white;
+    stroke: none;
+}
+
+svg .lava {
+    fill: orange;
+    stroke: none;
+}
+
+svg .enemyArrows {
+    fill: green;
+}
+
+svg .blackShapes {
+    stroke: none;
+    fill: #444
+}
+
+svg .text {
+    font-size: 13px;
+    dominant-baseline: middle;
+    text-anchor:middle;
+    font-weight: bolder;
+    fill:blue;
+    stroke: blue;
+    stroke-width: 2px;
+}
+
+svg .solidWalls {
+    stroke:black;
+    stroke-width: 2px;
+}
+
+svg .arcs {
+    stroke: blue;
+    stroke-width: 1px;
+}
+
+svg .selected {
+    fill: #ffdb00b3;
+}
+
+svg .select-rect {
+    stroke: black;
+    fill: #00000020;
+    stroke-width: 2px;
+    stroke-dasharray: 3,3;
+}
+
+svg .currentWall {
+    fill: #5800bf;
+}
+
+svg .transparentWalls {
+        stroke: #0000007a;
+}
+
+svg .soundBlocker {
+    stroke: #0000FF80;
+}
+
+svg .playerBlocker {
+    stroke: #ff000080;
+}
+
+svg .soundBlocker {
+    stroke: #00FF0080;
+}
+
+svg .items {
+     dominant-baseline: middle;
+    text-anchor:middle;
+   
+}
