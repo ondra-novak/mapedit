@@ -30,6 +30,7 @@ bool match_path(std::string_view source_path, std::string_view pattern, PathVari
     std::string_view query_part = (query_pos != std::string_view::npos) ? source_path.substr(query_pos + 1) : std::string_view{};
 
     path_vars.clear();
+    query_vars.clear();
 
 
     do {
@@ -48,9 +49,7 @@ bool match_path(std::string_view source_path, std::string_view pattern, PathVari
             return false;
         }
     } while (!pattern.empty() && !path_part.empty());
-    if (pattern =="{}") {
-        path_vars.emplace_back("");
-    } else if (path_part.empty() != pattern.empty()) {
+    if (path_part.empty() != pattern.empty()) {
         return false;
     }
 

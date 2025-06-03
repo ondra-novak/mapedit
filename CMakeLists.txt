@@ -10,4 +10,5 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+include_directories(BEFORE src/json/src)
 add_subdirectory(src/miniserver)

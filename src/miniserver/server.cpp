@@ -2,6 +2,7 @@
 #include "utils/stack_alloc.hpp"
 #include "utils/http_utils.hpp"
 
+#include <json/serializer.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -114,8 +115,9 @@ bool Server::parse_header(std::string_view data, Socket socket, Fn &&fn)
         if (method != "GET" && method != "HEAD") {
             utils::HeaderKey ctl("Content-Length");
             auto lwiter = std::lower_bound(list,iter, HeaderRow{ctl,{}});
-            if (lwiter == iter || lwiter->key != ctl) return false;
-            req.body_size = std::strtoul(lwiter->value.data(), nullptr,10);
+            if (lwiter != iter && lwiter->key == ctl) {
+                req.body_size = std::strtoul(lwiter->value.data(), nullptr,10);
+            }
         }
         req.headers = {list,iter};
         req.method = method;
@@ -154,15 +156,17 @@ bool Server::process_request(Socket & socket, const Handler &handler)
             read_buffer.resize(sz+r);
             auto n = read_buffer.find("\r\n\r\n");
             if (n != std::string::npos) {
+                int sck = socket.get();
                 return parse_header(std::string_view(read_buffer).substr(0,n+2), std::move(socket), [&](BasicRequest &req){
                     if (req.body_size) {
                         return utils::stack_alloc<char>(req.body_size,[&](char *buffer){                            
                             char *iter = buffer;
                             char *end = iter+req.body_size;
-                            std::size_t remain_size = std::min(read_buffer.size() - n, req.body_size);
-                            iter = std::copy(read_buffer.data()+n, read_buffer.data()+n+remain_size, buffer);
+                            int s = n+4;
+                            std::size_t remain_size = std::min(read_buffer.size() - s, req.body_size);
+                            iter = std::copy(read_buffer.data()+s, read_buffer.data()+s+remain_size, buffer);
                             while (iter != end) {
-                                int r = recv(socket.get(), iter, end - iter, MSG_NOSIGNAL);
+                                int r = recv(sck, iter, end - iter, MSG_NOSIGNAL);
                                 if (r < 0) {
                                     int e = errno;
                                     if (e != EINTR) return false;
@@ -213,26 +217,38 @@ void Server::HandleDeleter::operator()(int fd) {
     ::close(fd);
 }
 
+constexpr std::string_view content_type("Content-Type");
+constexpr std::string_view application_json("application/json");
+
 bool Server::SendCallback::operator()(StatusCode status, std::initializer_list<HeaderRow> headers, ResponseBody body)
-{
-    std::size_t req_size = 64+status.message.size();
+{    
+    std::size_t req_size = 64+status.message.size()
+            +(std::holds_alternative<json::value>(body)?(content_type.size()+application_json.size()+4):std::size_t(0));
+
     for (const auto &[key,value]:headers ) {
         req_size += key.size()+value.size()+4;
     };
+
     req_size+=2;
     return utils::stack_alloc<char>(req_size, [&](char *buffer){
         char *iter = buffer;
-    //                                char *end = buffer+req_size;
-        std::size_t content_length = 0;
-        if (std::holds_alternative<std::string_view>(body)) {
-            content_length = std::get<std::string_view>(body).size();
-        } else {
-            content_length = std::get<std::unique_ptr<IReader> >(body)->size();
-        }                                
         iter = std::format_to(iter, "HTTP/1.1 {} {}\r\n", status.code, status.message);
         for (const auto &[key, value]: headers) {
             iter = std::format_to(iter, "{}: {}\r\n", static_cast<std::string_view>(key), value);                                    
         }
+        std::string json_data;        
+        std::size_t content_length = 0;
+        if (std::holds_alternative<std::string_view>(body)) {
+            content_length = std::get<std::string_view>(body).size();
+        } else if (std::holds_alternative<json::value>(body)) {
+            const auto &js = std::get<json::value>(body);
+            json_data = js.to_json();
+            content_length = json_data.size();
+            iter = std::format_to(iter, "{}: {}\r\n", content_type, application_json);                                
+        } else {
+            content_length = std::get<std::unique_ptr<IReader> >(body)->size();
+        }                                
+
         iter = std::format_to(iter, "Content-Length: {}\r\n", content_length);                                
         iter = std::format_to(iter, "\r\n");
 
@@ -240,6 +256,8 @@ bool Server::SendCallback::operator()(StatusCode status, std::initializer_list<H
 
         if (std::holds_alternative<std::string_view>(body)) {
             return complete =  send_block(socket.get(), std::get<std::string_view>(body));
+        } else if (std::holds_alternative<json::value>(body)) {        
+            return complete =  send_block(socket.get(), json_data);
         } else {
             auto &rd = std::get<std::unique_ptr<IReader> >(body);
             while (content_length) {

@@ -2,6 +2,8 @@
 #include <cstring>
 #include <fstream>
 
+constexpr std::string_view directory_mark = "$$DIR$$";
+
 std::vector<std::string> DDLManager::list() const
 {
     std::vector<std::string> out;
@@ -9,7 +11,7 @@ std::vector<std::string> DDLManager::list() const
     if (!f) return {};
     parse_ddl(f,[&](const DirItem &item){
         auto name = item.get_name();
-        if (!name.empty()) {
+        if (!name.empty() && name != directory_mark) {
             out.emplace_back(name);
         }
         return true;
@@ -19,6 +21,11 @@ std::vector<std::string> DDLManager::list() const
 
 void DDLManager::put(std::string_view name, std::string_view data) const
 {
+    if (!std::filesystem::exists(_pathname)) {
+        //create empty
+        std::fstream tmp(_pathname, std::ios::out|std::ios::binary);
+        create_ddl(tmp, 16);
+    }
     std::fstream f(_pathname, std::ios::in|std::ios::out|std::ios::binary);
     if (!f) throw std::runtime_error("Can't open DDL file");
     
@@ -47,13 +54,14 @@ std::optional<std::vector<char>> DDLManager::get(std::string_view name) const
     std::fstream f(_pathname, std::ios::in|std::ios::binary);
     if (!f) return out;
     auto fnfo = find_file(f, name);
+    if (!fnfo) return out;
     out.emplace(get_file(f, fnfo->first));
     return out;
 }
 
 void DDLManager::erase(std::string_view name) const
 {
-    std::fstream f(_pathname, std::ios::in|std::ios::binary);
+    std::fstream f(_pathname, std::ios::in|std::ios::out|std::ios::binary);
     if (!f) return;
     auto fnfo = find_file(f, name);
     if (!fnfo) return;
@@ -73,7 +81,8 @@ void DDLManager::compact() const
     if (!sf) return;
 
     parse_ddl(sf, [&](const DirItem &it){
-        if (!it.get_name().empty())  {
+        auto n = it.get_name();
+        if (!n.empty() && n != directory_mark)  {
             items.push_back(it);
         }
         return true;
@@ -83,7 +92,7 @@ void DDLManager::compact() const
     auto tf = newddl.create_ddl(items.size()+16);
     for (unsigned int idx = 0, cnt = static_cast<unsigned int>(items.size()); idx<cnt; ++idx) {
         auto payload = get_file(sf,items[idx]);        
-        replace_entry(tf,idx,items[idx].get_name(),{payload.data(), payload.size()});
+        replace_entry(tf,idx+1,items[idx].get_name(),{payload.data(), payload.size()});
     }
     sf.close();
     tf.close();
@@ -93,9 +102,10 @@ void DDLManager::compact() const
 
 DDLManager::Stats DDLManager::get_stats() const
 {
-    Stats stats;
+    Stats stats = {};
     std::vector<uint32_t> dir;
     std::ifstream f(_pathname, std::ios::in|std::ios::binary);
+    if (!f) return stats;
     stats.reserved_space = parse_ddl(f, [&](const DirItem &item) {
         if (item.get_name().empty()) ++stats.entries_reserved;
         else {
@@ -137,13 +147,14 @@ std::size_t DDLManager::parse_ddl(std::istream &f, Callback &&callback)
     // Read offset of first item (also marks end of directory)
     f.read(reinterpret_cast<char*>(&first), sizeof(DirItem));
     if (!f) throw std::runtime_error("Failed to read end offset");
-
-    while (static_cast<uint32_t>(f.tellg()) < first.offset) {
-        DirItem item;
-        f.read(reinterpret_cast<char*>(&item), sizeof(DirItem));
-        if (!f) throw std::runtime_error("Failed to read DirItem");
-        if (!callback(item)) break;
-    }    
+    if (callback(first)) {
+        while (static_cast<uint32_t>(f.tellg()) < first.offset) {
+            DirItem item;
+            f.read(reinterpret_cast<char*>(&item), sizeof(DirItem));
+            if (!f) throw std::runtime_error("Failed to read DirItem");
+            if (!callback(item)) break;
+        }    
+    }
     return dir_offset;
 }
 
@@ -182,21 +193,26 @@ void DDLManager::prepare_directory(std::span<const PreparedDirItem> src, std::sp
 }
 
 std::fstream DDLManager::create_ddl(unsigned int entries) const {
-    
-    std::fstream f(_pathname, std::ios::out|std::ios::trunc|std::ios::binary);
-    if (!f) throw std::runtime_error("Failed to create new version od DDL archive");
-    create_ddl(f,entries);
-    return f;
+        std::fstream f(_pathname, std::ios::in|std::ios::out|std::ios::trunc|std::ios::binary);    
+        if (!f) throw std::runtime_error("Failed to create new version od DDL archive");
+        create_ddl(f,entries);
+        return f;
 }
 void DDLManager::create_ddl(std::ostream &f, unsigned int entries) {
-    uint32_t z = 0;
+    uint32_t z = 0;    
     f.write(reinterpret_cast<const char *>(&z),4);
     z = 8;
     f.write(reinterpret_cast<const char *>(&z),4);
+    DirItem first;
+    first.set_name(directory_mark);
+    first.offset = 8+sizeof(DirItem) * (entries+1);
     DirItem entry = {};
-    entry.offset = 8+sizeof(DirItem) * entries;
+    f.write(reinterpret_cast<const char *>(&first), sizeof(first));
     for (unsigned int i = 0; i < entries; ++i) f.write(reinterpret_cast<const char *>(&entry), sizeof(entry));
-    
+    f.flush();
+    f.seekp(0);
+    f.clear();    
+
     
 
 
@@ -209,12 +225,12 @@ std::vector<char> DDLManager::get_file(std::istream &f, const DirItem &item)
     if (!f) throw std::runtime_error("Failed to seek to file");
     uint32_t size;
     f.read(reinterpret_cast<char *>(&size),4);
-    if (!f || f.gcount() == 4) throw std::runtime_error("Failed to reed file");
+    if (!f || f.gcount() < 4) throw std::runtime_error("Failed to reed file");
     std::vector<char> out;
     if (size) {
         out.resize(size);
         f.read(out.data(), out.size());
-        if (!f || static_cast<uint32_t>(f.gcount()) == size) throw std::runtime_error("Failed to reed file");
+        if (!f || static_cast<uint32_t>(f.gcount()) < size) throw std::runtime_error("Failed to reed file");
     }
     return out;
 
@@ -268,7 +284,7 @@ void DDLManager::replace_entry(std::iostream &f, unsigned int index, std::string
     entry.offset = payload.empty()?static_cast<uint32_t>(0):static_cast<uint32_t>(f.tellg());
 
     // Skip first 4 bytes
-    f.seekg(4, std::ios::beg);
+    f.seekg(4);
     if (!f) throw std::runtime_error("Failed to skip first 4 bytes");
 
     // Read next 4 bytes as offset (little endian)
@@ -287,9 +303,14 @@ void DDLManager::replace_entry(std::iostream &f, unsigned int index, std::string
     if (!payload.empty()) {
         f.seekp(entry.offset);
         if (!f)  throw std::runtime_error("Failed to seek end");
-
+        uint32_t sz = static_cast<uint32_t>(payload.size());
+        f.write(reinterpret_cast<const char *>(&sz),4);
         f.write(payload.data(),payload.size());
     }
+    f.flush();
+    f.seekg(0);
+    f.clear();
+
 }
 
 void DDLManager::DirItem::set_name(std::string_view new_name)

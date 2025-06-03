@@ -3,6 +3,7 @@
 #include "utils/http_utils.hpp"
 #include "utils/inline_function.hpp"
 #include "utils/unique_handle.hpp"
+#include <json/value.h>
 #include <vector>
 #include <variant>
 #include <utility>
@@ -43,16 +44,19 @@ namespace server {
     };
 
 
-    class ResponseBody : public std::variant<std::string_view, std::unique_ptr<IReader> > {
+    class ResponseBody : public std::variant<std::string_view, std::unique_ptr<IReader>, json::value > {
     public:
 
-        using super = std::variant<std::string_view, std::unique_ptr<IReader> >;
+        using super = std::variant<std::string_view, std::unique_ptr<IReader>, json::value >;
         template<typename Fn>
         requires(std::is_invocable_r_v<std::string_view, Fn>)
         ResponseBody(std::size_t sz, Fn &&fn):super(std::unique_ptr<IReader>(std::make_unique<CBReader<Fn> >(sz, std::forward<Fn>(fn)))) {}
         template<typename T>
         requires(std::is_constructible_v<std::string_view, T>)
-        ResponseBody(T body):super(std::string_view(body)) {}
+        ResponseBody(T &&body):super(std::string_view(body)) {}
+        template<typename T>
+        requires(std::is_constructible_v<json::value, T> && !std::is_constructible_v<std::string_view, T>)
+        ResponseBody(T &&body):super(std::in_place_type<json::value>,std::forward<T>(body)) {}
     };
 
     struct StatusCode {

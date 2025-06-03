@@ -24,8 +24,11 @@ protected:
     std::filesystem::path _asset_dir;
 
     bool webserver(Request &req);
+    bool webserver_index(Request &req);
     bool assets(Request &req);
     bool serve_maps(Request &req);
+    bool serve_map_list(Request &req);
+    
 
     bool serve_file(const std::filesystem::path &path, std::string_view name, Request &req);
  
