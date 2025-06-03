@@ -1,0 +1,1 @@
+add_executable(mapedit main.cpp server.cpp handler_map.cpp ddlman.cpp interface.cpp)
