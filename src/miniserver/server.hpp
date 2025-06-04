@@ -87,6 +87,7 @@ namespace server {
 
         Server(std::string address_port);
         void listen(Handler callback);
+        std::string get_listen_addr() const;
 
     protected:
 

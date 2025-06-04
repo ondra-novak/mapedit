@@ -17,6 +17,11 @@
  */
 class DDLManager {
 public:
+    struct Item {
+        std::string name;
+        uint32_t group;
+    };
+
     /**
      * @brief Constructs a DDLManager for the specified archive path.
      * @param path Path to the archive file.
@@ -27,14 +32,14 @@ public:
      * @brief Lists all file names stored in the archive.
      * @return Vector of file names present in the archive.
      */
-    std::vector<std::string> list() const;
+    std::vector<Item> list() const;
 
     /**
      * @brief Inserts or replaces a file in the archive.
      * @param name Name of the file to store.
      * @param data File data to store.
      */
-    void put(std::string_view name, std::string_view data) const;
+    void put(std::string_view name, std::string_view data, uint32_t group) const;
 
     /**
      * @brief Retrieves the contents of a file from the archive.
@@ -80,6 +85,10 @@ protected:
         }
         void set_name(std::string_view new_name);
     };
+
+    struct DirItemGroup : DirItem{
+        uint32_t group;
+    };
     
     struct PreparedDirItem {
         std::string_view name;
@@ -92,7 +101,7 @@ protected:
     static void build_ddl_directory(std::ostream &f, std::span<const PreparedDirItem> list);
     static void prepare_directory(std::span<const PreparedDirItem> src, std::span<DirItem> list) ;
     static void append_file(std::ostream &f, std::string_view payload) ;
-    static void replace_entry(std::iostream &f, unsigned int index, std::string_view name, std::string_view payload) ;
+    static void replace_entry(std::iostream &f, unsigned int index, std::string_view name, std::string_view payload, uint32_t group) ;
     std::fstream create_ddl(unsigned int entries) const;
     static void create_ddl(std::ostream &f, unsigned int entries);
     static std::vector<char> get_file(std::istream &f, const DirItem &item);

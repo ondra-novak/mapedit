@@ -4,6 +4,7 @@
 #include <sstream>
 #include <fstream>
 #include <algorithm>
+#include <filesystem>
 
 class IniFile {
 public:
@@ -11,7 +12,7 @@ public:
     using Data = std::unordered_map<std::string, Section>;
 
     // Parse from file
-    bool load(const std::string& filename) {
+    bool load(const std::filesystem::path& filename) {
         std::ifstream file(filename);
         if (!file) return false;
         std::stringstream buffer;
@@ -61,6 +62,50 @@ public:
         }
         return def;
     }
+    // Read a boolean value from the INI file
+    bool get_bool(const std::string& section, const std::string& key, bool def = false) const {
+        std::string val = get(section, key, "");
+        if (val.empty()) return def;
+        std::string lower;
+        lower.reserve(val.size());
+        std::transform(val.begin(), val.end(), std::back_inserter(lower), [](unsigned char c) { return std::tolower(c); });
+        if (lower == "false" || lower == "no" || lower == "off" || lower == "0")
+            return false;
+        if (lower == "true" || lower == "yes" || lower == "on" || lower == "1")
+            return true;
+        // Try to parse as integer
+        try {
+            return std::stoi(lower) != 0;
+        } catch (...) {
+            return def;
+        }
+    }
+
+    int get_int(const std::string& section, const std::string& key, int def = 0) const {
+        std::string val = get(section, key, "");
+        if (val.empty()) return def;
+        try {
+            return std::stoi(val);
+        } catch (...) {
+            return def;
+        }
+    }
+
+    unsigned int get_uint(const std::string& section, const std::string& key, unsigned int def = 0) const {
+        std::string val = get(section, key, "");
+        if (val.empty()) return def;
+        try {
+            size_t idx = 0;
+            unsigned long result = std::stoul(val, &idx, 10);
+            if (idx != val.size() || result > std::numeric_limits<unsigned int>::max())
+                return def;
+            return static_cast<unsigned int>(result);
+        } catch (...) {
+            return def;
+        }
+    }
+
+    
 
 private:
     Data data;

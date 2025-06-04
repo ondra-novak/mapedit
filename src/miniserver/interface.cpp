@@ -108,23 +108,27 @@ bool WebInterface::serve_file(const std::filesystem::path &path, std::string_vie
 
 bool WebInterface::ddl_list(Request &req)
 {
-    std::vector<std::string> game_files = _game.list();
-    std::vector<std::string> user_files = _user.list();
-    std::vector<std::string> out_files;
+    std::vector<DDLManager::Item> game_files = _game.list();
+    std::vector<DDLManager::Item> user_files = _user.list();
+    std::vector<DDLManager::Item> out_files;
 
-    std::sort(game_files.begin(), game_files.end());
-    std::sort(user_files.begin(), user_files.end());
+    auto cmp =[](const auto &a, const auto &b) {
+        return a.name.compare(b.name);
+    };
+
+    std::sort(game_files.begin(), game_files.end(), cmp);
+    std::sort(user_files.begin(), user_files.end(), cmp);
 
     std::set_union(game_files.begin(), game_files.end(),
                    user_files.begin(), user_files.end(),
-                   std::back_inserter(out_files));
+                   std::back_inserter(out_files),cmp);
 
     auto stats = _user.get_stats();
     return req.response({200},{},json::value({
-        {"files", json::value(out_files.begin(), out_files.end(), [&](const std::string &val){
-            auto iter = std::lower_bound(user_files.begin(), user_files.end(), val);
-            bool ovr = iter != user_files.end() && *iter == val;
-            return json::value({val, ovr});
+        {"files", json::value(out_files.begin(), out_files.end(), [&](const DDLManager::Item &val){
+            auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
+            bool ovr = iter != user_files.end() && cmp(*iter , val) == 0;
+            return json::value({val.name, val.group, ovr});
         })},
         {"stats",{
             {"directory_space",stats.directory_space},
@@ -155,7 +159,10 @@ bool WebInterface::ddl_put(Request &req)
     if (req.body.size() > 0x7FFFFFFF) {
         return req.response({413,"Content Too Large"},{},"");
     }
-    _user.put(req.path_vars[0], req.body);
+    uint32_t group =0;
+    auto iter = std::find_if(req.query.begin(), req.query.end(), [](const auto &kv){return kv.first == "group";});
+    if (iter != req.query.end()) group = static_cast<uint32_t>(std::stoul(iter->second));
+    _user.put(req.path_vars[0], req.body,group);
     return req.response({202,"Accepted"},{},"");
 }
 
