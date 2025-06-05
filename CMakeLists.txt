@@ -18,6 +18,19 @@ else()
     message(WARNING "Git not found. Submodules may not be initialized.")
 endif()
 
+# Run `npm install` only once during cmake configure phase
+execute_process(
+    COMMAND npm install
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/web
+    RESULT_VARIABLE npm_result
+)
+
+if(NOT ${npm_result} EQUAL 0)
+    message(FATAL_ERROR "npm install failed")
+endif()
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 if(MSVC)
     add_compile_options(/W4 /permissive-)
 else()
@@ -25,4 +38,7 @@ else()
 endif()
 
 include_directories(BEFORE src/json/src)
+
+
 add_subdirectory(src/miniserver)
+add_subdirectory(src/web)

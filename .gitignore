@@ -5,3 +5,5 @@
 /.vscode
 /SKELDAL.DDL
 /mapedit.local.conf
+src/web/.editorconfig
+src/web/package-lock.json

@@ -21,11 +21,11 @@ protected:
     DDLManager _user;
     std::filesystem::path _maps;
     std::filesystem::path _app_dir;
-    std::filesystem::path _asset_dir;
+    std::filesystem::path _assets_dir;
 
     bool webserver(Request &req);
     bool webserver_index(Request &req);
-    bool assets(Request &req);
+    bool webserver_assets(Request &req);
     bool serve_maps(Request &req);
     bool serve_map_list(Request &req);
     

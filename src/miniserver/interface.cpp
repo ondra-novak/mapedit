@@ -9,14 +9,14 @@ Server::Handler WebInterface::get_handler() {
 
 
 constexpr Endpoint<WebInterface> endpoints[] = {
-    {Method::GET, "/files/maps", &WebInterface::serve_map_list},
-    {Method::GET, "/files/maps/{}", &WebInterface::serve_maps},
-    {Method::GET, "/ddl", &WebInterface::ddl_list},
-    {Method::GET, "/ddl/{}", &WebInterface::ddl_get},
-    {Method::PUT, "/ddl/{}", &WebInterface::ddl_put},
-    {Method::DELETE, "/ddl/{}", &WebInterface::ddl_delete},
-    {Method::POST, "/ddl/compact", &WebInterface::ddl_compact},
-    {Method::GET, "/assets/{}", &WebInterface::assets},
+    {Method::GET, "/api/maps", &WebInterface::serve_map_list},
+    {Method::GET, "/api/maps/{}", &WebInterface::serve_maps},
+    {Method::GET, "/api/ddl", &WebInterface::ddl_list},
+    {Method::GET, "/api/ddl/{}", &WebInterface::ddl_get},
+    {Method::PUT, "/api/ddl/{}", &WebInterface::ddl_put},
+    {Method::DELETE, "/api/ddl/{}", &WebInterface::ddl_delete},
+    {Method::POST, "/api/ddl/compact", &WebInterface::ddl_compact},
+    {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::GET, "/{}", &WebInterface::webserver},
     {Method::GET, "/", &WebInterface::webserver_index}
 };
@@ -64,9 +64,9 @@ bool WebInterface::webserver_index(Request &req)
     return serve_file(_app_dir, "index.html", req);
 }
 
-bool WebInterface::assets(Request &req)
+bool WebInterface::webserver_assets(Request &req)
 {
-        return serve_file(_asset_dir, req.path_vars[0], req);
+        return serve_file(_assets_dir, req.path_vars[0], req);
 }
 
 bool WebInterface::serve_maps(Request &req)
@@ -208,7 +208,7 @@ WebInterface::WebInterface(Config cfg)
     ,_user(cfg.user_ddl)
     ,_maps(cfg.maps)
     ,_app_dir(cfg.app_dir)
-    ,_asset_dir(cfg.asset_dir)
+    ,_assets_dir(cfg.asset_dir)
 {
 
 }

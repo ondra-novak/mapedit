@@ -64,8 +64,8 @@ int entry_point(std::filesystem::path root_config) {
 
     server::Config cfg;
     auto parent = root_config.parent_path();
-    cfg.app_dir = parent/"public";
-    cfg.asset_dir = parent/"public"/"assets";
+    cfg.app_dir = parent/"web";
+    cfg.asset_dir = parent/"web"/"assets";
     cfg.maps = parent/"files"/"maps";
     cfg.game_ddl = parent/ddl;
     cfg.user_ddl = parent/"files"/"assets.ddl";
