@@ -108,12 +108,24 @@ bool WebInterface::serve_file(const std::filesystem::path &path, std::string_vie
 
 bool WebInterface::ddl_list(Request &req)
 {
+    std::optional<uint32_t> sel_group;
+    std::optional<bool> user_assets;
+
+    for (const auto &[k,v]: req.query) {
+        if (k == "group") sel_group = std::stoul(v);
+        else if (k == "type") {
+            if (v == "user") user_assets = true;
+            if (v == "orig") user_assets = false;
+        };
+    }
+
+
     std::vector<DDLManager::Item> game_files = _game.list();
     std::vector<DDLManager::Item> user_files = _user.list();
     std::vector<DDLManager::Item> out_files;
 
     auto cmp =[](const auto &a, const auto &b) {
-        return a.name.compare(b.name);
+        return a.name.compare(b.name) < 0;
     };
 
     std::sort(game_files.begin(), game_files.end(), cmp);
@@ -123,12 +135,23 @@ bool WebInterface::ddl_list(Request &req)
                    user_files.begin(), user_files.end(),
                    std::back_inserter(out_files),cmp);
 
+    out_files.erase(std::remove_if(out_files.begin(), out_files.end(), [&](const DDLManager::Item &val)->bool{
+            if (sel_group && val.group != *sel_group) return true;
+            if (user_assets) {
+                auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
+                bool ovr = iter != user_files.end() && iter->name == val.name;            
+                if (ovr != *user_assets) return true;
+            }
+            return false;
+    }), out_files.end());
+
     auto stats = _user.get_stats();
     return req.response({200},{},json::value({
         {"files", json::value(out_files.begin(), out_files.end(), [&](const DDLManager::Item &val){
             auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
-            bool ovr = iter != user_files.end() && cmp(*iter , val) == 0;
-            return json::value({val.name, val.group, ovr});
+            bool ovr = iter != user_files.end() && iter->name == val.name;            
+            if (ovr && iter->group) return json::value({val.name, iter->group, ovr});
+            else return json::value({val.name, val.group, ovr});
         })},
         {"stats",{
             {"directory_space",stats.directory_space},
