@@ -8,7 +8,13 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    vue(),
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => ['x-form'].includes(tag),
+        }
+      }
+    }),
     vueJsx(),
     vueDevTools(),
   ],
@@ -28,6 +34,6 @@ export default defineConfig({
       changeOrigin: true,
       secure: false,
     },
-  },
+  },  
 }
 })

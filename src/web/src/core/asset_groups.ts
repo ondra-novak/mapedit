@@ -1,10 +1,23 @@
-export const AssetGroups = Object.freeze({
-    1: "Walls, arcs",
-    2: "Sound effects",
-    4: "Map support files",
-    7: "UI and other",
-    8: "Items",
-    9: "Enemies",
-    11: "Dialogs ,shops"
-    // Add more groups as needed
-}); 
+export const AssetGroup = {
+    UNKNOWN: 0,
+    WALLS:1,
+    SOUNDS:2,
+    MAPS:4,
+    UI:7,
+    ITEMS:8,
+    ENEMIES:9,
+    DIALOGS:11
+} as const;
+
+export const AssetGroupLabel =  Object.freeze(Object.fromEntries([
+        [AssetGroup.WALLS,"Walls, arcs"],
+        [AssetGroup.SOUNDS,"Sound effects"],
+        [AssetGroup.MAPS, "Map support files"],
+        [AssetGroup.UI, "UI and other"],
+        [AssetGroup.ITEMS, "Items"],
+        [AssetGroup.ENEMIES, "Enemies"],
+        [AssetGroup.DIALOGS, "Dialogs ,shops"]
+]));
+
+
+export type AssetGroupType = typeof AssetGroup[keyof typeof AssetGroup];

@@ -1,5 +1,21 @@
 // PCX 256-color (8-bit) image support
 
+
+export const PCXProfile = {
+    //import all colors from palette
+    "default":0,
+    //assume index 0 is transparent color
+    "transp0":1,
+    //walls - origin is bottom, index 0 and 1 is transparency
+    "wall":2,
+    //items - origin is bottom, index 0 transparent, index 1 gray 50% alpha
+    "item":3,
+    //enemies - origin is bottom, index 0 transparent, indices 128-255 is alhpa 50%
+    "enemy":4,
+} as const;
+
+export type PCXProfileType = typeof PCXProfile[keyof typeof PCXProfile];
+
 export class PCX {
     width: number;
     height: number;
@@ -155,7 +171,7 @@ export class PCX {
             }
         }
     }
-    createCanvas(profile: "NOTRANSP" | "TRANSP0" | "TRANSP0TRANSP1" | "TRANSP0GRAY1" | "TRANSP0HALPHA"): HTMLCanvasElement {
+    createCanvas(profile: PCXProfileType): HTMLCanvasElement {
         const canvas = document.createElement("canvas");
         canvas.width = this.width;
         canvas.height = this.height;
@@ -163,43 +179,50 @@ export class PCX {
         if (!ctx) throw new Error("Could not get canvas context");
         const imageData = ctx.createImageData(this.width, this.height);
         const data = imageData.data;
-        for (let i = 0; i < this.width * this.height; i++) {
-            const idx = this.pixels[i];
-            const palIdx = idx * 3;
-            let r = this.palette[palIdx];
-            let g = this.palette[palIdx + 1];
-            let b = this.palette[palIdx + 2];
-            let a = 255;
-            switch (profile) {
-                case "NOTRANSP":
-                    // No transparency
-                    break;
-                case "TRANSP0":
-                    if (idx === 0) a = 0;
-                    break;
-                case "TRANSP0TRANSP1":
-                    if (idx === 0 || idx === 1) a = 0;
-                    break;
-                case "TRANSP0GRAY1":
-                    if (idx === 0) {
-                        a = 0;
-                    } else if (idx === 1) {
-                        r = 0; g = 0; b = 0; a = 128;
-                    }
-                    break;
-                case "TRANSP0HALPHA":
-                    if (idx === 0) {
-                        a = 0;
-                    } else if (idx >= 128) {
-                        a = 128;
-                    }
-                    break;
+        let i = 0;
+        for (let y = 0; y < this.height; ++y) {
+            let yofs = ((profile == PCXProfile.wall)
+                            ?this.height-y-1:y) * this.width;
+            for (let x = 0; x < this.width; ++x) {
+                const idx = this.pixels[yofs+x];
+                const palIdx = idx * 3;
+                let r = this.palette[palIdx];
+                let g = this.palette[palIdx + 1];
+                let b = this.palette[palIdx + 2];
+                let a = 255;
+                switch (profile) {
+                    default:
+                    case PCXProfile.default:
+                        // No transparency
+                        break;
+                    case PCXProfile.transp0:
+                        if (idx === 0) a = 0;
+                        break;
+                    case PCXProfile.wall:
+                        if (idx === 0 || idx === 1) a = 0;
+                        break;
+                    case PCXProfile.item:
+                        if (idx === 0) {
+                            a = 0;
+                        } else if (idx === 1) {
+                            r = 0; g = 0; b = 0; a = 128;
+                        }
+                        break;
+                    case PCXProfile.enemy:
+                        if (idx === 0) {
+                            a = 0;
+                        } else if (idx >= 128) {
+                            a = 128;
+                        }
+                        break;
+                }
+                const di = i * 4;
+                data[di] = r;
+                data[di + 1] = g;
+                data[di + 2] = b;
+                data[di + 3] = a;
+                ++i;
             }
-            const di = i * 4;
-            data[di] = r;
-            data[di + 1] = g;
-            data[di + 2] = b;
-            data[di + 3] = a;
         }
         ctx.putImageData(imageData, 0, 0);
         return canvas;

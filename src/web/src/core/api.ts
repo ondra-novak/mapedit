@@ -1,8 +1,9 @@
+import type { AssetGroupType } from "./asset_groups";
 
 
 export interface FileItem {
   name: string;
-  type: number;   // enum nebo číslo, 0 = vše
+  group: AssetGroupType;   // enum nebo číslo, 0 = vše
   ovr: boolean;
 }
 

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, defineEmits } from 'vue';
-import { AssetGroups } from "@/core/asset_groups.ts";
+import { AssetGroup, AssetGroupLabel } from "@/core/asset_groups.ts";
 import {ApiClient  } from '@/core/api.ts';
-import type{ DDLFiles, FileItem } from '@/core/api.ts';
+import type{ FileItem } from '@/core/api.ts';
 
-const emit = defineEmits(['update:selected']);
-
+const selectedFile = defineModel<FileItem>();
 // Groups
-const asset_groups = AssetGroups;
+const asset_groups = AssetGroupLabel;
 
 // Filtry
 const filterType = ref(0);      // 0 = vše, 1 = něco, 2 = něco jiného (podle tvého enumu)
@@ -20,7 +19,6 @@ const files = ref<FileItem[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-const selectedFile = ref<FileItem | null>(null);
 
 // Simulace fetch z backendu
 async function fetchFilesFromBackend(type: number, source: string): Promise<FileItem[]> {
@@ -43,8 +41,7 @@ async function loadFiles() {
 }
 
 function selectFile(file: FileItem) {
-  selectedFile.value = file;
-  emit('update:selected', { name: file.name, type: file.type });
+  selectedFile.value = file;  
 }
 
 // Na začátku načti data
@@ -106,14 +103,29 @@ watch([filterType, filterSource], () => {
     background-color: gainsboro;
     position: sticky;
     top: 0;
+    z-index: 1;
 }
 
 .flist .content div {
-    padding: 0 0.5em;
+    padding: 0 1.5em;
+    position: relative;
+
 }
 .flist .selected {
     background-color: blue;
     color: white;
 }
+.flist .ovr::before {
+  content: "";
+  display:block;  ;
+  width: 0.6em;
+  height: 0.6em;
+  background-color: black;
+  position: absolute;
+  left: 0.25em;
+  top: 0.25em;
+  border-radius: 1em;
+}
+
 
 </style>

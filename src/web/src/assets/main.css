@@ -13,4 +13,21 @@ logo {
   text-align: center;  
 }
 
+x-form {
+  display:block;
+}
+
+x-form > label {
+  display: flex;
+  position:relative;  
+  justify-content: space-between;
+  margin: 1em 0em;
+}
+x-form > label > * {
+  display:block;
+}
+
+x-form > label > input {
+   width: 40%   
+}
 
