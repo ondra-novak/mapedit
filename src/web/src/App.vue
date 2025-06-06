@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
 </script>
 
 <template>
+<workspace>
 <header>
   <nav>
     <RouterLink to="/maps">Maps</RouterLink>
@@ -13,11 +13,33 @@ import HelloWorld from './components/HelloWorld.vue'
   </nav>
 </header>
 <RouterView />
+</workspace>
 </template>
 
+
 <style scoped>
-header nav {
-  display: flex;
-  gap: 2em;
+
+workspace {
+  position: relative;
+  height: 100vh;
+  padding-top: 2em;
+  box-sizing: border-box;
+  display: block;
 }
+
+header nav {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  display: flex;
+  background-color: white;
+  border: 1px solid;  
+}
+
+nav > a {
+  border-right: 1px solid black;
+  padding: 0.5em 2em;
+}
+
 </style>

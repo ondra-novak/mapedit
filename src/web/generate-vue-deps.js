@@ -14,9 +14,9 @@ if (!outFile) {
 
 async function run() {
   const sources = await glob([
-    'src/web/src/**/*',
-    'src/web/public/**/*',
-    'src/web/index.html'
+    './src/**/*',
+    './public/**/*',
+    './index.html'
   ], { onlyFiles: true });
 
   const target = 'dist/index.html'; // Tento řetězec musí odpovídat tomu, co CMake očekává v OUTPUT
