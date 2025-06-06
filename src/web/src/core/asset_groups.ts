@@ -5,6 +5,6 @@ export const AssetGroups = Object.freeze({
     7: "UI and other",
     8: "Items",
     9: "Enemies",
-    11: "Dialogs and shops"
+    11: "Dialogs ,shops"
     // Add more groups as needed
 }); 

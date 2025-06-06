@@ -42,4 +42,10 @@ nav > a {
   padding: 0.5em 2em;
 }
 
+.router-link-active {
+  background-color: black;
+  color: white;
+}
+
+
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, defineEmits } from 'vue';
+import { ref, watch, onMounted, computed, defineEmits } from 'vue';
 import { AssetGroups } from "@/core/asset_groups.ts";
 import {ApiClient  } from '@/core/api.ts';
 import type{ DDLFiles, FileItem } from '@/core/api.ts';
@@ -52,12 +52,14 @@ onMounted(() => {
   loadFiles();
 });
 
-function rowClass(file: FileItem):string {
-    let r = "";
-    if (file.name == selectFile.name) r += "selected";
-    if (file.ovr) r += "ovr"
-    return r;
-}
+const getRowClass = computed(()=> {
+  return (file:FileItem) => {
+    return {
+      selected: file.name == selectedFile.value?.name,
+      ovr: file.ovr,
+    }
+  }
+});
 
 // Sleduj změny filtrů a načti soubory znovu
 watch([filterType, filterSource], () => {
@@ -74,19 +76,19 @@ watch([filterType, filterSource], () => {
       </select>
 
       <select v-model="filterSource">
-        <option value="">All sources</option>
-        <option value="orig">Original files</option>
-        <option value="user">User files</option>
+        <option value="">All</option>
+        <option value="orig">Original</option>
+        <option value="user">User</option>
       </select>
 
-      <button @click="loadFiles" :disabled="loading">Reload</button>
+      <button @click="loadFiles" :disabled="loading">R</button>
     </div>
 
     <div v-if="loading">Načítám soubory...</div>
     <div v-if="error" style="color: red">{{ error }}</div>
 
     <div class="content">
-      <div v-for="file in files" :key="file.name" @click="selectFile(file)" :class="rowClass(file)">{{ file.name }}</div>
+      <div v-for="file in files" :key="file.name" @click="selectFile(file)" :class="getRowClass(file)">{{ file.name }}</div>
     </div>
   </div>
 </template>
@@ -98,12 +100,20 @@ watch([filterType, filterSource], () => {
     background-color: white;;
     overflow: auto;
     height: 100%;
+    cursor: pointer;
 }
 .toolbar {
     background-color: gainsboro;
+    position: sticky;
+    top: 0;
 }
-.flist .content {
-    
+
+.flist .content div {
+    padding: 0 0.5em;
+}
+.flist .selected {
+    background-color: blue;
+    color: white;
 }
 
 </style>
