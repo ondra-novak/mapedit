@@ -36,14 +36,18 @@ watch([cur_file_model], ()=>{
     }    
 })
 
+const assetList = ref<InstanceType<typeof AssetsList> | null>(null)
 
+function onUploadDone() {
+    assetList.value?.reload();
+}
 
 </script>
 
 
 <template>
     <div class="left-panel">
-    <AssetsList v-model="cur_file_model" />
+    <AssetsList v-model="cur_file_model" ref="assetList" />
     </div>
     <div class="middle-panel">
         <select v-model="selected_tool">
@@ -55,7 +59,9 @@ watch([cur_file_model], ()=>{
             <option value="dialogshi">Dialog portraits</option>
         </select>
         <div>
-            <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" v-model:file="selected_file" v-model:group="selected_group" />
+            <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" 
+                v-model:file="selected_file" v-model:group="selected_group"
+                @upload="onUploadDone" />
         </div>
     </div>
 

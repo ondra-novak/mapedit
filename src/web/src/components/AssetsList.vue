@@ -8,6 +8,10 @@ const selectedFile = defineModel<FileItem>();
 // Groups
 const asset_groups = AssetGroupLabel;
 
+defineExpose({
+  reload: loadFiles
+})
+
 // Filtry
 const filterType = ref(0);      // 0 = vše, 1 = něco, 2 = něco jiného (podle tvého enumu)
 const filterSource = ref('');   // "" = vše, "orig", "user"

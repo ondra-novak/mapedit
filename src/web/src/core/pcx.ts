@@ -1,5 +1,9 @@
 // PCX 256-color (8-bit) image support
 
+import { extractImageData, findQuantizationAndGeneratePalette, type ImageDataResult } from "./image_manip";
+import { ColorLUT } from "./lut";
+import type { RGB } from "./lut";
+
 
 export const PCXProfile = {
     //import all colors from palette
@@ -228,7 +232,72 @@ export class PCX {
         return canvas;
     }
 
+    set_palete(rgb: RGB[] ) {
+        const pal = new Uint8Array(256 * 3);
+        for (let i = 0; i < 256; i++) {
+            const color = rgb[i] || { r: 0, g: 0, b: 0 };
+            pal[i * 3] = color.r & 0xFF;
+            pal[i * 3 + 1] = color.g & 0xFF;
+            pal[i * 3 + 2] = color.b & 0xFF;
+        }
+        this.palette = pal;
+    }
 
+    convertImageData(imageData: ImageDataResult, lut: ColorLUT, indexOffset: number, minAlpha: number, maxAlpha: number) : void{
+        const { data, width, height } = imageData;
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 4;
+                const r = data[idx];
+                const g = data[idx + 1];
+                const b = data[idx + 2];
+                const a = data[idx + 3];
+                if (a < minAlpha || a > maxAlpha) {
+                    continue;
+                }
+                const lutIdx = lut.lookup({ r, g, b });
+                this.setPixel(x, y, (lutIdx + indexOffset) & 0xFF);
+            }
+        }
+    }
+
+    clear(index:number) {
+        this.pixels.fill(index & 0xFF);
+    }
+
+
+    static async fromImage(img:HTMLImageElement, profile: PCXProfileType) : Promise<PCX>{
+        const imgdata = await extractImageData(img);
+        if (profile == PCXProfile.wall) {
+            const pal = findQuantizationAndGeneratePalette(imgdata,253,128,255);
+            const lut = new ColorLUT(pal, 5);
+            const pcx = new PCX(imgdata.width, imgdata.height);
+            pal.unshift({r:0,g:0,b:0});
+            pal.unshift({r:0,g:0,b:0});            
+            pcx.set_palete(pal);
+            pcx.clear(0);
+            pcx.convertImageData(imgdata, lut, 2, 128, 255);
+            pcx.flipVertically();
+            return pcx;
+        }
+        if (profile == PCXProfile.enemy) {
+            const pal1 = findQuantizationAndGeneratePalette(imgdata,127,173,255);
+            const pal2 = findQuantizationAndGeneratePalette(imgdata,127,85,172);
+            const lut1 = new ColorLUT(pal1, 5);
+            const lut2 = new ColorLUT(pal2, 5);
+            pal1.unshift({r:0,g:0,b:0});
+            const pcx = new PCX(imgdata.width, imgdata.height);
+            pcx.set_palete(pal1.concat(pal2));
+            pcx.clear(0);
+            pcx.convertImageData(imgdata, lut1, 1, 173, 255);
+            pcx.convertImageData(imgdata, lut2, 128, 85, 172);
+            return pcx;
+        }
+        return new PCX(imgdata.width, imgdata.height);
+
+    }
+
+    
 
 
 }

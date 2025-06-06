@@ -46,7 +46,7 @@ export class ApiClient {
         return response.bytes();
     }
 
-    async putDDLFile(id: string, data: Uint8Array, group: number): Promise<void> {
+    async putDDLFile(id: string, data: ArrayBuffer, group: number): Promise<void> {
         const response = await fetch(`api/ddl/${encodeURIComponent(id)}?group=${group}`, {
             method: "PUT",
             headers: { "Content-Type": "application/octet-stream" },
