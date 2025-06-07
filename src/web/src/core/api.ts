@@ -72,8 +72,12 @@ export class ApiClient {
         const response = await fetch(`api/ddl/compact`, {
             method: "POST"
         });
-        return response.json();
+        if (response.status !== 202) {
+            const text = await response.text(); // Může obsahovat chybovou hlášku
+            throw new Error(`Compact failed. Status: ${response.status}. Message: ${text}`);
+       }
     }
 
 }
 
+export const server = new ApiClient();

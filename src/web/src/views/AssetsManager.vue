@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import AssetsPcxView from '@/components/AssetsPcxView.vue';
+import AssetsHiView from '@/components/AssetsHiView.vue';
 import AssetsList from '../components/AssetsList.vue'
 import { ref, watch, onMounted, computed, defineEmits } from 'vue';
 import { AssetGroup } from '@/core/asset_groups';
 import type {AssetGroupType}from '@/core/asset_groups';
-import type { FileItem } from '@/core/api';
+import { server, type FileItem } from '@/core/api';
+import AssetsDDLManage from '@/components/AssetsDDLManage.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
 const selected_group = ref<AssetGroupType>(AssetGroup.UNKNOWN);
 const cur_file_model = ref<FileItem>();
+const disable_delete = ref<boolean>(true);
 
 watch([selected_tool], ()=>{
     switch (selected_tool.value) {
@@ -21,7 +24,11 @@ watch([selected_tool], ()=>{
 });
 
 watch([cur_file_model], ()=>{
-    if (!cur_file_model.value) return;
+    if (!cur_file_model.value) {
+        disable_delete.value = true;
+        return;
+    }
+    disable_delete.value = !cur_file_model.value.ovr;
     selected_file.value = cur_file_model.value.name;
     selected_group.value = cur_file_model.value.group;
     switch (cur_file_model.value.group) {
@@ -29,8 +36,12 @@ watch([cur_file_model], ()=>{
         case AssetGroup.ENEMIES: selected_tool.value = "enemies";break;
         case AssetGroup.ITEMS: selected_tool.value = "items";break;
         case AssetGroup.UI: selected_tool.value = "uigfx";break;
-        case AssetGroup.DIALOGS: if (cur_file_model.value.name.endsWith(".HI"))
+        case AssetGroup.DIALOGS: if (cur_file_model.value.name.endsWith(".HI")) 
                                         selected_tool.value = "dialogshi";
+                                else if (cur_file_model.value.name.endsWith(".PCX"))
+                                        selected_tool.value = "uigfx";
+                                else    
+                                    selected_tool.value = "";
                                 break;        
         default: selected_tool.value = "";break;
     }    
@@ -42,6 +53,16 @@ function onUploadDone() {
     assetList.value?.reload();
 }
 
+function delete_file() {
+    if (cur_file_model.value) {
+        if (confirm("Are you sure to delete file: "+cur_file_model.value.name)) {
+            server.deleteDDLFile(cur_file_model.value.name);
+            assetList.value?.reload();
+            cur_file_model.value = undefined;
+        }
+    }
+}
+
 </script>
 
 
@@ -49,6 +70,8 @@ function onUploadDone() {
     <div class="left-panel">
     <AssetsList v-model="cur_file_model" ref="assetList" />
     </div>
+    <button class="right-top" :disabled="disable_delete" @click="delete_file" >Delete file</button>
+
     <div class="middle-panel">
         <select v-model="selected_tool">
             <option value="">--- choose tool ---</option>
@@ -57,11 +80,15 @@ function onUploadDone() {
             <option value="enemies">Enemies</option>
             <option value="uigfx">UI and other</option>
             <option value="dialogshi">Dialog portraits</option>
+            <option value="ddlinfo">Manage DDL</option>
         </select>
         <div>
             <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" 
                 v-model:file="selected_file" v-model:group="selected_group"
                 @upload="onUploadDone" />
+            <AssetsHiView v-if="selected_tool == 'dialogshi'"
+                v-model="selected_file"  @upload="onUploadDone" />
+            <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />                
         </div>
     </div>
 
@@ -87,6 +114,14 @@ function onUploadDone() {
 .middle-panel > select {
     display: block;
     margin: 1em auto;
+}
+.right-top {
+    position: absolute;
+    right: 1em;
+    top: 3em;
+    width: 6em;
+    display: block;
+    z-index: 2;
 }
 
 </style>

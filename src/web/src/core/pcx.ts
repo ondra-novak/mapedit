@@ -31,6 +31,20 @@ export class PCX {
         this.height = height;
         this.pixels = pixels ?? new Uint8Array(width * height);
         this.palette = palette ?? new Uint8Array(768);
+    }    
+
+    static isSupported(buffer: ArrayBuffer) : boolean{
+        if (buffer.byteLength < 128) return false;
+        const view = new DataView(buffer);
+        if (view.getUint8(0) !== 0x0A) return false; // Manufacturer
+        if (view.getUint8(1) !== 5) return false;    // Version 3.0+
+        if (view.getUint8(3) !== 8) return false;    // 8 bits per pixel
+        // Check for palette marker at the end
+        if (buffer.byteLength < 769 + 128) return false;
+        const paletteMarkerOffset = buffer.byteLength - 769;
+        const paletteMarker = new Uint8Array(buffer, paletteMarkerOffset, 1)[0];
+        if (paletteMarker !== 0x0C) return false;
+        return true;
     }
 
     static fromArrayBuffer(buffer: ArrayBuffer): PCX {
@@ -270,7 +284,7 @@ export class PCX {
         const imgdata = await extractImageData(img);
         if (profile == PCXProfile.wall) {
             const pal = findQuantizationAndGeneratePalette(imgdata,253,128,255);
-            const lut = new ColorLUT(pal, 5);
+            const lut = new ColorLUT(pal, 6);
             const pcx = new PCX(imgdata.width, imgdata.height);
             pal.unshift({r:0,g:0,b:0});
             pal.unshift({r:0,g:0,b:0});            
@@ -280,17 +294,38 @@ export class PCX {
             pcx.flipVertically();
             return pcx;
         }
-        if (profile == PCXProfile.enemy) {
+        else if (profile == PCXProfile.enemy) {
             const pal1 = findQuantizationAndGeneratePalette(imgdata,127,173,255);
             const pal2 = findQuantizationAndGeneratePalette(imgdata,127,85,172);
-            const lut1 = new ColorLUT(pal1, 5);
-            const lut2 = new ColorLUT(pal2, 5);
+            const lut1 = new ColorLUT(pal1, 6);
+            const lut2 = new ColorLUT(pal2, 6);
             pal1.unshift({r:0,g:0,b:0});
             const pcx = new PCX(imgdata.width, imgdata.height);
             pcx.set_palete(pal1.concat(pal2));
             pcx.clear(0);
             pcx.convertImageData(imgdata, lut1, 1, 173, 255);
             pcx.convertImageData(imgdata, lut2, 128, 85, 172);
+            return pcx;
+        } else if (profile == PCXProfile.item) {
+            const pal = findQuantizationAndGeneratePalette(imgdata,253,128,255);
+            const lut = new ColorLUT(pal, 6);
+            const pal2 = [{r:1,g:1,b:1}];
+            const lut2 = new ColorLUT(pal2, 6);
+            const pcx = new PCX(imgdata.width, imgdata.height);
+            pal2.unshift({r:0,g:0,b:0});
+            pcx.set_palete(pal2.concat(pal));
+            pcx.clear(0);
+            pcx.convertImageData(imgdata, lut, 2, 173, 255);
+            pcx.convertImageData(imgdata, lut2, 1, 85, 172);
+            return pcx;
+        } else {
+            const pal = findQuantizationAndGeneratePalette(imgdata,254,128,255);
+            const lut = new ColorLUT(pal, 6);
+            const pcx = new PCX(imgdata.width, imgdata.height);
+            pal.unshift({r:0,g:0,b:0});
+            pcx.set_palete(pal);
+            pcx.clear(0);
+            pcx.convertImageData(imgdata, lut,1, 128, 255);            
             return pcx;
         }
         return new PCX(imgdata.width, imgdata.height);

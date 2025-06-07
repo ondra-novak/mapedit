@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, defineEmits } from 'vue';
 import { AssetGroup, AssetGroupLabel } from "@/core/asset_groups.ts";
-import {ApiClient  } from '@/core/api.ts';
+import {server  } from '@/core/api.ts';
 import type{ FileItem } from '@/core/api.ts';
 
 const selectedFile = defineModel<FileItem>();
@@ -16,7 +16,7 @@ defineExpose({
 const filterType = ref(0);      // 0 = vše, 1 = něco, 2 = něco jiného (podle tvého enumu)
 const filterSource = ref('');   // "" = vše, "orig", "user"
 
-const api = new ApiClient ();
+
 
 // Data
 const files = ref<FileItem[]>([]);
@@ -29,7 +29,7 @@ async function fetchFilesFromBackend(type: number, source: string): Promise<File
   loading.value = true;
   error.value = null;  
   try {
-    const ddldata = await api.getDDLFiles(type, source);
+    const ddldata = await server.getDDLFiles(type, source);
     // mock data - ve skutečnosti to přijde z backendu podle filtru
     return ddldata.files;
   } catch (e) {
