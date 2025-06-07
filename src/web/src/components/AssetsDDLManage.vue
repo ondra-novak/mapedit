@@ -32,12 +32,13 @@ onMounted(()=>{
 
 <template>
     <h2>Statistics</h2>
-    <table>        
+    <table>        <tbody>
         <tr><th>Directory entries</th><td>{{ stats?stats.entries_used:"-" }}</td><td></td></tr>
         <tr><th>Unused directory entries</th><td>{{ stats?stats.entries_reserved:"-" }}</td><td></td></tr>
         <tr><th>Total size</th><td>{{ stats?Math.round(stats.total_space / 1024):"-" }}</td><td>KiB</td></tr>
         <tr><th>Used space</th><td>{{ stats?Math.round(stats.used_space / 1024):"-" }}</td><td>KiB</td></tr>
         <tr><th>Fragmentation</th><td>{{ stats?Math.round(100-(stats.used_space+stats.reserved_space)/stats.total_space*100):"-" }}</td><td>%</td></tr>
+        </tbody>
     </table>
     
     <div class="at-center">

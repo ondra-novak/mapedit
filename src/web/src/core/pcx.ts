@@ -2,7 +2,7 @@
 
 import { extractImageData, findQuantizationAndGeneratePalette, type ImageDataResult } from "./image_manip";
 import { ColorLUT } from "./lut";
-import type { RGB } from "./lut";
+import type { RGBPalette } from "./colors";
 
 
 export const PCXProfile = {
@@ -189,7 +189,7 @@ export class PCX {
             }
         }
     }
-    createCanvas(profile: PCXProfileType): HTMLCanvasElement {
+    createCanvas(profile: PCXProfileType, altpalette?: RGBPalette): HTMLCanvasElement {
         const canvas = document.createElement("canvas");
         canvas.width = this.width;
         canvas.height = this.height;
@@ -197,6 +197,7 @@ export class PCX {
         if (!ctx) throw new Error("Could not get canvas context");
         const imageData = ctx.createImageData(this.width, this.height);
         const data = imageData.data;
+        const pal = altpalette?PCX.create_palette(altpalette):this.palette;
         let i = 0;
         for (let y = 0; y < this.height; ++y) {
             let yofs = ((profile == PCXProfile.wall)
@@ -204,9 +205,9 @@ export class PCX {
             for (let x = 0; x < this.width; ++x) {
                 const idx = this.pixels[yofs+x];
                 const palIdx = idx * 3;
-                let r = this.palette[palIdx];
-                let g = this.palette[palIdx + 1];
-                let b = this.palette[palIdx + 2];
+                let r = pal[palIdx];
+                let g = pal[palIdx + 1];
+                let b = pal[palIdx + 2];
                 let a = 255;
                 switch (profile) {
                     default:
@@ -246,15 +247,34 @@ export class PCX {
         return canvas;
     }
 
-    set_palete(rgb: RGB[] ) {
+    toDataURL(profile: PCXProfileType, altpalette?: RGBPalette):string {
+        return this.createCanvas(profile, altpalette).toDataURL();
+    }
+
+    static create_palette(rgb: RGBPalette) {
         const pal = new Uint8Array(256 * 3);
         for (let i = 0; i < 256; i++) {
             const color = rgb[i] || { r: 0, g: 0, b: 0 };
-            pal[i * 3] = color.r & 0xFF;
-            pal[i * 3 + 1] = color.g & 0xFF;
-            pal[i * 3 + 2] = color.b & 0xFF;
+            pal[i * 3] = color[0] & 0xFF;
+            pal[i * 3 + 1] = color[1] & 0xFF;
+            pal[i * 3 + 2] = color[2] & 0xFF;
         }
-        this.palette = pal;
+        return pal;
+    }
+
+    set_palete(rgb: RGBPalette ) {
+        this.palette = PCX.create_palette(rgb);
+    }
+
+    get_palette(): RGBPalette {
+        const palette: RGBPalette = [];
+        for (let i = 0; i < 256; i++) {
+            const r = this.palette[i * 3];
+            const g = this.palette[i * 3 + 1];
+            const b = this.palette[i * 3 + 2];
+            palette.push([r, g, b]);
+        }
+        return palette;
     }
 
     convertImageData(imageData: ImageDataResult, lut: ColorLUT, indexOffset: number, minAlpha: number, maxAlpha: number) : void{
@@ -269,7 +289,7 @@ export class PCX {
                 if (a < minAlpha || a > maxAlpha) {
                     continue;
                 }
-                const lutIdx = lut.lookup({ r, g, b });
+                const lutIdx = lut.lookup([ r, g, b ]);
                 this.setPixel(x, y, (lutIdx + indexOffset) & 0xFF);
             }
         }
@@ -286,8 +306,8 @@ export class PCX {
             const pal = findQuantizationAndGeneratePalette(imgdata,253,128,255);
             const lut = new ColorLUT(pal, 6);
             const pcx = new PCX(imgdata.width, imgdata.height);
-            pal.unshift({r:0,g:0,b:0});
-            pal.unshift({r:0,g:0,b:0});            
+            pal.unshift([0,0,0]);
+            pal.unshift([0,0,0]);            
             pcx.set_palete(pal);
             pcx.clear(0);
             pcx.convertImageData(imgdata, lut, 2, 128, 255);
@@ -299,7 +319,7 @@ export class PCX {
             const pal2 = findQuantizationAndGeneratePalette(imgdata,127,85,172);
             const lut1 = new ColorLUT(pal1, 6);
             const lut2 = new ColorLUT(pal2, 6);
-            pal1.unshift({r:0,g:0,b:0});
+            pal1.unshift([0,0,0]);
             const pcx = new PCX(imgdata.width, imgdata.height);
             pcx.set_palete(pal1.concat(pal2));
             pcx.clear(0);
@@ -309,10 +329,10 @@ export class PCX {
         } else if (profile == PCXProfile.item) {
             const pal = findQuantizationAndGeneratePalette(imgdata,253,128,255);
             const lut = new ColorLUT(pal, 6);
-            const pal2 = [{r:1,g:1,b:1}];
+            const pal2 : RGBPalette= [ [1,1,1] ];
             const lut2 = new ColorLUT(pal2, 6);
             const pcx = new PCX(imgdata.width, imgdata.height);
-            pal2.unshift({r:0,g:0,b:0});
+            pal2.unshift([0,0,0]);
             pcx.set_palete(pal2.concat(pal));
             pcx.clear(0);
             pcx.convertImageData(imgdata, lut, 2, 173, 255);
@@ -322,7 +342,7 @@ export class PCX {
             const pal = findQuantizationAndGeneratePalette(imgdata,254,128,255);
             const lut = new ColorLUT(pal, 6);
             const pcx = new PCX(imgdata.width, imgdata.height);
-            pal.unshift({r:0,g:0,b:0});
+            pal.unshift([0,0,0]);
             pcx.set_palete(pal);
             pcx.clear(0);
             pcx.convertImageData(imgdata, lut,1, 128, 255);            

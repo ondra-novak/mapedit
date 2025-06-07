@@ -7,6 +7,6 @@ export function determineProfile(file:string, group:AssetGroupType, pcx?: PCX) :
         case AssetGroup.WALLS: return (pcx && pcx.width == 640)?PCXProfile.default:PCXProfile.wall;
         case AssetGroup.ITEMS: return PCXProfile.item;
         case AssetGroup.ENEMIES: return PCXProfile.enemy;
-        default: return PCXProfile.default;                                
+        default: return PCXProfile.transp0;                                
     }
 }

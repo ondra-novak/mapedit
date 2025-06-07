@@ -7,6 +7,7 @@ import { AssetGroup } from '@/core/asset_groups';
 import type {AssetGroupType}from '@/core/asset_groups';
 import { server, type FileItem } from '@/core/api';
 import AssetsDDLManage from '@/components/AssetsDDLManage.vue';
+import AssetsToolCol from '@/components/AssetsToolCol.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -33,8 +34,13 @@ watch([cur_file_model], ()=>{
     selected_group.value = cur_file_model.value.group;
     switch (cur_file_model.value.group) {
         case AssetGroup.WALLS: selected_tool.value = "walls";break;
-        case AssetGroup.ENEMIES: selected_tool.value = "enemies";break;
-        case AssetGroup.ITEMS: selected_tool.value = "items";break;
+        case AssetGroup.ENEMIES: if (cur_file_model.value.name.endsWith(".COL") )
+                                    selected_tool.value = "coledit";
+                                else 
+                                    selected_tool.value = "enemies";
+                                break;
+        case AssetGroup.ITEMS: selected_tool.value = "items";
+                               break;
         case AssetGroup.UI: selected_tool.value = "uigfx";break;
         case AssetGroup.DIALOGS: if (cur_file_model.value.name.endsWith(".HI")) 
                                         selected_tool.value = "dialogshi";
@@ -78,17 +84,22 @@ function delete_file() {
             <option value="walls">Walls and arcs</option>
             <option value="items">Items</option>
             <option value="enemies">Enemies</option>
+            <option value="coledit">Enemy colors</option>
             <option value="uigfx">UI and other</option>
             <option value="dialogshi">Dialog portraits</option>
             <option value="ddlinfo">Manage DDL</option>
         </select>
-        <div>
+        <div class="tools">
             <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" 
                 v-model:file="selected_file" v-model:group="selected_group"
                 @upload="onUploadDone" />
             <AssetsHiView v-if="selected_tool == 'dialogshi'"
-                v-model="selected_file"  @upload="onUploadDone" />
+                v-model="selected_file" @upload="onUploadDone" />
+            <AssetsToolCol v-if="selected_tool == 'coledit'" 
+                v-model="selected_file" @upload="onUploadDone" />
+
             <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />                
+
         </div>
     </div>
 
@@ -102,12 +113,11 @@ function delete_file() {
     bottom: 0px;
 }
 .middle-panel {
-    left: 15em;
-    position: absolute;
-    top:2.25rem;
-    bottom: 0;
-    right: 0;
+    margin-left: 15em;    
     text-align: center;
+    display:flex;
+    flex-direction: column;
+    height: 100%;
     background-color: #CCC;
 }
 
@@ -115,6 +125,11 @@ function delete_file() {
     display: block;
     margin: 1em auto;
 }
+.middle-panel > .tools {
+    overflow: auto;
+    
+}
+
 .right-top {
     position: absolute;
     right: 1em;

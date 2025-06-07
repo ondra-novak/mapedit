@@ -1,6 +1,8 @@
 <template>
+    <div>
     <div> {{ width}}x{{height}} </div>
     <div ref="canvas" class="checkerboard" style="display:inline-block"> </div>
+    </div>
 </template>
 
 <script lang="ts" setup>
@@ -10,6 +12,7 @@ import HIFormat from '@/core/hiformat.ts'
 import { defineProps, onMounted, ref, watch } from 'vue';
 import type { AssetGroupType } from '@/core/asset_groups.ts';
 import {determineProfile} from '@/core/pcx_profle.ts'
+import type { RGBPalette } from '@/core/colors';
 
 export interface ImageModel {
     name: string;
@@ -17,7 +20,10 @@ export interface ImageModel {
 }
 
 const model =  defineModel<ImageModel>();
-
+// Další props — palette
+const props = defineProps<{
+  palette?: RGBPalette
+}>()
 
 const canvas = ref<HTMLDivElement | null>(null);
 const width = ref<number>(0);
@@ -39,6 +45,7 @@ async function update() {
             if (PCX.isSupported(data.buffer)) {
                 const pcx = PCX.fromArrayBuffer(data.buffer);
                 const profile = determineProfile(model.value.name, model.value.group, pcx);
+                if (props.palette) pcx.set_palete(props.palette);
                 set_canvas( pcx.createCanvas(profile));
                 width.value = pcx.width;
                 height.value = pcx.height;
@@ -65,7 +72,7 @@ onMounted(() => {
     update();
 });
 
-watch([model], () => {
+watch([model, props], () => {
     update();
 });
 </script>

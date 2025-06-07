@@ -115,8 +115,7 @@ async function start_upload() {
         <template v-if="group==AssetGroup.ENEMIES">
         <label><span>Phase / Sequence</span><div><select v-model="enemy_side">
             <option value="F">Front</option>
-            <option value="L">Left</option>
-            <option value="R">Right</option>
+            <option value="L">Left/Right(mirror)</option>
             <option value="B">Back</option>
             <option value="C">Attack</option>
             <option value="H">Damaged</option>

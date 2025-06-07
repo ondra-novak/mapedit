@@ -1,3 +1,5 @@
+import type { RGBPalette } from "./colors";
+
 export interface ImageDataResult {
     width: number;
     height: number;
@@ -75,7 +77,7 @@ export function createRgbHistogram(
 
 
 export function findQuantizationAndGeneratePalette(imageData:ImageDataResult, colors:number, minAlpha:number, maxAlpha:number
-) : {r:number; g:number; b:number}[] {
+) : RGBPalette {
 
     let hist;
     for (let q = 64; q>7 ; q/=2) {
@@ -120,9 +122,7 @@ export function findQuantizationAndGeneratePalette(imageData:ImageDataResult, co
     }
 
     // Return palette as average colors
-    return hist.map(c => ({
-        r: Math.round(c.sumR / c.count),
-        g: Math.round(c.sumG / c.count),
-        b: Math.round(c.sumB / c.count),
-    }));
+    return hist.map(c => [
+        Math.round(c.sumR / c.count),Math.round(c.sumG / c.count),Math.round(c.sumB / c.count)]
+    );
 }

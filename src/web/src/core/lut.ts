@@ -1,11 +1,12 @@
-export type RGB = { r: number; g: number; b: number };
+import type { RGB, RGBPalette } from "./colors";
+
 
 export class ColorLUT {
-    private palette: RGB[];
+    private palette: RGBPalette;
     private table: Uint16Array;
     private depth: number;
 
-    constructor(palette: RGB[], depth: number = 5) {
+    constructor(palette: RGBPalette, depth: number = 5) {
         this.palette = palette;
         this.depth = depth;
         const size = 1 << depth; // 32 for 5 bits
@@ -22,9 +23,9 @@ export class ColorLUT {
         // Seed the queue with palette colors mapped to the grid
         for (let i = 0; i < this.palette.length; i++) {
             const p = this.palette[i];
-            const r = Math.round((p.r / 255) * (size - 1));
-            const g = Math.round((p.g / 255) * (size - 1));
-            const b = Math.round((p.b / 255) * (size - 1));
+            const r = Math.round((p[0] / 255) * (size - 1));
+            const g = Math.round((p[1] / 255) * (size - 1));
+            const b = Math.round((p[2] / 255) * (size - 1));
             const index = this.getIndex(r, g, b);
             this.table[index] = i;
             visited[index] = 1;
@@ -65,9 +66,9 @@ export class ColorLUT {
 
     lookup(color: RGB): number {
         const size = 1 << this.depth;
-        const r = Math.floor((color.r / 256) * size );
-        const g = Math.floor((color.g / 256) * size );
-        const b = Math.floor((color.b / 256) * size );
+        const r = Math.floor((color[0] / 256) * size );
+        const g = Math.floor((color[1] / 256) * size );
+        const b = Math.floor((color[2] / 256) * size );
         return this.table[this.getIndex(r, g, b)];
     }
 }
