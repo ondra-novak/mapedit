@@ -43,7 +43,11 @@ export class ApiClient {
 
     async getDDLFile(id: string): Promise<Uint8Array> {
         const response = await fetch(`api/ddl/${encodeURIComponent(id)}`);
-        return response.bytes();
+        if (response.ok) {
+            return response.bytes();
+        } else {
+            throw Error("Get File Status: " + response.status);
+        }
     }
 
     async putDDLFile(id: string, data: ArrayBuffer, group: number): Promise<void> {

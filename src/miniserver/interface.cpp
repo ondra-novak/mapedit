@@ -1,6 +1,7 @@
 #include "interface.hpp"
 #include "handler_map.hpp"
 #include <fstream>
+#include <mutex>
 
 namespace server {
 
@@ -76,6 +77,7 @@ bool WebInterface::serve_maps(Request &req)
 
 bool WebInterface::serve_map_list(Request &req)
 {
+    std::shared_lock _(_mx);    
     std::vector<std::string> files;
     for (auto iter = std::filesystem::directory_iterator(_maps);iter != std::filesystem::directory_iterator();++iter) {
         if (iter->is_regular_file()) {
@@ -87,6 +89,7 @@ bool WebInterface::serve_map_list(Request &req)
 
 bool WebInterface::serve_file(const std::filesystem::path &path, std::string_view name, Request &req)
 {
+        std::shared_lock _(_mx);    
         if (name.find_first_of("/\\") != name.npos) return false;
         auto p = path/name;
         auto ext = p.extension();
@@ -108,6 +111,7 @@ bool WebInterface::serve_file(const std::filesystem::path &path, std::string_vie
 
 bool WebInterface::ddl_list(Request &req)
 {
+    std::shared_lock _(_mx);    
     std::optional<uint32_t> sel_group;
     std::optional<bool> user_assets;
 
@@ -166,6 +170,7 @@ bool WebInterface::ddl_list(Request &req)
 
 bool WebInterface::ddl_get(Request &req)
 {
+    std::shared_lock _(_mx);    
     auto f = _user.get(req.path_vars[0]);
     if (!f) {
         f = _game.get(req.path_vars[0]);
@@ -178,6 +183,7 @@ bool WebInterface::ddl_get(Request &req)
 
 bool WebInterface::ddl_put(Request &req)
 {
+    std::lock_guard _(_mx);
     if (req.path_vars[0].empty()) return false;
     if (req.body.size() > 0x7FFFFFFF) {
         return req.response({413,"Content Too Large"},{},"");
@@ -191,6 +197,7 @@ bool WebInterface::ddl_put(Request &req)
 
 bool WebInterface::ddl_delete(Request &req)
 {
+    std::lock_guard _(_mx);
     if (req.path_vars[0].empty()) return false;
     _user.erase(req.path_vars[0]);
     return req.response({202,"Accepted"},{},"");
@@ -198,7 +205,8 @@ bool WebInterface::ddl_delete(Request &req)
 
 
 bool WebInterface::ddl_compact(Request &req)
-{
+{   
+    std::lock_guard _(_mx);
     _user.compact();
     return req.response({202,"Accepted"},{},"");
 }

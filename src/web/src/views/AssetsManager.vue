@@ -2,12 +2,13 @@
 import AssetsPcxView from '@/components/AssetsPcxView.vue';
 import AssetsHiView from '@/components/AssetsHiView.vue';
 import AssetsList from '../components/AssetsList.vue'
-import { ref, watch, onMounted, computed, defineEmits } from 'vue';
+import { ref, watch, onMounted, computed, defineEmits, onUnmounted } from 'vue';
 import { AssetGroup } from '@/core/asset_groups';
 import type {AssetGroupType}from '@/core/asset_groups';
 import { server, type FileItem } from '@/core/api';
 import AssetsDDLManage from '@/components/AssetsDDLManage.vue';
 import AssetsToolCol from '@/components/AssetsToolCol.vue';
+import AssetToolIcons from '@/components/AssetToolIcons.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -34,12 +35,15 @@ watch([cur_file_model], ()=>{
     selected_group.value = cur_file_model.value.group;
     switch (cur_file_model.value.group) {
         case AssetGroup.WALLS: selected_tool.value = "walls";break;
-        case AssetGroup.ENEMIES: if (cur_file_model.value.name.endsWith(".COL") )
+        case AssetGroup.ENEMIES: if (cur_file_model.value.name.endsWith(".COL") || selected_tool.value == "coledit" )
                                     selected_tool.value = "coledit";
                                 else 
                                     selected_tool.value = "enemies";
                                 break;
-        case AssetGroup.ITEMS: selected_tool.value = "items";
+        case AssetGroup.ITEMS: if (cur_file_model.value.name.endsWith(".LIB")) 
+                                    selected_tool.value = "icons";
+                                else
+                                    selected_tool.value = "items";
                                break;
         case AssetGroup.UI: selected_tool.value = "uigfx";break;
         case AssetGroup.DIALOGS: if (cur_file_model.value.name.endsWith(".HI")) 
@@ -55,7 +59,8 @@ watch([cur_file_model], ()=>{
 
 const assetList = ref<InstanceType<typeof AssetsList> | null>(null)
 
-function onUploadDone() {
+async function onUploadDone(filename:string, done?:Promise<void>) {
+    if (done) await done;
     assetList.value?.reload();
 }
 
@@ -65,9 +70,11 @@ function delete_file() {
             server.deleteDDLFile(cur_file_model.value.name);
             assetList.value?.reload();
             cur_file_model.value = undefined;
+            selected_tool.value="ddlinfo";
         }
     }
 }
+
 
 </script>
 
@@ -83,6 +90,7 @@ function delete_file() {
             <option value="">--- choose tool ---</option>
             <option value="walls">Walls and arcs</option>
             <option value="items">Items</option>
+            <option value="icons">Icons (items)</option>
             <option value="enemies">Enemies</option>
             <option value="coledit">Enemy colors</option>
             <option value="uigfx">UI and other</option>
@@ -97,6 +105,7 @@ function delete_file() {
                 v-model="selected_file" @upload="onUploadDone" />
             <AssetsToolCol v-if="selected_tool == 'coledit'" 
                 v-model="selected_file" @upload="onUploadDone" />
+            <AssetToolIcons v-if="selected_tool == 'icons'" @upload="onUploadDone"/>
 
             <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />                
 

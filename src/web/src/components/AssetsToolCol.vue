@@ -2,7 +2,7 @@
 import { COLPaletteSet } from '@/core/col_palette_set';
 import { server, type FileItem } from '@/core/api';
 import { PCX, PCXProfile } from '@/core/pcx';
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, shallowReactive, shallowRef, watch } from 'vue';
 import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import { AssetGroup } from '@/core/asset_groups';
 import { PhotoshopPicker } from 'vue-color';
@@ -10,18 +10,31 @@ import { hslToRgb, rgbToHsl, type RGB, type RGBPalette } from '@/core/colors';
 import CanvasView from './CanvasView.vue';
 
 const filename = defineModel<string | null>();
-const enemy_image = ref<PCX>();
+const enemy_image = shallowRef<PCX>();
 const palete_col = ref<COLPaletteSet>();
 const palete_col_name = ref<string>();
 const selected_ciks = ref<boolean[]>([]);
 const original_palette = ref<RGBPalette>();
+const undo_palette = ref<RGBPalette>();
+const undo_index = ref<number>();
+let change_flag = false;
 
 const average_colors = ref<RGB[]>([]);
 
+
 const emit = defineEmits<{
-  (e: 'upload', name: string): void
+  (e: 'upload', name: string, done?:Promise<void>): void
 }>();
 
+
+function save_col(name : string) {
+    const col = palete_col.value;
+    if (col && change_flag) {        
+        const p = server.putDDLFile(name, col.toArrayBuffer(), AssetGroup.ENEMIES);        
+        emit("upload",name, p);
+        change_flag = false;
+    }
+}
 
 async function prepareImage(fname: string) {
     try {
@@ -38,37 +51,57 @@ function onUpdate() {
             prepareImage(filename.value);
             palete_col_name.value = filename.value.substring(0,6)+".COL";
         } else if (filename.value.endsWith(".COL")) {
-            prepareImage(filename.value.substring(0,6)+"F1.PCX");
+            try {
+                prepareImage(filename.value.substring(0,6)+"F1.PCX");
+            } catch (e) {
+                prepareImage(filename.value.substring(0,6)+"F0.PCX");
+            }
             palete_col_name.value = filename.value;
         }
     }
 }
 
-function getOriginalPalette() : RGBPalette{
-    if (enemy_image.value) {
-        return enemy_image.value.get_palette();
-    } else {
-        return [];
-    }
-}
-
-async function onUpdatePalete() {
+async function onUpdatePalete(newValue:[string|undefined], oldValue:[string|undefined]) {
     if (palete_col_name.value) {
         try {
+            if (oldValue[0]) await save_col(oldValue[0]);
             const data = await server.getDDLFile(palete_col_name.value);
             palete_col.value = COLPaletteSet.fromArrayBuffer(data.buffer);
         } catch (e) {
             palete_col.value = new COLPaletteSet();
             palete_col.value.addPalette(enemy_image.value?.get_palette());            
         }
+        change_flag = false;
     }
 }
 
-function select_color(index:number){
-    const val = selected_ciks.value[index] || false;
-    selected_ciks.value[index] = !val;
+let last_select = -1;
+let last_end = -1;
+
+function make_selection(from :number, to:number, val:boolean) {
+    if (from > to) return make_selection(to, from, val);
+    for (let i = from; i <= to; ++i) selected_ciks.value[i] = val;
+}
+
+function select_color(event: MouseEvent, index:number){
+
+    if (event.shiftKey && last_select >= 0) {
+        let f = last_select;
+        let e = index;
+        let flag = selected_ciks.value[f];
+        if (last_end != -1) make_selection(f, last_end, !flag);
+        last_end = e;
+        make_selection(f, last_end, flag);
+    } else {
+        if (!event.ctrlKey) selected_ciks.value = [];
+        const val = selected_ciks.value[index] || false;
+        selected_ciks.value[index] = !val;
+        last_select = index;
+        last_end = -1;
+    }
 
     update_selected();
+    undo_palette.value = undefined;
 }
 
 function update_selected_pal(pal: RGBPalette): RGB {
@@ -129,12 +162,13 @@ function updateColors(event: Event, index: number) {
                 }
         });
         
-        update_selected_pal(palete_col.value.palettes[index])
+        average_colors.value[index] = update_selected_pal(palete_col.value.palettes[index]);
+        change_flag = true;
     }
   
 }
 
-watch([palete_col_name], onUpdatePalete);
+watch([palete_col_name], (newValue, oldValue) => onUpdatePalete(newValue,oldValue));
 watch([filename], onUpdate)
 
 onMounted(()=>{
@@ -151,13 +185,68 @@ function rgb2value(rgb: RGB) {
     ):"#000000";
 }
 
-function reset(event: Event, index: number) {
-    if (palete_col.value && enemy_image.value) {
-        palete_col.value.palettes[index] = enemy_image.value.get_palette();
+function undo(event: Event, index: number) {
+    if (undo_index.value == index && undo_palette.value && palete_col.value && undo_palette.value.length == 256) {
+        palete_col.value.palettes[index] = undo_palette.value.map(col => [...col] as RGB);
+        update_selected();
     }
 }
 
+function clear_selection() {
+    selected_ciks.value = [];
+}
+function init_undo(event: Event, index: number) {
+    if (!palete_col.value) {
+        undo_palette.value = undefined;
+        return;
+    }
+    if (index != undo_index.value || !undo_palette.value) {
+        const palette : RGBPalette = palete_col.value.palettes[index];
+        undo_palette.value = palette.map(col => [...col] as RGB);
+        undo_index.value = index;
+    }
+}
+
+function add() {
+    if (palete_col.value) {
+        palete_col.value.addPalette(enemy_image.value?.get_palette());
+        change_flag = true;
+    }
+}
+function delete_pal(index: number) {
+    if (confirm("Are you sure delete this palette?")) {
+        palete_col.value?.palettes.splice(index,1);
+        change_flag = true;
+    }
+}
+
+function select_color_from_image(event: Event) {
+    const canvas = (event.target as HTMLCanvasElement);
+    if (canvas && event instanceof MouseEvent && enemy_image.value) {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.floor(event.clientX - rect.left);
+        const y = Math.floor(event.clientY - rect.top);
+        // x and y are the coordinates where the mouse was clicked on the canvas
+        const index = enemy_image.value.getPixel(x,y);
+        
+        if (!event.ctrlKey) selected_ciks.value = [];
+        selected_ciks.value[index] = !event.shiftKey;
+
+        update_selected();
+        undo_palette.value = undefined;
+
+    }
+}
+
+onUnmounted(()=>{
+    if (change_flag && palete_col_name.value) save_col(palete_col_name.value);
+});
+
+
+
 </script>   
+
+
 
 <template>
     <div>
@@ -165,29 +254,34 @@ function reset(event: Event, index: number) {
             <label><span>File name</span><input readonly type="text" v-model="palete_col_name"></label>            
         </x-form>        
     </div>
-    <div v-for="(pal , pal_index) of palete_col?.palettes" :index="pal_index">
+    <div class="palette" v-for="(pal , pal_index) of palete_col?.palettes" :key="pal_index">
         <p>Palette index {{ pal_index }}</p>
+        <button class="right-button" @click="delete_pal(pal_index)">Delete</button>
         <div class="panel">
         <div class="pal_view">
         <div class="grid">
             <div
                 v-for="(col, col_index) of pal"
                 :key="col_index"
-                @click="select_color(col_index)"
+                @click="event => select_color(event, col_index)"
                 :class="{selected: selected_ciks[col_index] || false}"                
                 :style="{ backgroundColor: `rgb(${col[0]}, ${col[1]}, ${col[2]})`}"
             ></div>
         </div>
         <div class="pal_actions">
-            <input type="color" :value="rgb2value(average_colors[pal_index])" @input="event => updateColors(event, pal_index)">
-            <button @click="event=>reset(event, pal_index)">Reset</button>
+            <input type="color" :value="rgb2value(average_colors[pal_index])" @input="event => updateColors(event, pal_index)" @click="event => init_undo(event, pal_index)">
+            <button :disabled="!undo_palette || pal_index != undo_index" @click="event=>undo(event, pal_index)">Undo</button>
+            <button  @click="clear_selection">Clear selection</button>
         </div>
         </div>
         <div class="preview">     
-            <CanvasView :canvas="enemy_image?enemy_image.createCanvas(PCXProfile.enemy, pal):null"  />            
+            <CanvasView class="checkerboard cross" :canvas="enemy_image?enemy_image.createCanvas(PCXProfile.enemy, pal):null"  @click="event => select_color_from_image(event)"/>            
         </div>
         </div>
     </div>
+     <div class="palette"><button class="right-button" @click="add">Add</button></div>
+    
+
 </template>
 
 <style scoped>
@@ -203,10 +297,43 @@ function reset(event: Event, index: number) {
     cursor: pointer;
 }
 .grid > div.selected {
-    border: 2px solid;
+    border: 2px solid blue;
     margin: 0px;
+    position: relative;
 }
+.grid > div.selected::before {
+    display: block;
+    position: absolute;
+    content: "";
+    border: 2px solid yellow;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
 .panel {
     display: flex;
+}
+
+.pal_actions {
+    text-align: center;
+}
+.palette {
+    position: relative;
+    text-align: left;
+    border: 1px solid;
+    padding: 0.5em;
+    margin: 1em;
+    background-color: rgb(209, 197, 181);
+}
+.right-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 5em;;
+}
+.cross {
+    cursor: crosshair;
 }
 </style>

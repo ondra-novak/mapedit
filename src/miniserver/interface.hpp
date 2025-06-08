@@ -3,6 +3,8 @@
 #include "config.hpp"
 #include "ddlman.hpp"
 #include "server.hpp"
+#include <shared_mutex>
+
 
 namespace server {
 
@@ -19,6 +21,7 @@ public:
 protected:
     DDLManager _game;
     DDLManager _user;
+    std::shared_mutex _mx;
     std::filesystem::path _maps;
     std::filesystem::path _app_dir;
     std::filesystem::path _assets_dir;
