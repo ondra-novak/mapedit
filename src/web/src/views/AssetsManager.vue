@@ -9,6 +9,8 @@ import { server, type FileItem } from '@/core/api';
 import AssetsDDLManage from '@/components/AssetsDDLManage.vue';
 import AssetsToolCol from '@/components/AssetsToolCol.vue';
 import AssetToolIcons from '@/components/AssetToolIcons.vue';
+import AssetToolSeq from '@/components/AssetToolSeq.vue';
+import AssetsFloorAndCeil from '@/components/AssetsFloorAndCeil.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -35,7 +37,9 @@ watch([cur_file_model], ()=>{
     selected_group.value = cur_file_model.value.group;
     switch (cur_file_model.value.group) {
         case AssetGroup.WALLS: selected_tool.value = "walls";break;
-        case AssetGroup.ENEMIES: if (cur_file_model.value.name.endsWith(".COL") || selected_tool.value == "coledit" )
+        case AssetGroup.ENEMIES:if (cur_file_model.value.name.endsWith(".SEQ") )
+                                    selected_tool.value = "seqedit";
+                                else if (cur_file_model.value.name.endsWith(".COL") || selected_tool.value == "coledit" )
                                     selected_tool.value = "coledit";
                                 else 
                                     selected_tool.value = "enemies";
@@ -62,6 +66,7 @@ const assetList = ref<InstanceType<typeof AssetsList> | null>(null)
 async function onUploadDone(filename:string, done?:Promise<void>) {
     if (done) await done;
     assetList.value?.reload();
+    if (cur_file_model.value) cur_file_model.value.name = filename;
 }
 
 function delete_file() {
@@ -89,10 +94,12 @@ function delete_file() {
         <select v-model="selected_tool">
             <option value="">--- choose tool ---</option>
             <option value="walls">Walls and arcs</option>
+            <option value="floorceil">Floors and ceils</option>
             <option value="items">Items</option>
             <option value="icons">Icons (items)</option>
             <option value="enemies">Enemies</option>
             <option value="coledit">Enemy colors</option>
+            <option value="seqedit">Enemy animation sets</option>
             <option value="uigfx">UI and other</option>
             <option value="dialogshi">Dialog portraits</option>
             <option value="ddlinfo">Manage DDL</option>
@@ -106,7 +113,8 @@ function delete_file() {
             <AssetsToolCol v-if="selected_tool == 'coledit'" 
                 v-model="selected_file" @upload="onUploadDone" />
             <AssetToolIcons v-if="selected_tool == 'icons'" @upload="onUploadDone"/>
-
+            <AssetToolSeq v-if="selected_tool == 'seqedit'" v-model="selected_file" @upload="onUploadDone"/>
+            <AssetsFloorAndCeil v-if="selected_tool == 'floorceil'"  @upload="onUploadDone"/>
             <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />                
 
         </div>

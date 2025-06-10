@@ -1,6 +1,352 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed, defineEmits } from 'vue';
+import { server, type FileItem } from '@/core/api';
+import { AssetGroup } from '@/core/asset_groups';
+import { AnimationTypeIndex, AnimationTypeLetter, AnimationTypeMirror, SeqFile, type AnimationTypeIndexType } from '@/core/seqfile';
+import { ref, watch, onMounted, computed, defineEmits, shallowRef, onUnmounted } from 'vue';
+import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
+import CanvasView from './CanvasView.vue';
+import { PCXProfile, PCX } from '@/core/pcx';
 
-const 
+const emit = defineEmits<{
+  (e: 'upload', name: string, done?: Promise<void>): void
+}>();
+
+interface OptionItem {
+    phase: number;
+    face: number;
+    name: string;
+};
+
+const filename = defineModel<string | null>();
+const selfile = ref<string>();
+const animations = ref<SeqFile>();
+const cur_phase = ref<AnimationTypeIndexType>(AnimationTypeIndex.WALK_FRONT);
+const cur_frame = ref<number>(0);
+const option_list = ref<OptionItem[]>();
+const cur_face = ref<number>(0);
+const cur_image = shallowRef<PCX>();
+const cur_offset = ref<number>(0);
+let changed = false;
+let play_anim = false;
+
+
+async function onUpdateModel() {
+    done();
+    changed = false;
+    if (filename.value) {
+        const f = filename.value;
+        if (f.endsWith(".SEQ")) {
+            selfile.value = f;
+        } else {
+            selfile.value = f.substring(0,6)+".SEQ";
+        }
+    } else {
+        selfile.value = "";
+    }
+    const state = await server.getDDLFiles(AssetGroup.ENEMIES, null);    
+    const stem = selfile.value?selfile.value.split('.')[0]:"UNKNOWN"
+    const ffiles = state.files.filter((x:FileItem)=>{
+        return x.name.endsWith(".PCX") && x.name.startsWith(stem);
+    });
+    option_list.value = ffiles.reduce((a,f:FileItem)=>{
+        const phase = AnimationTypeLetter.indexOf(f.name[stem.length]);
+        const face = parseInt(f.name[stem.length+1],32);
+        a.push({phase:phase, face:face, name:f.name});
+        if (phase == AnimationTypeIndex.WALK_LEFT) {
+            a.push({phase:AnimationTypeIndex.WALK_RIGHT, face: face, name: f.name})
+        }
+        return a;
+    },[] as OptionItem[]);
+    try {
+        const anim = await server.getDDLFile(selfile.value || "");
+        animations.value = SeqFile.fromArrayBuffer(anim);
+    } catch (e) {
+        console.warn(e);
+        animations.value = new SeqFile([[0],[0],[0],[0],[0],[0]]);
+    }
+
+    onChangePhase();
+}   
+
+function onChangePhase() {
+    if (option_list.value && animations.value) {
+        cur_frame.value = 0;    
+        onChangeFrame();
+        play_anim = false;
+    }
+}
+
+async function onChangeFrame() {
+    if (option_list.value && animations.value && cur_frame.value !== undefined) {
+        const sq = animations.value;
+        const fr = cur_frame.value;
+        const opt = option_list.value.find((f)=>f.phase == cur_phase.value && f.face == sq.animation[f.phase][fr]);
+        let w = 0;
+        if (opt) {
+            cur_face.value = opt.face;
+
+            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(opt.name)).buffer);
+            w = cur_image.value.width ;
+        } else {
+            cur_face.value = -1;            
+        }
+        const ofs = sq.xoffsets && sq.xoffsets[cur_phase.value] && sq.xoffsets[cur_phase.value][fr];
+        if (ofs === undefined || ofs === null)  {
+            cur_offset.value = w/2;            
+        } else {
+            cur_offset.value = ofs;
+        }        
+    }
+
+}
+
+function go_prev() {
+    if (cur_frame.value) --cur_frame.value;
+    play_anim = false;
+}
+
+function go_next() {
+    if (animations.value &&cur_phase.value !== undefined && cur_frame.value !== undefined ) {
+            if(cur_frame.value < animations.value.animation[cur_phase.value].length-1) ++cur_frame.value;
+            else cur_frame.value = 1;
+    } 
+}
+
+function insert_frame() {
+    if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined) {
+        animations.value.animation[cur_phase.value].splice(cur_frame.value,0,animations.value.animation[cur_phase.value][cur_frame.value]);
+        while (animations.value.animation[cur_phase.value].length > 16) animations.value.animation[cur_phase.value].pop();
+    }
+    play_anim = false;
+}
+
+function delete_frame() {
+    if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined && animations.value.animation[cur_phase.value].length>1) {
+           animations.value.animation[cur_phase.value].splice(cur_frame.value,1);
+    }
+    play_anim = false;
+}
+
+let dragging = false;
+let dragStartX = 0;
+let offsetStart = 0;
+
+function onDragStart(e: MouseEvent | TouchEvent) {
+    dragging = true;
+    if (e instanceof MouseEvent) {
+        dragStartX = e.clientX;
+    } else {
+        dragStartX = e.touches[0].clientX;
+    }
+    offsetStart = cur_offset.value;
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('touchmove', onDragMove, { passive: false });
+    window.addEventListener('touchend', onDragEnd);
+    play_anim = false;
+}
+
+function setOffset(value: number) {
+    let pmin = -320;
+    let pmax = 320;
+    if (cur_image.value) {
+        const w = cur_image.value.width/2;
+        pmin += w;
+        pmax += w;
+    }
+    cur_offset.value = Math.min(pmax,Math.max(pmin, value));
+}
+
+function onDragMove(e: MouseEvent | TouchEvent) {
+    if (!dragging) return;
+    let clientX = 0;
+    if (e instanceof MouseEvent) {
+        clientX = e.clientX;
+    } else {
+        clientX = e.touches[0].clientX;
+        e.preventDefault();
+    }
+    setOffset(offsetStart + (dragStartX - clientX));
+}
+
+function onDragEnd() {
+    dragging = false;
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', onDragEnd);
+    window.removeEventListener('touchmove', onDragMove);
+    window.removeEventListener('touchend', onDragEnd);
+    onChangeOffset();
+}
+
+function onChangeOffset() {
+    if (animations.value && cur_phase.value  !== undefined  && cur_frame.value  !== undefined ) {
+        if (!animations.value.xoffsets) animations.value.xoffsets = [];
+        if (!animations.value.xoffsets[cur_phase.value]) animations.value.xoffsets[cur_phase.value] = [];
+        animations.value.xoffsets[cur_phase.value][cur_frame.value] = cur_offset.value;
+        changed = true;
+    }    
+}
+
+function onChangeFace () {
+    if (cur_face.value  !== undefined  && animations.value && cur_phase.value !== undefined  && cur_frame.value  !== undefined )  {
+        animations.value.animation[cur_phase.value][cur_frame.value] = cur_face.value;
+        changed = true;
+        onChangeFrame();
+    }
+    play_anim = false;
+}
+
+function play_cycle() {
+    setTimeout(()=>{
+        if (play_anim) {
+            go_next();  
+            play_cycle();
+        }
+    },125)
+
+}
+
+function on_play_anim() {
+    play_anim = !play_anim;
+    if (play_anim) play_cycle();
+}
+
+function done() {
+    play_anim = false
+    if (animations.value && selfile.value && changed) {
+        let p = server.putDDLFile(selfile.value, animations.value.toArrayBuffer(), AssetGroup.ENEMIES)
+        emit("upload", selfile.value, p);
+    }
+}
+
+function changeOffsetDelta(delta:number) {
+    setOffset((cur_offset.value || 0) + delta);
+    onChangeOffset();
+}
+
+
+function onKeyPress(event: Event) {
+    console.log(event);
+}
+
+watch([filename], onUpdateModel);
+watch([cur_phase], onChangePhase);
+watch([cur_frame], onChangeFrame);
+onMounted(onUpdateModel);
+onUnmounted(done);
+
 
 </script>
+<template>
+    <div class="workspace">
+        <div class="left-panel">
+            <select v-model="cur_phase" size="6">
+                <option value="0">Stand/Walk front</option>
+                <option value="1">Stand/Walk left</option>
+                <option value="3">Stand/Walk right</option>
+                <option value="2">Stand/Walk back</option>
+                <option value="4">Attack</option>
+                <option value="5">Damaged (hit)</option>
+            </select>
+            <select v-model="cur_face" size="16" @change="onChangeFace">
+                <option v-for="v of option_list?.filter(x=>x.phase == cur_phase)" :value="v.face">
+                    {{ v.name }} 
+                </option>
+            </select>
+        </div>
+        <div class="top-panel">
+            <button @click="on_play_anim">|&gt;</button>
+            <button @click="go_prev">&lt;&lt;</button>            
+            <div> {{  cur_frame?cur_frame:"standing" }} / {{ animations?animations.animation[cur_phase].length-1:-1 }}</div>
+            <button @click="go_next">&gt;&gt;</button>            
+            <button @click="insert_frame">+</button>
+            <button @click="delete_frame">-</button>
+        </div>
+        <div class="preview checkerboard" :class="{mirror: AnimationTypeMirror[cur_phase]}" @mousedown="event=>onDragStart(event as MouseEvent)"
+            @keypress="event=>onKeyPress" tabindex="1">
+            <div class="offset" :style="{left: `${320-cur_offset}px`}" >
+                <CanvasView :canvas="cur_image?cur_image.createCanvas(PCXProfile.enemy):null" />
+            </div>
+        </div>
+        <div class="bottom-panel" ><button @click="changeOffsetDelta(1)">&lt;</button><button @click="changeOffsetDelta(-1)">&gt;</button></div>
+    </div>
+
+</template>
+<style scoped>
+.workspace {
+    position: relative;
+    padding-left: 10em;
+    padding-top: 2em;
+    min-height: 25em;
+    width: 40em;
+    margin: auto;    
+}
+
+.preview {
+    border: 1px solid;
+    width: 640px;
+    position: relative;
+    text-align: left;
+    overflow: hidden;
+}
+.preview::after {
+    display:block;
+    content: "";
+    position: absolute;
+    left:  320px;
+    right: 320px;
+    top: 0;
+    bottom: 0;
+    border-right: 1px dashed black;
+    border-left: 1px dashed white;
+    
+}
+.preview.mirror > div > div{
+    transform: scaleX(-1);
+}
+
+.preview > div {
+    white-space: nowrap;
+}
+
+.preview > div > div {
+    display:inline-block
+    
+}
+.preview  .offset {
+    width: fit-content;
+    position: relative;
+}
+
+.left-panel {
+    position: absolute;
+    left: 0;
+    top: 2em;
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+}
+.top-panel {
+    position: absolute;
+    top: 0;
+    left: 10em;
+    right: 0;    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1em;
+}
+.left-panel > select {
+    width: 10em;
+     overflow-y: auto;
+}
+.top-panel > div {
+    width: 7em;
+}
+
+.top-panel > button {
+    width: 4em;
+    height: 2em;
+}
+
+</style>

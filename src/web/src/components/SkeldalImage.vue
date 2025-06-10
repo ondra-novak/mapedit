@@ -19,6 +19,7 @@ export interface ImageModel {
     group: AssetGroupType;
 }
 
+
 const model =  defineModel<ImageModel>();
 // Další props — palette
 const props = defineProps<{
@@ -37,6 +38,11 @@ function set_canvas(c: HTMLCanvasElement|null) : void {
         }
     }
 }
+
+defineExpose({
+    width,
+    height
+});
 
 async function update() {
     if (model.value) {

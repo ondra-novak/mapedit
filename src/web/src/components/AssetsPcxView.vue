@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup, type AssetGroupType } from '@/core/asset_groups';
-import { make_dosname } from '@/core/dosname';
+import { dosname_sanitize, make_dosname } from '@/core/dosname';
 import { extractImageData, findQuantizationAndGeneratePalette } from '@/core/image_manip';
 import { PCX} from '@/core/pcx';
 import  SkeldalImage from "@/components/SkeldalImage.vue"
@@ -17,6 +17,7 @@ const new_filename = ref<string>("");
 
 const image = ref<ImageModel>();
 
+const enemy_name = ref<string>();
 const enemy_side = ref<string>();
 const enemy_seq = ref<number>();
 
@@ -50,28 +51,38 @@ function  onUpdate() {
             const side = filename.value[6];
             const seq = filename.value[7];
             if (seq>='0' && seq <= '9') enemy_seq.value = seq.charCodeAt(0)-48;
-            else if (seq>='A' && seq <='F') enemy_seq.value = seq.charCodeAt(0)-55;
+            else if (seq>='A' && seq <='Z') enemy_seq.value = seq.charCodeAt(0)-55;
             enemy_side.value = side;
+            enemy_name.value = filename.value.substring(0,6);
         }
     }
 }
 
 function onUpdateSideSeq() {
-    if (group.value == AssetGroup.ENEMIES && enemy_seq.value) {
-        let f= new_filename.value || "";
-        let p = f.split('.');
-        let n = p[0];
+    if (group.value == AssetGroup.ENEMIES && enemy_seq.value!==undefined && enemy_name.value!==undefined) {
+        let n = enemy_name.value;
         while (n.length<6) n = n + "_";
         n = n.substring(0,6);
         n = n + enemy_side.value;
-        n = n + String.fromCharCode(enemy_seq.value+(enemy_seq.value> 9?55:48));
-        p[0] = n;
-        new_filename.value = p.join('.');        
+        n = n + String.fromCharCode(enemy_seq.value+(enemy_seq.value> 9?55:48));        
+        new_filename.value = `${n}.PCX`;
     }
+}
+
+function onFixNewFilename() {
+    if (new_filename.value) {
+        if (group.value == AssetGroup.ENEMIES && enemy_seq.value && enemy_name.value && enemy_side.value) {
+            onUpdateSideSeq();
+        } else {
+            new_filename.value = dosname_sanitize(new_filename.value);
+        }
+    }
+
 }
 
 watch([filename,group],onUpdate);
 watch([enemy_seq, enemy_side], onUpdateSideSeq);
+watch([new_filename], onFixNewFilename);
     
 onMounted(()=>{
     onUpdate();
@@ -113,6 +124,7 @@ async function start_upload() {
 <x-form>
         <label><span>Target image name (PCX)</span><input type="text" v-model="new_filename" maxlength="12"></label>    
         <template v-if="group==AssetGroup.ENEMIES">
+        <label><span>Enemy name:</span><input type="text" v-model="enemy_name" maxlength="6"></label>    
         <label><span>Phase / Sequence</span><div><select v-model="enemy_side">
             <option value="F">Front</option>
             <option value="L">Left/Right(mirror)</option>

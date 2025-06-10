@@ -1,11 +1,13 @@
+export function dosname_sanitize(name: string) {
+    return name.split('').map(c => {
+        const code = c.charCodeAt(0);
+        return (code >= 32 && code <= 127) ? c : '~';
+    }).join('').toUpperCase();
+}
+
 export function make_dosname(name: string, ext?: string): string {
-    const sanitize = (s: string) =>
-        s.split('').map(c => {
-            const code = c.charCodeAt(0);
-            return (code >= 32 && code <= 127) ? c : '~';
-        }).join('');
-    const base = sanitize(name.split('.')[0]);
-    const extPart = ext ? sanitize(ext) : "";
+    const base = dosname_sanitize(name.split('.')[0]);
+    const extPart = ext ? dosname_sanitize(ext) : "";
     let fin_name = "";
     if (extPart.length + base.length > 12) {
         const l = 12 - extPart.length;
