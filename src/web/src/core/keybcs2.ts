@@ -93,7 +93,7 @@ const charcode_to_keybcs2=(()=>{
     return r;
 })();
 
-export function string_from_keybcs2(source) {
+export function string_from_keybcs2(source:number[]) {
     const str = [];
     for (const v of source) {
         str.push(keybcs2_to_windows1250[v]);
@@ -101,7 +101,7 @@ export function string_from_keybcs2(source) {
     return (new TextDecoder("windows-1250")).decode(new Uint8Array(str));
 }
 
-export function keybcs2_from_string(source) {
+export function keybcs2_from_string(source:string) {
 
     const res = [];
     for (const v of source) {

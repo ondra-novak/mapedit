@@ -1,6 +1,6 @@
-import { string_from_keybcs2, keybcs2_from_string } from "./keybcs2.js";
+import { string_from_keybcs2, keybcs2_from_string } from "./keybcs2.ts";
 
-export async function loadBinaryContent(url) {
+export async function loadBinaryContent(url:string) {
     try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -14,27 +14,42 @@ export async function loadBinaryContent(url) {
     }
 }
 
+export type SchemaArray = [Schema|string, number, ...number[]];
+
+export interface Schema {
+    [key: string]: string | SchemaArray | Schema;
+}
+
+
+
 export class BinaryIterator {
-    constructor(binaryContent) {
+
+    binaryContent: ArrayBuffer;
+    position: number;
+    dataView:DataView;
+
+
+    constructor(binaryContent:ArrayBuffer) {
         this.binaryContent = binaryContent;
         this.position = 0;
-        this.dataView = new DataView(binaryContent.buffer);
+        this.dataView = new DataView(binaryContent);
     }
 
 
-    parse_array(type, dimensions) {
+    parse_array(type:string, dimensions:number[]) : any[]{
         if (dimensions.length == 0) {
             return this.parse_type(type);
         }
         const r = [];
-        const cnt = dimensions.shift();
-        for (let i = 0; i < cnt; ++i)         {
-            r.push(this.parse_array(type, dimensions));
+        const cnt = dimensions[0];
+        dimensions = dimensions.slice(1);
+        for (let i = 0; i < cnt; ++i) {
+            r.push(this.parse_array(type, dimensions));            
         }
         return r;
     }
 
-    parse_type(type) {
+    parse_type(type:string|Schema) : any{
         let result;
         if (typeof type === 'object') {
             if (!Array.isArray(type)) {
@@ -45,22 +60,25 @@ export class BinaryIterator {
                 result = this.parse_array(item_type, dimensions)
             }
         } else if (type.startsWith('char[')) {
-            const length = parseInt(type.match(/\d+/)[0], 10);
-            const chars = [];
-            for (let i = 0; i < length; i++) {
-                const charCode = this.dataView.getUint8(this.position++);
-                if (charCode === 0) {
-                    ++i
-                    while (i < length)   {
-                        const c = this.dataView.getUint8(this.position++);
-                        ++i;
+            const m = type.match(/\d+/);
+            if (m) {
+                const length = parseInt(m[0], 10);
+                const chars = [];
+                for (let i = 0; i < length; i++) {
+                    const charCode = this.dataView.getUint8(this.position++);
+                    if (charCode === 0) {
+                        ++i
+                        while (i < length)   {
+                            const c = this.dataView.getUint8(this.position++);
+                            ++i;
+                        }
+                        break;
+                        // Null-terminated
                     }
-                    break;
-                    // Null-terminated
+                    chars.push(charCode);
                 }
-                chars.push(charCode);
+                result = string_from_keybcs2(chars);                
             }
-            result = string_from_keybcs2(chars);                
         } else {
             switch (type) {
                 case 'int8':
@@ -103,11 +121,11 @@ export class BinaryIterator {
 
     }
 
-    parse(schema) {
-        const result = {};
+    parse(schema: Schema) {
+        const result: Record<string, any> = {};
         for (const [n, type] of Object.entries(schema)) {
             try {
-                result[n] = this.parse_type(type);
+                result[n] = this.parse_type(type as string | Schema);
             } catch (e) {
                 if (e instanceof RangeError) {
                     break;
@@ -119,15 +137,15 @@ export class BinaryIterator {
         return result;
     }
 
-    readBytes(length) {
-        const endPosition = Math.min(this.position + length, this.binaryContent.length);
+    readBytes(length:number) {
+        const endPosition = Math.min(this.position + length, this.binaryContent.byteLength);
         const bytes = this.binaryContent.slice(this.position, endPosition);
         this.position = endPosition;
         return bytes;
     }
 
     eof() {
-        return this.position >= this.binaryContent.length;
+        return this.position >= this.binaryContent.byteLength;
     }
 
     parse_stringz() {
@@ -143,42 +161,47 @@ export class BinaryIterator {
 }
 
 export class BinaryWriter {
+
+    buffer: number[];
+
     constructor() {
         this.buffer = [];
     }
 
-    write_array(type, dimensions, item) {
+    write_array(type:string | Schema, dimensions:number[], item:any) {
         if (dimensions.length == 0) {
             this.write_type(type,item);
         } else {
-            const cnt = dimensions.shift();
+            const dim = dimensions.slice();
+            const cnt = dim.shift() || 0;            
             if (Array.isArray(item)) {
                 for (let i = 0; i < cnt; ++i)         {
                     if (item.length < i) {
-                        this.write_array(type, dimensions, item[i]);
+                        this.write_array(type, dim, item[i]);
                     } else {
-                        this.write_array(type, dimensions, 0);
+                        this.write_array(type, dim, 0);
                     }
                 }
             } else {
                 for (let i = 0; i < cnt; ++i)         {
-                    this.write_array(type, dimensions, 0);
+                    this.write_array(type, dim, 0);
                 }
             }
         }
     }
 
-    write_type(type, value)  {
+    write_type(type:Schema| string| SchemaArray, value:any)  {
         if (typeof type === 'object') {
             if (!Array.isArray(type)) {
                 this.write(type, value);
             } else {
                 let item_type = type[0];
-                let dimensions = type.slice(1);
+                let dimensions = type.slice(1) as number[];
                 this.write_array(item_type, dimensions, value);
             }
         } else if (type.startsWith('char[')) {
-            const length = parseInt(type.match(/\d+/)[0], 10);
+            const m = type.match(/\d+/) || ["0"];
+            const length = parseInt(m[0], 10);
             const encodedChars = keybcs2_from_string(value);
             for (let i = 0; i < length; i++) {
                 const charCode = i < encodedChars.length ? encodedChars[i] : 0;
@@ -232,20 +255,20 @@ export class BinaryWriter {
         }
     }
 
-    write(schema, obj) {
+    write(schema: Schema, obj:any) {
         for (const [key, type] of Object.entries(schema)) {
             const value = obj[key];
-            this.write_type(type, value);
+            this.write_type(type as Schema| string |SchemaArray, value);
         }
     }
 
-    write_stringz(text) {
-        const encoder = new TextEncoder('windows-1252'); // Replace 'windows-1252' with the desired encoding
+    write_stringz(text : string) : void{
+        const encoder = new TextEncoder();
         const encodedText = encoder.encode(text);
         this.buffer.push(...encodedText, 0); // Append the encoded text followed by a null terminator
     }
 
-    getBuffer() {
-        return new Uint8Array(this.buffer);
+    getBuffer() : ArrayBuffer{
+        return new Uint8Array(this.buffer).buffer;
     }
 }
