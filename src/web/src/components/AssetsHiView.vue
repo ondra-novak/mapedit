@@ -93,7 +93,7 @@ async function start_upload() {
 
 <div>
 <x-form>
-        <label><span>Target image name (HI)</span><input type="text" v-model="new_filename" maxlength="12"></label>
+        <label><span>Target image name (HI)</span><input type="text" v-model="new_filename" class="centered" maxlength="12"></label>
         <label><span>Local image </span><input type="file" @change="onSelectFile" accept="image/*"></label>
         <label><span></span><button @click="start_upload">Upload</button></label>
 </x-form>

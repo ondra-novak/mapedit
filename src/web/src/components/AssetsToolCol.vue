@@ -169,7 +169,7 @@ function updateColors(event: Event, index: number) {
 }
 
 watch([palete_col_name], (newValue, oldValue) => onUpdatePalete(newValue,oldValue));
-watch([filename], onUpdate)
+watch([filename], onUpdate);
 
 onMounted(()=>{
     onUpdate();

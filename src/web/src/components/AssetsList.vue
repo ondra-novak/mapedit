@@ -5,6 +5,7 @@ import {server  } from '@/core/api.ts';
 import type{ FileItem } from '@/core/api.ts';
 
 const selectedFile = defineModel<FileItem>();
+const select_model = ref<string>();
 // Groups
 const asset_groups = AssetGroupLabel;
 
@@ -19,7 +20,7 @@ const filterSource = ref('');   // "" = vše, "orig", "user"
 
 
 // Data
-const files = ref<FileItem[]>([]);
+const files = ref<Record<string,FileItem> >({});
 const loading = ref(false);
 const error = ref<string | null>(null);
 
@@ -41,7 +42,11 @@ async function fetchFilesFromBackend(type: number, source: string): Promise<File
 }
 
 async function loadFiles() {
-  files.value = await fetchFilesFromBackend(filterType.value, filterSource.value);
+  files.value = (await fetchFilesFromBackend(filterType.value, filterSource.value))
+    .reduce((a:Record<string, FileItem>, b)=>{
+      a[b.name] = b;
+      return a;
+    },{})
 }
 
 function selectFile(file: FileItem) {
@@ -66,6 +71,26 @@ const getRowClass = computed(()=> {
 watch([filterType, filterSource], () => {
   loadFiles();
 });
+
+function updateSelectedFile (){
+  if (selectedFile.value) {
+    select_model.value = selectedFile.value.name    
+  }
+}
+
+function updateSelectModel() {
+  if (select_model.value && files.value) {
+    selectedFile.value = {
+        name: select_model.value,
+        group: files.value[select_model.value].group,
+        ovr: files.value[select_model.value].ovr,
+    }
+  }
+}
+
+
+watch([selectedFile], updateSelectedFile);
+watch([select_model], updateSelectModel);
 </script>
 
 <template>
@@ -88,48 +113,49 @@ watch([filterType, filterSource], () => {
     <div v-if="loading">Načítám soubory...</div>
     <div v-if="error" style="color: red">{{ error }}</div>
 
-    <div class="content">
-      <div v-for="file in files" :key="file.name" @click="selectFile(file)" :class="getRowClass(file)">{{ file.name }}</div>
-    </div>
+    <select size="2" v-model="select_model" class="files">
+      <option v-for="(file, key) in files" :key="key" :class="{ovr: file.ovr}">{{ file.name }}</option>
+    </select>
   </div>
 </template>
 
 <style scoped>
 
-
 .flist {
-    background-color: white;;
-    overflow: auto;
-    height: 100%;
-    cursor: pointer;
+  width: 100%;
+  height: 100%;
+  position:relative;
+}
+
+.files {
+  position: absolute;
+  display:block;
+  left:0;top:2em;right: 0;bottom: 0;
+}
+
+.files option.ovr {
+  font-weight: bold;
+  padding-left:0.5em;
+}
+
+.files option.ovr::before {
+  content: "✏️";
+  display: inline-block;
+  width: 1.5em;
+}
+
+.files option {
+  padding-left: 2em;
+}
+
+.toolbar > select, .toolbar > button {
+  height: 2em;;
+}
+.toolbar >button {
+  flex-grow: 1;
 }
 .toolbar {
-    background-color: gainsboro;
-    position: sticky;
-    top: 0;
-    z-index: 1;
+  display:flex;  
 }
-
-.flist .content div {
-    padding: 0 1.5em;
-    position: relative;
-
-}
-.flist .selected {
-    background-color: blue;
-    color: white;
-}
-.flist .ovr::before {
-  content: "";
-  display:block;  ;
-  width: 0.6em;
-  height: 0.6em;
-  background-color: black;
-  position: absolute;
-  left: 0.25em;
-  top: 0.25em;
-  border-radius: 1em;
-}
-
 
 </style>

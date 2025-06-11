@@ -11,6 +11,7 @@ import AssetsToolCol from '@/components/AssetsToolCol.vue';
 import AssetToolIcons from '@/components/AssetToolIcons.vue';
 import AssetToolSeq from '@/components/AssetToolSeq.vue';
 import AssetsFloorAndCeil from '@/components/AssetsFloorAndCeil.vue';
+import AssetsToolUpload from '@/components/AssetsToolUpload.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -27,6 +28,37 @@ watch([selected_tool], ()=>{
     }
 });
 
+function select_tool() : string | null {
+    if (!cur_file_model.value) return null;
+    switch (cur_file_model.value.group) {
+        case AssetGroup.WALLS: return "walls";
+        case AssetGroup.ENEMIES:if (cur_file_model.value.name.endsWith(".SEQ") )
+                                    return "seqedit";
+                                else if (cur_file_model.value.name.endsWith(".COL") || selected_tool.value == "coledit" )
+                                    return "coledit";
+                                else 
+                                    return  "enemies";
+        case AssetGroup.ITEMS: if (cur_file_model.value.name.endsWith(".LIB")) 
+                                    return  "icons";
+                                else
+                                    return "items";
+        case AssetGroup.UI: return  "uigfx";break;
+        case AssetGroup.DIALOGS: if (cur_file_model.value.name.endsWith(".HI")) 
+                                        return "dialogshi";
+                                else if (cur_file_model.value.name.endsWith(".PCX"))
+                                        return  "uigfx";
+                                else    
+                                    return null;        
+        case AssetGroup.MAPS:
+                if (cur_file_model.value.name == "ENEMY.DAT" 
+                    || cur_file_model.value.name == "SOUND.DAT") {
+                        return "goto_editor:enemies";
+                }
+                return null;
+        default:  return null;
+    }    
+}
+
 watch([cur_file_model], ()=>{
     if (!cur_file_model.value) {
         disable_delete.value = true;
@@ -35,30 +67,10 @@ watch([cur_file_model], ()=>{
     disable_delete.value = !cur_file_model.value.ovr;
     selected_file.value = cur_file_model.value.name;
     selected_group.value = cur_file_model.value.group;
-    switch (cur_file_model.value.group) {
-        case AssetGroup.WALLS: selected_tool.value = "walls";break;
-        case AssetGroup.ENEMIES:if (cur_file_model.value.name.endsWith(".SEQ") )
-                                    selected_tool.value = "seqedit";
-                                else if (cur_file_model.value.name.endsWith(".COL") || selected_tool.value == "coledit" )
-                                    selected_tool.value = "coledit";
-                                else 
-                                    selected_tool.value = "enemies";
-                                break;
-        case AssetGroup.ITEMS: if (cur_file_model.value.name.endsWith(".LIB")) 
-                                    selected_tool.value = "icons";
-                                else
-                                    selected_tool.value = "items";
-                               break;
-        case AssetGroup.UI: selected_tool.value = "uigfx";break;
-        case AssetGroup.DIALOGS: if (cur_file_model.value.name.endsWith(".HI")) 
-                                        selected_tool.value = "dialogshi";
-                                else if (cur_file_model.value.name.endsWith(".PCX"))
-                                        selected_tool.value = "uigfx";
-                                else    
-                                    selected_tool.value = "";
-                                break;        
-        default: selected_tool.value = "";break;
-    }    
+    if (selected_tool.value != "upload") {
+        const tool = select_tool();
+        selected_tool.value = tool || "";
+    }
 })
 
 const assetList = ref<InstanceType<typeof AssetsList> | null>(null)
@@ -102,6 +114,7 @@ function delete_file() {
             <option value="seqedit">Enemy animation sets</option>
             <option value="uigfx">UI and other</option>
             <option value="dialogshi">Dialog portraits</option>
+            <option value="upload">Upload and download</option>
             <option value="ddlinfo">Manage DDL</option>
         </select>
         <div class="tools">
@@ -115,9 +128,11 @@ function delete_file() {
             <AssetToolIcons v-if="selected_tool == 'icons'" @upload="onUploadDone"/>
             <AssetToolSeq v-if="selected_tool == 'seqedit'" v-model="selected_file" @upload="onUploadDone"/>
             <AssetsFloorAndCeil v-if="selected_tool == 'floorceil'"  @upload="onUploadDone"/>
-            <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />                
-            <div v-if="cur_file_model?.name == 'ENEMY.DAT'">
-                <div class="hint-link"><RouterLink to="/enemies">Open enemy editor</RouterLink></div>
+            <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />
+            <AssetsToolUpload v-if="selected_tool == 'upload'" @upload="onUploadDone"
+                v-model:file="selected_file" v-model:group="selected_group" />
+            <div v-if="selected_tool.startsWith('goto_editor:')">
+                <div class="hint-link"><RouterLink :to="`/${selected_tool.split(':')[1]}`">Open editor</RouterLink></div>
             </div>
 
         </div>

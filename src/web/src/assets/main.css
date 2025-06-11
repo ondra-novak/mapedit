@@ -27,8 +27,13 @@ x-form > label > * {
   display:block;
 }
 
-x-form > label > input {
-   width: 40%   
+x-form > label > *:last-child {
+   width: 60%;
+   box-sizing: border-box;
+}
+
+input.centered {
+  text-align: center;
 }
 
 .checkerboard {

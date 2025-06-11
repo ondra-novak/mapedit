@@ -122,9 +122,9 @@ async function start_upload() {
 
 <div>
 <x-form>
-        <label><span>Target image name (PCX)</span><input type="text" v-model="new_filename" maxlength="12"></label>    
+        <label><span>Target image name (PCX)</span><input type="text" v-model="new_filename"  class="centered" maxlength="12"></label>    
         <template v-if="group==AssetGroup.ENEMIES">
-        <label><span>Enemy name:</span><input type="text" v-model="enemy_name" maxlength="6"></label>    
+        <label><span>Enemy name:</span><input type="text" v-model="enemy_name" maxlength="6" class="centered" ></label>    
         <label><span>Phase / Sequence</span><div><select v-model="enemy_side">
             <option value="F">Front</option>
             <option value="L">Left/Right(mirror)</option>
@@ -132,7 +132,7 @@ async function start_upload() {
             <option value="C">Attack</option>
             <option value="H">Damaged</option>
             </select>
-            <input type="number" v-model="enemy_seq" size="2" style="width: 3em;text-align: center;" min="0" max="35"></div></label>
+            <input type="number" v-model="enemy_seq" size="2" min="0" max="35" class="centered" ></div></label>
         </template>
         <label><span>Local image </span><input type="file" @change="onSelectFile" accept="image/*"></label>
         <label><span></span><button @click="start_upload">Upload</button></label>

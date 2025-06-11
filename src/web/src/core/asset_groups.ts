@@ -16,7 +16,8 @@ export const AssetGroupLabel =  Object.freeze(Object.fromEntries([
         [AssetGroup.UI, "UI and other"],
         [AssetGroup.ITEMS, "Items"],
         [AssetGroup.ENEMIES, "Enemies"],
-        [AssetGroup.DIALOGS, "Dialogs ,shops"]
+        [AssetGroup.DIALOGS, "Dialogs ,shops"],
+        [AssetGroup.UNKNOWN, "Unspecified group"]
 ]));
 
 

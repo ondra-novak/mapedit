@@ -59,6 +59,7 @@ async function import_files() {
             }
         }
     }
+    load_files();
 }
 
 
@@ -79,7 +80,10 @@ function assign_import_file(event: Event, what:number) {
 }
 
 function create_new_project() {
-    
+    enemies.value = [];
+    sounds.value = [];
+    missing_enemy_dat.value = false;
+    missing_sound_dat.value = false;    
 }
 
 onMounted(init);
@@ -91,13 +95,13 @@ onMounted(init);
         <option v-for="(e,idx) in enemies" :key="idx" :value="idx">{{ e.name }}</option>
     </select>
     <div class="files-not-found" v-if="missing_enemy_dat || missing_sound_dat">
-        <p>Some files missing. Do you want to import them from original game</p>
+        <p>Some files are missing. Do you want to import them from the original game</p>
         <x-form>
             <label v-if="missing_enemy_dat"><span>ENEMY.DAT</span><input type="file" @change="event =>assign_import_file(event, 0)" accept=".dat"></label>    
-            <label v-if="missing_sound_dat"><span>SOUND.DAT</span><input type="file" @change="event =>assign_import_file(event, 0)" accept=".dat"></label>
+            <label v-if="missing_sound_dat"><span>SOUND.DAT</span><input type="file" @change="event =>assign_import_file(event, 1)" accept=".dat"></label>
         </x-form>
-        <button @click="import_files">Import files</button>
-        <button @click="create_new_project">Create empty</button>
+        <div class="button-panel"><button @click="import_files">Import files</button></div>
+        <div class="button-panel"><button @click="create_new_project">Create empty</button></div>
     </div>
 </template>
 
@@ -108,20 +112,31 @@ onMounted(init);
     top: 2.25rem;
     bottom: 0px;
     display: block;
-    height: 100%;
 }
 
-.enemy-not-found {
+.files-not-found {
     position: absolute;
     left: 50%;
     top: 10vw;
-    height: 4em;
-    width: 20em;
+    height: 14em;
+    width: 25em;
     margin-left: -10em;
     border: 1px solid;
     background-color: white;
-    padding: 2em;
     text-align: center;
+}
+
+.files-not-found x-form {
+    padding: 0 2em;
+}
+.files-not-found x-form > label > input {
+    width: 65%;
+}
+
+.files-not-found .button-panel {
+    border-top: 1px solid;
+    padding: 0.5em;
+    
 }
 
 .enemy-not-found input {

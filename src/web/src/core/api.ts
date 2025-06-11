@@ -82,6 +82,10 @@ export class ApiClient {
        }
     }
 
+    getDownloadLink(id:string):string {
+        return `api/ddl/${encodeURIComponent(id)}`;
+    }
+
 }
 
 export const server = new ApiClient();
