@@ -88,8 +88,8 @@ const EnemySchema : Schema = {
 } as const;
 
 
-type Enemies = EnemyDef[];
-type EnemySounds = string[];
+export type Enemies = EnemyDef[];
+export type EnemySounds = string[];
 
 export function enemyFromArrayBuffer(buffer:ArrayBuffer ): Enemies {
     const iter = new BinaryIterator(buffer);
