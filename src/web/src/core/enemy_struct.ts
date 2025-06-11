@@ -1,4 +1,4 @@
-import { BinaryIterator, BinaryWriter, type Schema } from "./binary";
+import { BinaryIterator, BinaryWriter, joinUint8Arrays, splitArrayBuffer, type Schema } from "./binary";
 
 export interface EnemyDef {
   name: string; // jméno moba (char[30])
@@ -89,6 +89,7 @@ const EnemySchema : Schema = {
 
 
 type Enemies = EnemyDef[];
+type EnemySounds = string[];
 
 export function enemyFromArrayBuffer(buffer:ArrayBuffer ): Enemies {
     const iter = new BinaryIterator(buffer);
@@ -106,4 +107,20 @@ export function enemyToArrayBuffer(enms: Enemies) : ArrayBuffer {
         wrt.write(EnemySchema, x);
     });
     return wrt.getBuffer();
+}
+
+export function enemySoundsFromArrayBuffer(buffer: ArrayBuffer):  EnemySounds {
+    const view = buffer.slice(8);
+    const dec = new TextDecoder()
+    const strings = splitArrayBuffer(view, 0).map(x=>dec.decode(x));
+    return strings.slice(0,-1);
+}
+
+export function enemySoundsToArrayBuffer(sounds: EnemySounds):  ArrayBuffer {
+    const enc = new TextEncoder();
+    const strs  = sounds.map(x=>enc.encode(x || ".").buffer);
+    strs.unshift(new ArrayBuffer(7));
+    strs.push(new ArrayBuffer(0));
+    strs.push(new ArrayBuffer(0));
+    return joinUint8Arrays(strs,0);
 }

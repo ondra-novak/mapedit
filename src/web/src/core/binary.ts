@@ -272,3 +272,45 @@ export class BinaryWriter {
         return new Uint8Array(this.buffer).buffer;
     }
 }
+
+export function splitArrayBuffer(arr: ArrayBuffer , separator: number) : ArrayBuffer[]{
+    const arr8 = new Uint8Array(arr);
+  const result = [];
+  let start = 0;
+
+  for (let i = 0; i < arr8.length; i++) {
+    if (arr8[i] === separator) {
+      result.push(arr8.slice(start, i).buffer);
+      start = i + 1;
+    }
+  }
+  // přidáme poslední úsek (i když nekončí oddělovačem)
+  if (start <= arr8.length) {
+    result.push(arr8.slice(start).buffer);
+  }
+  return result;
+}
+
+export function joinUint8Arrays(arrays: ArrayBuffer[], separator : number) {
+  if (!Array.isArray(arrays) || arrays.length === 0) return new Uint8Array();
+
+  const sep =  new Uint8Array([separator]);
+
+  const totalLength = arrays.reduce((sum, a) => sum + a.byteLength, 0) +
+    sep.length * (arrays.length-1);
+
+  const result : Uint8Array = new Uint8Array(totalLength);
+  let offset = 0;
+
+  arrays.forEach((arr:ArrayBuffer, index:number) => {
+    result.set(new Uint8Array(arr), offset);
+    offset += arr.byteLength;
+
+    if (index < arrays.length - 1) {
+      result.set(sep, offset);
+      offset += sep.length;
+    }
+  });
+
+  return result;
+}
