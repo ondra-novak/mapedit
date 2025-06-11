@@ -22,7 +22,7 @@ import { RouterLink, RouterView } from 'vue-router'
 workspace {
   position: relative;
   height: 100vh;
-  padding-top: 2em;
+  padding-top: 2.25em;
   box-sizing: border-box;
   display: block;
 }

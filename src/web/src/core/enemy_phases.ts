@@ -1,4 +1,4 @@
-export const EnemyPhases = Object.freeze({
+    export const EnemyPhases = Object.freeze({
     0: "Front",
     1: "Left",
     2: "Back ",

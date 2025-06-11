@@ -116,6 +116,9 @@ function delete_file() {
             <AssetToolSeq v-if="selected_tool == 'seqedit'" v-model="selected_file" @upload="onUploadDone"/>
             <AssetsFloorAndCeil v-if="selected_tool == 'floorceil'"  @upload="onUploadDone"/>
             <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />                
+            <div v-if="cur_file_model?.name == 'ENEMY.DAT'">
+                <div class="hint-link"><RouterLink to="/enemies">Open enemy editor</RouterLink></div>
+            </div>
 
         </div>
     </div>
