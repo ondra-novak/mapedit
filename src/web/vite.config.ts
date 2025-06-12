@@ -11,7 +11,7 @@ export default defineConfig({
     vue({
       template: {
         compilerOptions: {
-          isCustomElement: (tag) => ['x-form'].includes(tag),
+          isCustomElement: (tag) => tag.startsWith("x-")
         }
       }
     }),

@@ -33,6 +33,7 @@ export interface EnemyDef {
   actions: number; // počet akcí (char)
   hit_pos: number; // pozice zásahu (char)
   sounds: number[]; // zvukové události (word[MOB_SOUNDS]) – délka bude třeba doplnit
+  sound_files?: string[]; //associated sound files
   paletts_count: number; // počet palet (signed char)
   mode: number; // režim (char)
   dialog: number; // dialog (short)

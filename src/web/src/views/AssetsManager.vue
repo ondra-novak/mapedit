@@ -54,6 +54,9 @@ function select_tool() : string | null {
                     || cur_file_model.value.name == "SOUND.DAT") {
                         return "goto_editor:enemies";
                 }
+                if (cur_file_model.value.name == "FACTS.JSON") {
+                    return "goto_editor:facts";
+                }
                 return null;
         default:  return null;
     }    

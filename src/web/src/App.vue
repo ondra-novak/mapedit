@@ -6,10 +6,13 @@ import { RouterLink, RouterView } from 'vue-router'
 <workspace>
 <header>
   <nav>
+    <RouterLink to="/assets">Assets manager</RouterLink>
     <RouterLink to="/maps">Maps</RouterLink>
     <RouterLink to="/items">Items</RouterLink>
     <RouterLink to="/enemies">Enemies</RouterLink>
-    <RouterLink to="/assets">Assets manager</RouterLink>
+    <RouterLink to="/characters">Characters</RouterLink>
+    <RouterLink to="/dialogs">Dialogs</RouterLink>
+    <RouterLink to="/facts">Facts</RouterLink>
   </nav>
 </header>
 <RouterView />

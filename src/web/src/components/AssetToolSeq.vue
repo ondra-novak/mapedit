@@ -11,21 +11,16 @@ const emit = defineEmits<{
   (e: 'upload', name: string, done?: Promise<void>): void
 }>();
 
-interface OptionItem {
-    phase: number;
-    face: number;
-    name: string;
-};
 
 const filename = defineModel<string | null>();
 const selfile = ref<string>();
 const animations = ref<SeqFile>();
 const cur_phase = ref<AnimationTypeIndexType>(AnimationTypeIndex.WALK_FRONT);
 const cur_frame = ref<number>(0);
-const option_list = ref<OptionItem[]>();
-const cur_face = ref<number>(0);
+const cur_face = ref<string>("");
 const cur_image = shallowRef<PCX>();
 const cur_offset = ref<number>(0);
+const list_files = ref<string[]>([]);
 let changed = false;
 let play_anim = false;
 
@@ -48,54 +43,59 @@ async function onUpdateModel() {
     const ffiles = state.files.filter((x:FileItem)=>{
         return x.name.endsWith(".PCX") && x.name.startsWith(stem);
     });
-    option_list.value = ffiles.reduce((a,f:FileItem)=>{
-        const phase = AnimationTypeLetter.indexOf(f.name[stem.length]);
-        const face = parseInt(f.name[stem.length+1],32);
-        a.push({phase:phase, face:face, name:f.name});
-        if (phase == AnimationTypeIndex.WALK_LEFT) {
-            a.push({phase:AnimationTypeIndex.WALK_RIGHT, face: face, name: f.name})
-        }
-        return a;
-    },[] as OptionItem[]);
+    list_files.value = ffiles.map(f=>f.name);
+
     try {
         const anim = await server.getDDLFile(selfile.value || "");
         animations.value = SeqFile.fromArrayBuffer(anim);
     } catch (e) {
         console.warn(e);
-        animations.value = new SeqFile([[0],[0],[0],[0],[0],[0]]);
+        animations.value = new SeqFile([]);
     }
+    
 
     onChangePhase();
 }   
 
 function onChangePhase() {
-    if (option_list.value && animations.value) {
+    if (animations.value) {
         cur_frame.value = 0;    
         onChangeFrame();
         play_anim = false;
     }
 }
 
+function face2filename(face:string) {
+    const stem = filename.value?.split(".SEQ")[0];            
+    const name = `${stem}${face}.PCX`;
+    return name;
+
+}
+
+function filename2face(f:string) {
+    const stem = filename.value?.split(".SEQ")[0] || "";        
+    return f.substring(stem.length, stem.length+2);
+}
+
 async function onChangeFrame() {
-    if (option_list.value && animations.value && cur_frame.value !== undefined) {
+    if (animations.value && cur_phase.value != undefined && cur_frame.value !== undefined) {
         const sq = animations.value;
         const fr = cur_frame.value;
-        const opt = option_list.value.find((f)=>f.phase == cur_phase.value && f.face == sq.animation[f.phase][fr]);
+        const ph = cur_phase.value;
+        const frinfo = sq.animation[ph][fr];
         let w = 0;
-        if (opt) {
-            cur_face.value = opt.face;
-
-            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(opt.name)).buffer);
+        if (frinfo) {
+            cur_face.value = frinfo.suffix;
+            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(face2filename(frinfo.suffix))).buffer);
             w = cur_image.value.width ;
+            if (frinfo.offset_x <= -1000) {
+                frinfo.offset_x = w/2;                
+            }
+            cur_offset.value = frinfo.offset_x;
         } else {
-            cur_face.value = -1;            
+            cur_face.value = "";            
+            cur_offset.value = 0;
         }
-        const ofs = sq.xoffsets && sq.xoffsets[cur_phase.value] && sq.xoffsets[cur_phase.value][fr];
-        if (ofs === undefined || ofs === null)  {
-            cur_offset.value = w/2;            
-        } else {
-            cur_offset.value = ofs;
-        }        
     }
 
 }
@@ -175,21 +175,17 @@ function onDragEnd() {
     window.removeEventListener('mouseup', onDragEnd);
     window.removeEventListener('touchmove', onDragMove);
     window.removeEventListener('touchend', onDragEnd);
-    onChangeOffset();
-}
-
-function onChangeOffset() {
-    if (animations.value && cur_phase.value  !== undefined  && cur_frame.value  !== undefined ) {
-        if (!animations.value.xoffsets) animations.value.xoffsets = [];
-        if (!animations.value.xoffsets[cur_phase.value]) animations.value.xoffsets[cur_phase.value] = [];
-        animations.value.xoffsets[cur_phase.value][cur_frame.value] = cur_offset.value;
-        changed = true;
-    }    
+    onChangeFace();
 }
 
 function onChangeFace () {
     if (cur_face.value  !== undefined  && animations.value && cur_phase.value !== undefined  && cur_frame.value  !== undefined )  {
-        animations.value.animation[cur_phase.value][cur_frame.value] = cur_face.value;
+        if (!animations.value.animation[cur_phase.value]) animations.value.animation[cur_phase.value] = [];
+        animations.value.animation[cur_phase.value][cur_frame.value] = {
+            suffix:cur_face.value,
+            offset_x:cur_offset.value,
+            offset_y:0
+        };
         changed = true;
         onChangeFrame();
     }
@@ -221,12 +217,20 @@ function done() {
 
 function changeOffsetDelta(delta:number) {
     setOffset((cur_offset.value || 0) + delta);
-    onChangeOffset();
+    onChangeFace();
 }
 
 
 function onKeyPress(event: Event) {
     console.log(event);
+}
+
+function sethit() {
+    if (animations.value) {
+        if (animations.value && animations.value.hit_pos == cur_frame.value) animations.value.hit_pos = null;
+        else animations.value.hit_pos = cur_frame.value;
+        changed=true;
+    }
 }
 
 watch([filename], onUpdateModel);
@@ -249,9 +253,7 @@ onUnmounted(done);
                 <option value="5">Damaged (hit)</option>
             </select>
             <select v-model="cur_face" size="16" @change="onChangeFace">
-                <option v-for="v of option_list?.filter(x=>x.phase == cur_phase)" :value="v.face">
-                    {{ v.name }} 
-                </option>
+                <option v-for="v of list_files" :value="filename2face(v)" :key="v">{{ v }} </option>
             </select>
         </div>
         <div class="top-panel">
@@ -267,6 +269,7 @@ onUnmounted(done);
             <div class="offset" :style="{left: `${320-cur_offset}px`}" >
                 <CanvasView :canvas="cur_image?cur_image.createCanvas(PCXProfile.enemy):null" />
             </div>
+            <div class="hitpos" v-if="cur_phase==4" :class="{active: animations?.hit_pos == cur_frame}" @click="sethit">Hit</div>
         </div>
         <div class="bottom-panel" ><button @click="changeOffsetDelta(1)">&lt;</button><button @click="changeOffsetDelta(-1)">&gt;</button></div>
     </div>
@@ -309,7 +312,7 @@ onUnmounted(done);
     white-space: nowrap;
 }
 
-.preview > div > div {
+.preview > div.offset > div {
     display:inline-block
     
 }
@@ -347,6 +350,24 @@ onUnmounted(done);
 .top-panel > button {
     width: 4em;
     height: 2em;
+}
+
+.preview > .hitpos {
+    position:absolute;
+    right:5px;
+    bottom: 5px;
+    font-size: 16px;
+    width: 2em;
+    height: 1em;
+    padding: 0.5em;
+    text-align: center;
+    background-color: #FFF8;
+    border-radius: 1em;
+    cursor: pointer;
+}
+.preview > .hitpos.active {
+    background-color: red;
+    color: yellow;
 }
 
 </style>

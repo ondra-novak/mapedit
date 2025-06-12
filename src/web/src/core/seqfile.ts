@@ -1,5 +1,9 @@
 
-export type FrameSequence = number;
+export type FrameSequence = {
+    suffix: string;
+    offset_x: number;
+    offset_y: number;
+}
 export type AnimationPhase = FrameSequence[];
 export type AnimationSet = AnimationPhase[];
 
@@ -19,15 +23,16 @@ export const AnimationTypeLetter : string[] = ['F','L','B','L','C','H'] as const
 export const AnimationTypeMirror = [false,false,false,true,false,false] as const;
 
 
+
 export class SeqFile {
 
 
     animation: AnimationSet = [];    
-    xoffsets: AnimationSet|null = null;
+    hit_pos: number|null = null;
     
-    constructor(a: AnimationSet, ofs?: AnimationSet) {
+    constructor(a: AnimationSet, hit_pos?: number) {
         this.animation = a;
-        this.xoffsets = ofs || null;
+        this.hit_pos = hit_pos || null;
     };
 
     static fromArrayBuffer(buffer: ArrayBuffer) : SeqFile {
@@ -35,58 +40,48 @@ export class SeqFile {
         const decoder = new TextDecoder('utf-8');
         const str = decoder.decode(buffer);
         const all_lines =  str.split("\r\n");
-        const seq_lines = all_lines.slice(0,6);
-        const a = seq_lines.map((ln:string)=>{return ln.split('').filter((n:string)=>n != 'Z').map((n:string)=>{
-            return parseInt(n, 32);
-        })}) as AnimationSet;
-        let ofs = null;
+        const set : AnimationSet = [];
+        let hit_pos = undefined;
+        if (all_lines[0] == "ver2") {
+            all_lines.shift();
+            all_lines.forEach(ln=>{
+                const [ph,fr,ofsx,ofsy,hit,name] = ln.split(",",6);
+                const phn = parseInt(ph);
+                const frn = parseInt(fr);
+                if (!set[phn]) set[phn] = [];
+                set[phn][frn] = {
+                    suffix:name,
+                    offset_x:parseInt(ofsx),
+                    offset_y:parseInt(ofsy),
+                }                
+                if (parseInt(hit)) {
+                    hit_pos = frn;
+                }
+            });
+        } else {
+            const seq_lines = all_lines.slice(0,6);        
+            const a = seq_lines.map((ln:string,ph:number)=>ln.split('').map((n:string,fr:number)=>(
+                {
+                    suffix: AnimationTypeLetter[ph]+n,
+                    offset_x: -1000,
+                    offset_y: 0
+                }))) as AnimationSet;
+            set.push(...a);
 
-        if (all_lines[AnimationTotalPhases] && all_lines[AnimationTotalPhases].length>0) {
-            try {
-                ofs = JSON.parse(all_lines[AnimationTotalPhases]);
-            } catch (e) {
-
-            }
         }
-        return new SeqFile(a, ofs);
+        return new SeqFile(set, hit_pos);
+
     };
 
     toArrayBuffer() : ArrayBuffer{
+        let out :string = "ver2\r\n";
 
-        const ln1 = this.animation.map((s:AnimationPhase)=>{
-            let r =  s.map((p:FrameSequence) => {
-                return p.toString(32).toUpperCase();
-            }).join('');
-            while (r.length < 16) r = r + 'Z';
-            return r + "\r\n";
-        }).join('');
-
-        const ln2 = (this.xoffsets?JSON.stringify(this.xoffsets):"")+"\r\n";
+        this.animation.forEach((ph: AnimationPhase, phidx: number) => (ph || []).forEach((fr: FrameSequence, fridx:number)=>{
+            if (fr) {
+                out = out + `${phidx},${fridx},${fr.offset_x},${fr.offset_y},${this.hit_pos == fridx && phidx == AnimationTypeIndex.COMBAT?1:0},${fr.suffix}\r\n`;
+            }
+        }));
         const tdec = new TextEncoder();
-        return tdec.encode(ln1+ln2).buffer;
+        return tdec.encode(out).buffer;
     }
-
-    init_xoffsets() {
-        if (!this.xoffsets) {
-            this.xoffsets = new Array(AnimationTotalPhases);
-        }
-    }
-
-    set_xoffset(type: AnimationTypeIndexType, frame: number, xofs: number) : void{
-        if (!this.xoffsets) this.xoffsets = [];
-        if (!this.xoffsets[type]) this.xoffsets[type] = [];
-        this.xoffsets[type][frame] = xofs;
-    }
-
-    get_xoffset(type: AnimationTypeIndexType, frame: number) : number{
-        if (!this.xoffsets) return 0;
-        if (!this.xoffsets[type]) return 0;
-        return this.xoffsets[type][frame] || 0;
-    }
-
-    are_xoffsets_defined() : boolean{
-        return !!this.xoffsets;
-    }
-
-
 };

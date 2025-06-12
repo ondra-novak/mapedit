@@ -19,18 +19,32 @@ x-form {
 
 x-form > label {
   display: flex;
-  position:relative;  
-  justify-content: space-between;
-  margin: 1em 0em;
+  position:relative;    
+  align-items: center;
+  align-content: center;
+  margin: 0.25em 0em;
 }
 x-form > label > * {
   display:block;
 }
 
-x-form > label > *:last-child {
+x-form > label > * {
    width: 60%;
    box-sizing: border-box;
 }
+
+x-form > label > input[type=checkbox] {
+  width: 2em;
+}
+x-form > label > div:last-child {
+  text-align: right;
+}
+
+x-form > label > span {
+  width: unset;
+  flex-grow: 1;
+}
+
 
 input.centered {
   text-align: center;
@@ -49,4 +63,29 @@ input.centered {
   background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
   border: 1px solid;
   font-size: 0;
+}
+
+x-section {
+  border: 4px groove #eee;
+  display: block;
+  position: relative;
+  padding: 0.5em;
+  margin: 0.5em;
+}
+
+x-section-title {
+  display:block;
+  position: absolute;
+  left: 1em;
+  top: -0.7em;  
+  padding: 0.1em 0.5em ;
+  background-color: #ccc;
+
+}
+x-workspace {
+    position: absolute;
+    left:0;right: 0;bottom: 0;top:2.2em;
+    overflow: auto;
+    display:block;
+    background-color: #ccc;
 }
