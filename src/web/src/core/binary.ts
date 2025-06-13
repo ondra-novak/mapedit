@@ -176,7 +176,7 @@ export class BinaryWriter {
             const cnt = dim.shift() || 0;            
             if (Array.isArray(item)) {
                 for (let i = 0; i < cnt; ++i)         {
-                    if (item.length < i) {
+                    if (item.length > i) {
                         this.write_array(type, dim, item[i]);
                     } else {
                         this.write_array(type, dim, 0);
@@ -314,3 +314,5 @@ export function joinUint8Arrays(arrays: ArrayBuffer[], separator : number) {
 
   return result;
 }
+
+

@@ -12,6 +12,7 @@ import AssetToolIcons from '@/components/AssetToolIcons.vue';
 import AssetToolSeq from '@/components/AssetToolSeq.vue';
 import AssetsFloorAndCeil from '@/components/AssetsFloorAndCeil.vue';
 import AssetsToolUpload from '@/components/AssetsToolUpload.vue';
+import HexView from '@/components/HexView.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -70,7 +71,7 @@ watch([cur_file_model], ()=>{
     disable_delete.value = !cur_file_model.value.ovr;
     selected_file.value = cur_file_model.value.name;
     selected_group.value = cur_file_model.value.group;
-    if (selected_tool.value != "upload") {
+    if (selected_tool.value != "upload" && selected_tool.value != "hexview") {
         const tool = select_tool();
         selected_tool.value = tool || "";
     }
@@ -118,6 +119,7 @@ function delete_file() {
             <option value="uigfx">UI and other</option>
             <option value="dialogshi">Dialog portraits</option>
             <option value="upload">Upload and download</option>
+            <option value="hexview">HexView</option>
             <option value="ddlinfo">Manage DDL</option>
         </select>
         <div class="tools">
@@ -134,6 +136,7 @@ function delete_file() {
             <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />
             <AssetsToolUpload v-if="selected_tool == 'upload'" @upload="onUploadDone"
                 v-model:file="selected_file" v-model:group="selected_group" />
+            <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
             <div v-if="selected_tool.startsWith('goto_editor:')">
                 <div class="hint-link"><RouterLink :to="`/${selected_tool.split(':')[1]}`">Open editor</RouterLink></div>
             </div>
@@ -157,6 +160,7 @@ function delete_file() {
     flex-direction: column;
     height: 100%;
     background-color: #CCC;
+    position: relative;
 }
 
 .middle-panel > select {

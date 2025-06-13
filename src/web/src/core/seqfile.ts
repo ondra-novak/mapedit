@@ -29,10 +29,12 @@ export class SeqFile {
 
     animation: AnimationSet = [];    
     hit_pos: number|null = null;
+    big: boolean = false;
     
-    constructor(a: AnimationSet, hit_pos?: number) {
+    constructor(a: AnimationSet, hit_pos?: number, big? : boolean) {
         this.animation = a;
         this.hit_pos = hit_pos || null;
+        this.big = !!big;
     };
 
     static fromArrayBuffer(buffer: ArrayBuffer) : SeqFile {
@@ -41,10 +43,15 @@ export class SeqFile {
         const str = decoder.decode(buffer);
         const all_lines =  str.split("\r\n");
         const set : AnimationSet = [];
+        let big : boolean = false;
         let hit_pos = undefined;
         if (all_lines[0] == "ver2") {
             all_lines.shift();
             all_lines.forEach(ln=>{
+                if (ln == "big") {
+                    big = true;
+                    return;
+                }
                 const [ph,fr,ofsx,ofsy,hit,name] = ln.split(",",6);
                 const phn = parseInt(ph);
                 const frn = parseInt(fr);
@@ -69,12 +76,13 @@ export class SeqFile {
             set.push(...a);
 
         }
-        return new SeqFile(set, hit_pos);
+        return new SeqFile(set, hit_pos, big);
 
     };
 
     toArrayBuffer() : ArrayBuffer{
         let out :string = "ver2\r\n";
+        if (this.big) out = out + "big\r\n";
 
         this.animation.forEach((ph: AnimationPhase, phidx: number) => (ph || []).forEach((fr: FrameSequence, fridx:number)=>{
             if (fr) {

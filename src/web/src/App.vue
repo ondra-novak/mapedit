@@ -6,6 +6,7 @@ import { RouterLink, RouterView } from 'vue-router'
 <workspace>
 <header>
   <nav>
+    <RouterLink to="/basic">Basic info</RouterLink>
     <RouterLink to="/assets">Assets manager</RouterLink>
     <RouterLink to="/maps">Maps</RouterLink>
     <RouterLink to="/items">Items</RouterLink>
@@ -13,6 +14,7 @@ import { RouterLink, RouterView } from 'vue-router'
     <RouterLink to="/characters">Characters</RouterLink>
     <RouterLink to="/dialogs">Dialogs</RouterLink>
     <RouterLink to="/facts">Facts</RouterLink>
+    <RouterLink to="/book">Book</RouterLink>    
   </nav>
 </header>
 <RouterView />
@@ -42,7 +44,12 @@ header nav {
 
 nav > a {
   border-right: 1px solid black;
-  padding: 0.5em 2em;
+  padding: 0.5em 0;
+  flex-grow: 1;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .router-link-active {

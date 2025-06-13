@@ -21,13 +21,14 @@ const cur_face = ref<string>("");
 const cur_image = shallowRef<PCX>();
 const cur_offset = ref<number>(0);
 const list_files = ref<string[]>([]);
-let changed = false;
+const big=ref<boolean>(false);
+const changed = ref<boolean>(false);
 let play_anim = false;
 
 
 async function onUpdateModel() {
     done();
-    changed = false;
+    changed.value = false;
     if (filename.value) {
         const f = filename.value;
         if (f.endsWith(".SEQ")) {
@@ -48,6 +49,7 @@ async function onUpdateModel() {
     try {
         const anim = await server.getDDLFile(selfile.value || "");
         animations.value = SeqFile.fromArrayBuffer(anim);
+        big.value = animations.value.big;
     } catch (e) {
         console.warn(e);
         animations.value = new SeqFile([]);
@@ -116,6 +118,7 @@ function insert_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined) {
         animations.value.animation[cur_phase.value].splice(cur_frame.value,0,animations.value.animation[cur_phase.value][cur_frame.value]);
         while (animations.value.animation[cur_phase.value].length > 16) animations.value.animation[cur_phase.value].pop();
+        changed.value = true;
     }
     play_anim = false;
 }
@@ -123,6 +126,7 @@ function insert_frame() {
 function delete_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined && animations.value.animation[cur_phase.value].length>1) {
            animations.value.animation[cur_phase.value].splice(cur_frame.value,1);
+           changed.value = true;
     }
     play_anim = false;
 }
@@ -186,7 +190,7 @@ function onChangeFace () {
             offset_x:cur_offset.value,
             offset_y:0
         };
-        changed = true;
+        changed.value = true;
         onChangeFrame();
     }
     play_anim = false;
@@ -209,7 +213,7 @@ function on_play_anim() {
 
 function done() {
     play_anim = false
-    if (animations.value && selfile.value && changed) {
+    if (animations.value && selfile.value && changed.value) {
         let p = server.putDDLFile(selfile.value, animations.value.toArrayBuffer(), AssetGroup.ENEMIES)
         emit("upload", selfile.value, p);
     }
@@ -229,8 +233,20 @@ function sethit() {
     if (animations.value) {
         if (animations.value && animations.value.hit_pos == cur_frame.value) animations.value.hit_pos = null;
         else animations.value.hit_pos = cur_frame.value;
-        changed=true;
+        changed.value=true;
     }
+}
+
+function changeBig() {
+    if (animations.value) {
+        animations.value.big =  big.value;
+        changed.value=true;
+    }
+}
+
+function drop_changes() {
+    changed.value = false;
+    onUpdateModel();
 }
 
 watch([filename], onUpdateModel);
@@ -263,15 +279,21 @@ onUnmounted(done);
             <button @click="go_next">&gt;&gt;</button>            
             <button @click="insert_frame">+</button>
             <button @click="delete_frame">-</button>
+            <button @click="drop_changes" :disabled="!changed">Reset</button>
         </div>
         <div class="preview checkerboard" :class="{mirror: AnimationTypeMirror[cur_phase]}" @mousedown="event=>onDragStart(event as MouseEvent)"
             @keypress="event=>onKeyPress" tabindex="1">
             <div class="offset" :style="{left: `${320-cur_offset}px`}" >
                 <CanvasView :canvas="cur_image?cur_image.createCanvas(PCXProfile.enemy):null" />
             </div>
+            <div class="ruler r1"></div>
+            <div class="ruler r2"></div>
+            <div class="ruler r3"></div>
             <div class="hitpos" v-if="cur_phase==4" :class="{active: animations?.hit_pos == cur_frame}" @click="sethit">Hit</div>
         </div>
-        <div class="bottom-panel" ><button @click="changeOffsetDelta(1)">&lt;</button><button @click="changeOffsetDelta(-1)">&gt;</button></div>
+        <div class="bottom-panel" ><button @click="changeOffsetDelta(1)">&lt;</button><button @click="changeOffsetDelta(-1)">&gt;</button>
+            <div class="left"><input type="checkbox" v-model="big" @change="changeBig">Big enemy (one on square)</div>
+        </div>
     </div>
 
 </template>
@@ -292,17 +314,25 @@ onUnmounted(done);
     text-align: left;
     overflow: hidden;
 }
-.preview::after {
+.preview .ruler {
     display:block;
     content: "";
     position: absolute;
-    left:  320px;
-    right: 320px;
     top: 0;
     bottom: 0;
+    width: 0;
     border-right: 1px dashed black;
     border-left: 1px dashed white;
     
+}
+.preview .ruler.r1 {
+    left:  320px;
+}
+.preview .ruler.r2 {
+    left:  195px;
+}
+.preview .ruler.r3 {
+    left:  445px;
 }
 .preview.mirror > div > div{
     transform: scaleX(-1);
@@ -368,6 +398,16 @@ onUnmounted(done);
 .preview > .hitpos.active {
     background-color: red;
     color: yellow;
+}
+
+.bottom-panel {
+    position:relative;
+    text-align: center;
+}
+.bottom-panel .left {
+    position: absolute;
+    left: 0;
+    top: 0;
 }
 
 </style>

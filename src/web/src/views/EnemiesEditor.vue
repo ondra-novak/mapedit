@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import AssetsToolCol from '@/components/AssetsToolCol.vue';
+import AssetToolSeq from '@/components/AssetToolSeq.vue';
+import CanvasView from '@/components/CanvasView.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { enemyFromArrayBuffer,enemySoundsFromArrayBuffer,type EnemyDef, type EnemySounds } from '@/core/enemy_struct';
+import { COLPaletteSet } from '@/core/col_palette_set';
+import { EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,EnemyStats,enemyToArrayBuffer,newEnemy,SpellEffects,type EnemyDef } from '@/core/enemy_struct';
+import { useBitmaskCheckbox, useBitmaskCheckbox2 } from '@/core/flags';
+import { PCXProfile, PCX } from '@/core/pcx';
 import { readFileToArrayBuffer } from '@/core/read_file';
-import { onMounted, ref } from 'vue';
+import { SeqFile } from '@/core/seqfile';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
 const missing_sound_dat = ref<boolean>(false);
 const missing_enemy_dat = ref<boolean>(false);
@@ -11,13 +18,22 @@ const missing_enemy_dat = ref<boolean>(false);
 const enemies = ref<EnemyDef[]>([]);
 const sounds = ref<EnemySounds>([]);
 
-const selected_enemy = ref<number>(0);
+const selected_enemy = ref<number>();
 
 const import_enemy_dat_file = ref<File>();
 const import_sound_dat_file = ref<File>();
 
 const list_graphics = ref<string[]>([]);
 const list_sounds = ref<string[]>([]);
+
+const new_enemy_type = ref<string>();
+
+const appearence = ref<PCX>();
+const appearence_margin = ref<string>("");
+const palettes = ref<COLPaletteSet>();
+const edit_seq = ref<string>();
+let dont_save_now = false;
+let need_save = false;
 
 type RefFile = typeof import_enemy_dat_file;
 
@@ -40,9 +56,7 @@ async function  load_files() {
         enemies.value.forEach(enm=>{
             enm.sound_files = [];
             for (let i = 0; i < 4; ++i) {
-                if (enm.sounds[i]) {
-                    enm.sound_files.push(sounds.value[enm.sounds[i]-1] || "");
-                }                
+                enm.sound_files[i] = sounds.value[enm.sounds[i]-1] || "";
             }
         });
     }
@@ -99,7 +113,7 @@ function create_new_project() {
 
 async function load_graphics() {
     try {
-        const files = (await server.getDDLFiles(AssetGroup.ENEMIES,null)).files;
+        const files = (await server.getDDLFiles(AssetGroup.ENEMIES,"user")).files;
         const seq = files.filter((f:FileItem)=>f.name.endsWith(".SEQ"));
         list_graphics.value = seq.map((z:FileItem)=>z.name);
     } catch (e) {
@@ -115,130 +129,412 @@ async function load_sounds() {
     }
 }
 
+function create_soundmap () {
+    if (enemies.value) {
+        const m: Record<string, number> = {};
+        const l : EnemySounds = [];
+        enemies.value.forEach(e=>{
+            if (e.sound_files) {
+                e.sounds = e.sound_files.map(name=>{
+                    if (!m || m.length == 0) return 0;
+                    if (m[name]) return m[name];
+                    else {
+                        l.push(name);
+                        m[name] = l.length;                        
+                        return l.length;
+                    }
+                })
+            }
+        });
+        sounds.value = l;
+    }
+}
+
 function init() {
-    load_graphics();
     load_sounds();
     load_files();
 
 }
 
+async function save_all() {
+    if (enemies && sounds && need_save) {
+        try {
+            create_soundmap();
 
-const enm_name = ref<string>("");
-const enm_graphics = ref<string>("");
-const enm_speed = ref<number>(1);
-const enm_sightrange = ref<number>(1);
-const enm_engagerange = ref<number>(1);
-const enm_dialognum = ref<number|null>(1);
+            const e = enemies.value;
+            const s = sounds.value;
+            const ebuff = enemyToArrayBuffer(enemies.value);
+            const sbuff = enemySoundsToArrayBuffer(sounds.value);
+            await Promise.all([
+                server.putDDLFile("ENEMY.DAT",ebuff,AssetGroup.MAPS),
+                await server.putDDLFile("SOUND.DAT",sbuff,AssetGroup.MAPS)
+            ]);
+        }
+        catch (e) {
+            alert("Failed to save files:" + e);
+        }
+    }
+
+}
+
+onUnmounted(save_all);
 
 
 
+function deleteEnemy() {
+    if (selected_enemy.value !== undefined && enemies.value) {
+        if (confirm("Do you with to delete enemy:" + enemies.value[selected_enemy.value].name)) {
+            enemies.value[selected_enemy.value].mobs_name="";
+            while (enemies.value.length > 0 && enemies.value[enemies.value.length-1].mobs_name.length ==0) {
+                enemies.value.pop();
+            }
+        }
+    }
+}
 
+function findFreePos() : number{
+    if (!enemies.value) return 0;
+    const pos = enemies.value.findIndex((x:EnemyDef)=>x.mobs_name.length == 0);
+    if (pos == -1) return enemies.value.length;
+    else return pos;
+}
+
+function cloneEnemy() {
+    if (enemies.value && selected_enemy.value !== undefined) {
+        const pos = findFreePos();
+        enemies.value[pos] = JSON.parse(JSON.stringify(enemies.value[selected_enemy.value]));
+        selected_enemy.value = pos;
+    }
+}
+
+const filteredAndSortedEnemies = computed(() => {
+    const mp =  enemies.value.filter(x=>x.mobs_name.length>0)
+        .map((x,idx)=>{return [x, idx];}) as [ EnemyDef, number][];
+    const srt = mp.sort((a,b)=>{
+                    return a[0].name.localeCompare(b[0].name);
+                });
+    return srt;
+
+});
+
+async function addEnemy() {
+    await load_graphics();
+    new_enemy_type.value = "";
+}
+
+function createEnemy() {
+    if (new_enemy_type.value) {
+        const pos =findFreePos();
+        const name = new_enemy_type.value.split('.')[0];
+        const enm = newEnemy(name);
+        enm.name=`${name}-${pos}`;
+        enemies.value[pos] = enm;
+        selected_enemy.value = pos;
+        new_enemy_type.value = undefined;
+
+    }
+}
+
+async function loadAppearence() {
+    appearence.value = undefined;
+    if (selected_enemy.value !==undefined  && enemies.value && enemies.value[selected_enemy.value]) {
+        const e = enemies.value[selected_enemy.value];
+         if (e.mobs_name) {                    
+            try {
+                const seqdata = await server.getDDLFile(e.mobs_name + ".SEQ");
+                const seq = SeqFile.fromArrayBuffer(seqdata.buffer);
+                const suffix= seq.animation[0][0].suffix;
+                const imgdata = await server.getDDLFile(e.mobs_name+suffix+".PCX");
+                const pcx = PCX.fromArrayBuffer(imgdata.buffer);
+                appearence.value = pcx;
+                let ofs = seq.animation[0][0].offset_x;
+                if (ofs < -999) ofs = pcx.width/2;
+                appearence_margin.value = `-${pcx.height/2}px -${ofs}px`;
+            }
+            catch (e) {
+                console.warn("Can't open appearence:", e);
+            }
+         }
+    }
+}
+
+async function loadColors() {
+    palettes.value = undefined;
+    if (selected_enemy.value !==undefined  && enemies.value && enemies.value[selected_enemy.value]) {
+        const e = enemies.value[selected_enemy.value];
+        if (e.mobs_name) {
+            try {
+                const paldata = await server.getDDLFile(e.mobs_name + ".COL");
+                palettes.value = COLPaletteSet.fromArrayBuffer(paldata.buffer);
+            }
+            catch (e) {
+                console.warn("Can't load palette", e);
+            }
+        }
+    }
+}
 
 onMounted(init);
+
+
+const [enm_f2, chk_f2 ] = useBitmaskCheckbox2(EnemyFlags2, 0);
+const [enm_f1, chk_f1 ] = useBitmaskCheckbox2(EnemyFlags1, 0);
+const [enm_eff, chk_eff ] = useBitmaskCheckbox2(SpellEffects, 0);
+
+const form = reactive({
+    name: "",
+    speed: 1,
+    sightrange : 1,
+    engagerange: 1,
+    dialognum: -1,
+    palette: 0,
+    casting: 0,
+    snd_attack:"",
+    snd_damage:"",
+    snd_walk:"",
+    stat_hp:0,
+    stat_str:0,
+    stat_mg:0,
+    stat_mv:0,
+    stat_dex:0,
+    stat_def_min:0,
+    stat_def_max:0,
+    stat_att_min:0,
+    stat_att_max:0,
+    stat_damage:0,
+    stat_mg_min:0,
+    stat_mg_max:0,
+    stat_mg_type:-1,
+    stat_prot_f:0,
+    stat_prot_w:0,
+    stat_prot_e:0,
+    stat_prot_a:0,
+    stat_prot_m:0,
+    stat_reg:0,
+    flee_prob:0,
+    specproc:4,
+    exp:0,
+    bonus_exp:0,
+    money:0
+});
+
+function loadEnemyData() {
+    if (selected_enemy.value !==undefined && enemies.value) {
+        setTimeout(()=>dont_save_now = false, 100);
+        dont_save_now = true;
+        const enm = enemies.value[selected_enemy.value];
+        if (!enm.vlastnosti) enm.vlastnosti = new Array(24);
+
+        form.name = enm.name;
+        form.speed = enm.speed;
+        form.sightrange = enm.dohled;
+        form.engagerange = enm.dosah;
+        form.dialognum = enm.dialog;
+        form.flee_prob = enm.flee_num;
+        form.specproc = enm.specproc;
+        form.exp = enm.experience;
+        form.bonus_exp = enm.bonus;
+        form.money = enm.money;
+        form.palette = enm.paletts_count;
+        enm_f1.value = enm.stay_strategy;
+        enm_f2.value = enm.vlajky;
+        if (enm.sound_files) {
+            form.snd_damage =enm.sound_files[EnemySounds.MBS_HIT]
+            form.snd_attack =enm.sound_files[EnemySounds.MBS_ATTACK]
+            form.snd_walk =enm.sound_files[EnemySounds.MBS_WALK]
+        }
+        form.stat_hp =enm.vlastnosti[EnemyStats.VLS_MAXHIT]
+        form.stat_str =enm.vlastnosti[EnemyStats.VLS_SILA]
+        form.stat_mg =enm.vlastnosti[EnemyStats.VLS_SMAGIE]
+        form.stat_mv =enm.vlastnosti[EnemyStats.VLS_POHYB]
+        form.stat_dex =enm.vlastnosti[EnemyStats.VLS_OBRAT]
+        form.stat_def_min=enm.vlastnosti[EnemyStats.VLS_OBRAN_L]
+        form.stat_def_max =enm.vlastnosti[EnemyStats.VLS_OBRAN_H]
+        form.stat_att_min =enm.vlastnosti[EnemyStats.VLS_UTOK_L]
+        form.stat_att_max =enm.vlastnosti[EnemyStats.VLS_UTOK_H]
+        form.stat_mg_min =enm.vlastnosti[EnemyStats.VLS_MGSIL_L]
+        form.stat_mg_max =enm.vlastnosti[EnemyStats.VLS_MGSIL_H]
+        form.stat_mg_type =enm.vlastnosti[EnemyStats.VLS_MGZIVEL]
+        form.stat_damage =enm.vlastnosti[EnemyStats.VLS_DAMAGE]
+        form.stat_prot_f =enm.vlastnosti[EnemyStats.VLS_OHEN]
+        form.stat_prot_w =enm.vlastnosti[EnemyStats.VLS_VODA]
+        form.stat_prot_e =enm.vlastnosti[EnemyStats.VLS_ZEME]
+        form.stat_prot_a =enm.vlastnosti[EnemyStats.VLS_VZDUCH]
+        form.stat_prot_m =enm.vlastnosti[EnemyStats.VLS_MYSL]
+        form.stat_reg =enm.vlastnosti[EnemyStats.VLS_HPREG]
+        enm_eff.value =enm.vlastnosti[EnemyStats.VLS_KOUZLA]
+        loadAppearence();
+        loadColors();
+    }
+}
+
+function saveEnemyData() {
+    if (selected_enemy.value !==undefined  && enemies.value && !dont_save_now) {
+        setTimeout(()=>dont_save_now = false, 100);
+        dont_save_now = true;
+        const enm = enemies.value[selected_enemy.value];
+        enm.name = form.name;
+        enm.speed = form.speed;
+        enm.dohled = form.sightrange;
+        enm.dosah = form.engagerange;
+        enm.dialog = form.dialognum;
+        enm.paletts_count = form.palette;
+        enm.casting = form.spe
+        enm.sound_files = [];
+        enm.sound_files[EnemySounds.MBS_HIT] = form.snd_damage;
+        enm.sound_files[EnemySounds.MBS_ATTACK] = form.snd_attack;
+        enm.sound_files[EnemySounds.MBS_WALK] = form.snd_walk;
+        if (!enm.vlastnosti) enm.vlastnosti = new Array(24);
+        enm.vlastnosti[EnemyStats.VLS_MAXHIT] = form.stat_hp;
+        enm.vlastnosti[EnemyStats.VLS_SILA] = form.stat_str;
+        enm.vlastnosti[EnemyStats.VLS_SMAGIE] = form.stat_mg;
+        enm.vlastnosti[EnemyStats.VLS_POHYB] = form.stat_mv;
+        enm.vlastnosti[EnemyStats.VLS_OBRAT] = form.stat_dex;
+        enm.vlastnosti[EnemyStats.VLS_OBRAN_L] = Math.min(form.stat_def_min,form.stat_def_max);
+        enm.vlastnosti[EnemyStats.VLS_OBRAN_H] = Math.max(form.stat_def_min,form.stat_def_max);
+        enm.vlastnosti[EnemyStats.VLS_UTOK_L] = Math.min(form.stat_att_min,form.stat_att_max);
+        enm.vlastnosti[EnemyStats.VLS_UTOK_H] = Math.max(form.stat_att_min,form.stat_att_max);
+        enm.vlastnosti[EnemyStats.VLS_DAMAGE] = form.stat_damage;
+        enm.vlastnosti[EnemyStats.VLS_MGSIL_L] = Math.min(form.stat_mg_min,form.stat_mg_max);
+        enm.vlastnosti[EnemyStats.VLS_MGSIL_H] = Math.max(form.stat_mg_min,form.stat_mg_max);
+        enm.vlastnosti[EnemyStats.VLS_MGZIVEL] = form.stat_mg_type;
+        enm.vlastnosti[EnemyStats.VLS_OHEN] = form.stat_prot_f;
+        enm.vlastnosti[EnemyStats.VLS_VODA] = form.stat_prot_w;
+        enm.vlastnosti[EnemyStats.VLS_ZEME] = form.stat_prot_e;
+        enm.vlastnosti[EnemyStats.VLS_VZDUCH] = form.stat_prot_a;
+        enm.vlastnosti[EnemyStats.VLS_MYSL] = form.stat_prot_m;
+        enm.vlastnosti[EnemyStats.VLS_HPREG] = form.stat_reg;
+        enm.flee_num = form.flee_prob;
+        enm.specproc = form.specproc;
+        enm.experience = form.exp;
+        enm.bonus = form.bonus_exp;
+        enm.money = form.money;
+        enm.stay_strategy = enm_f1.value;
+        enm.vlajky = enm_f2.value
+        enm.vlastnosti[EnemyStats.VLS_KOUZLA] = enm_eff.value;
+        need_save = true;
+    }
+
+}
+
+
+watch([selected_enemy], loadEnemyData);
+watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
+
+
+
 
 </script>
 
 <template>    
     <div class="left-panel">
         <select v-model="selected_enemy" size="20" class="enemy-list">
-            <option v-for="(e,idx) in enemies" :key="idx" :value="idx">{{ e.name }}</option>
+            <option v-for="e in filteredAndSortedEnemies" :key="e[1]" :value="e[1]">{{ e[0].name }}</option>
         </select>
         <div class="buttons">
-            <button>Clone</button>
-            <button>New</button>
+            <button @click="deleteEnemy">Delete</button>
+            <button @click="cloneEnemy">Clone</button>
+            <button @click="addEnemy">New</button>
         </div>
     </div>
 
     <div class="editor-bgr">
-    <div class="editor">
+    <div class="editor" v-if="selected_enemy !== undefined">
         <div class="multiple">
             <x-section>
                 <x-section-title>Basic parameters</x-section-title>
                 <x-form>
-                    <label><span>Name</span><input type="text" v-model="enm_name" maxlength="29"></label>
-                    <label><span>Speed (px per frame)</span><input type="number" v-model="enm_speed"></label>
-                    <label><span>Sight range</span><input type="number" v-model="enm_sightrange"></label>
-                    <label><span>Engage range</span><input type="number" v-model="enm_engagerange"></label>
+                    <label><span>Name</span><input type="text" v-model="form.name" maxlength="29"></label>
+                    <label><span>Color</span><select v-model="form.palette">
+                        <option value="0">Original color</option>
+                        <option v-if="palettes && palettes.palettes.length>0" :value="palettes.palettes.length">Randomize</option>
+                        <option v-for="(p, idx) of (palettes?palettes.palettes:[])" :key="idx" :value="-idx-1">Palette {{ idx }}</option>
+                    </select></label>
+                    <label><span>Speed (px per frame)</span><input type="number" v-model="form.speed"></label>
+                    <label><span>Sight range</span><input type="number" v-model="form.sightrange"></label>
+                    <label><span>Engage range</span><input type="number" v-model="form.engagerange"></label>
                 </x-form>
             </x-section>
             <x-section>
                 <x-section-title>Flags</x-section-title>
                 <x-form>
-                <label><input type="checkbox" /><span>Big enemy (one on square)</span></label>
-                <label><input type="checkbox" /><span>Through (not blocking)</span></label>
-                <label><input type="checkbox" /><span>Just traveling sound effect</span></label>
-                <label><input type="checkbox" /><span>Respawn</span></label>
+                <label><input type="checkbox" v-model="chk_f2.MOB_PASSABLE"/><span>Through (not blocking)</span></label>
+                <label><input type="checkbox" v-model="chk_f2.MOB_MOBILE"/><span>Just traveling sound effect</span></label>
+                <label><input type="checkbox" v-model="chk_f2.MOB_RELOAD"/><span>Respawn</span></label>
                 </x-form>
             </x-section>
             <x-section>
                 <x-section-title>Sounds</x-section-title>
                 <x-form>
-                    <label><span>Walk</span><select><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
-                    <label><input type="checkbox" /><span>Loop</span></label>
-                    <label><span>Attack</span><select><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
-                    <label><span>Damaged</span><select><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                    <label><span>Walk</span><select v-model="form.snd_walk"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                    <label><input v-model="chk_f2.MOB_SAMPLE_LOOP" type="checkbox" /><span>Loop</span></label>
+                    <label><span>Attack</span><select v-model="form.snd_attack"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                    <label><span>Damaged</span><select v-model="form.snd_damage"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
                 </x-form>
             </x-section>
         </div>
-        <x-section>
+        <x-section class="appearence">
             <x-section-title>Appearence</x-section-title>
+            <div :style="{margin: appearence_margin}" @click="edit_seq = enemies[selected_enemy || 0].mobs_name + '.SEQ'">
+                <CanvasView :canvas="appearence?appearence.createCanvas(PCXProfile.enemy,palettes && form.palette<0?palettes.palettes[-form.palette-1]:undefined):null" />
+            </div>
         </x-section>
         <x-section>
             <x-form>
                 <x-section-title>Stats</x-section-title>
-                <label><span>Hit points</span><input type="number" min="0" max="65535"/></label>
-                <label><span>Strength</span><input type="number" min="0" max="100"/></label>
-                <label><span>Magic (% of casting)</span><input type="number" min="0" max="100"/></label>
-                <label><span>Movement (/15 actions)</span><input type="number" min="0" max="100"/></label>
-                <label><span>Dexterity</span><input type="number" min="0" max="100"/></label>
-                <label><span>Defense</span><div><input type="number" min="0" max="65535"/>-<input type="number" min="0" max="65535"/></div></label>
-                <label><span>Attack</span><div><input type="number" min="0" max="65535"/>-<input type="number" min="0" max="65535"/></div></label>
-                <label><span>Extra damage</span><input type="number" /></label>
-                <label><span>Magic attack</span><div><input type="number" min="0" max="65535"/>-<input type="number" min="0" max="65535"/></div></label>
-                <label><span>Magic attack type</span><div><select>
+                <label><span>Hit points</span><input v-model="form.stat_hp" type="number" min="0" max="65535"/></label>
+                <label><span>Strength</span><input v-model="form.stat_str"type="number" min="0" max="100"/></label>
+                <label><span>Magic (% of casting)</span><input v-model="form.stat_mg" type="number" min="0" max="100"/></label>
+                <label><span>Movement (/15 actions)</span><input v-model="form.stat_mv" type="number" min="0" max="100"/></label>
+                <label><span>Dexterity</span><input v-model="form.stat_dex" type="number" min="0" max="100"/></label>
+                <label><span>Defense</span><div><input v-model="form.stat_def_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_def_max" type="number" min="0" max="65535"/></div></label>
+                <label><span>Attack</span><div><input v-model="form.stat_att_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_att_max" type="number" min="0" max="65535"/></div></label>
+                <label><span>Extra damage</span><input v-model="form.stat_damage" type="number" /></label>
+                <label><span>Magic attack</span><div><input v-model="form.stat_mg_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_mg_min" type="number" min="0" max="65535"/></div></label>
+                <label><span>Magic attack type</span><div><select v-model="form.stat_mg_type">
                     <option value="-1">--select--</option>
                     <option value="0">fire</option>
                     <option value="1">water</option>
-                    <option value="1">earth</option>
-                    <option value="1">air</option>
-                    <option value="1">mind</option>
+                    <option value="2">earth</option>
+                    <option value="3">air</option>
+                    <option value="4">mind</option>
                 </select></div></label>
-                <label><span>Protection (fire)</span><input type="number" min="0" max="100"/></label>
-                <label><span>Protection (water)</span><input type="number" min="0" max="100"/></label>
-                <label><span>Protection (earth)</span><input type="number" min="0" max="100"/></label>
-                <label><span>Protection (air)</span><input type="number" min="0" max="100"/></label>
-                <label><span>Protection (mind)</span><input type="number" min="0" max="100"/></label>
-                <label><span>Regeneration</span><input type="number" min="0" max="65535"/></label>
+                <label><span>Protection (fire)</span><input  v-model="form.stat_prot_f" type="number" min="0" max="100"/></label>
+                <label><span>Protection (water)</span><input  v-model="form.stat_prot_w" type="number" min="0" max="100"/></label>
+                <label><span>Protection (earth)</span><input  v-model="form.stat_prot_e" type="number" min="0" max="100"/></label>
+                <label><span>Protection (air)</span><input  v-model="form.stat_prot_a" type="number" min="0" max="100"/></label>
+                <label><span>Protection (mind)</span><input  v-model="form.stat_prot_m" type="number" min="0" max="100"/></label>
+                <label><span>Regeneration</span><input v-model="form.stat_reg" type="number" min="0" max="65535"/></label>
             </x-form>
         </x-section>
         <x-section>
             <x-section-title>Effects</x-section-title>
             <x-form>
-                <label><input type="checkbox" /><span>Invisible</span></label>
-                <label><input type="checkbox" /><span>Eye by eye</span></label>
-                <label><input type="checkbox" /><span>Live drain</span></label>
-                <label><input type="checkbox" /><span>Physical resistance (50%)</span></label>
-                <label><input type="checkbox" /><span>Magical resistance (50%)</span></label>
-                <label><input type="checkbox" /><span>Blinded</span></label>
-                <label><input type="checkbox" /><span>Regenerate during battle</span></label>
-                <label><input type="checkbox" /><span>Hit knock back</span></label>
-                <label><input type="checkbox" /><span>Fear (flee from battle)</span></label>
-                <label><input type="checkbox" /><span>Stoned</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_INVIS"/><span>Invisible</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_OKO"/><span>Eye by eye</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_DRAIN"/><span>Live drain</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_SANC"/><span>Physical resistance (50%)</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_HSANC"/><span>Magical resistance (50%)</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_BLIND"/><span>Blinded</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_REGEN"/><span>Regenerate during battle</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_KNOCK"/><span>Hit knock back</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_FEAR"/><span>Fear (flee from battle)</span></label>
+                <label><input type="checkbox" v-model="chk_eff.SPL_STONED"/><span>Stoned</span></label>
             </x-form>
         </x-section>
         <x-section>
             <x-section-title>Behavior</x-section-title>
             <x-form>
-                <label><input type="checkbox" /><span>Walking</span></label>
-                <label><input type="checkbox" /><span>Engage player</span></label>
-                <label><input type="checkbox" /><span>Can hear sound</span></label>
-                <label><input type="checkbox" /><span>See invisible</span></label>
-                <label><input type="checkbox" /><span>Guarding the home room</span></label>
-                <label><input type="checkbox" /><span>Scavenger</span></label>
-                <label><input type="checkbox" /><span>Spellcaster - spell id: <input type="number"></span></label>
-                <label><input type="checkbox" /><span>Ranger (shoots): <input type="number"></span></label>
-                <label><span>Flee probability [%]</span><input type="number" min="0" max="100"/></label>
-                <label><span>Special Behavior</span><select>
+                <label><input type="checkbox" v-model="chk_f1.MOB_WALK"/><span>Walking</span></label>
+                <label><input type="checkbox" v-model="chk_f1.MOB_WATCH"/><span>Engage player</span></label>
+                <label><input type="checkbox" v-model="chk_f1.MOB_LISTEN"/><span>Can hear sound</span></label>
+                <label><input type="checkbox" v-model="chk_f2.MOB_SENSE"/><span>See invisible</span></label>
+                <label><input type="checkbox" v-model="chk_f1.MOB_GUARD"/><span>Guarding the home room</span></label>
+                <label><input type="checkbox" v-model="chk_f1.MOB_PICK"/><span>Scavenger</span></label>
+                <label><input type="checkbox" v-model="chk_f2.MOB_CASTING"/><span>Spellcaster - spell id: <input v-model="form.casting" type="number"></span></label>
+                <label><input type="checkbox" v-model="chk_f1.MOB_ROGUE"/><span>Ranger (shoots): </span></label>
+                <label><span>Flee probability [%]</span><input v-model="form.flee_prob" type="number" min="0" max="100"/></label>
+                <label><span>Special Behavior</span><select v-model="form.specproc">
                     <option value="0">Nothing</option>
                     <option value="2">Turn around in cycle</option>
                     <option value="3">Cast random spell(defunc)</option>
@@ -249,15 +545,15 @@ onMounted(init);
                     <option value="8">Attack at wimpy</option>
                     <option value="9">Held on place</option>
                 </select></label>
-                <label><span>Dialog number</span><input type="number" v-model="enm_dialognum"></label>
+                <label><span>Dialog number</span><input type="number" v-model="form.dialognum"></label>
             </x-form>
         </x-section>
         <x-section>
             <x-section-title>Other properties</x-section-title>
             <x-form>
-                <label><span>Drop money</span><input type="number" min="0" max="65535"/></label>
-                <label><span>Total experience</span><input type="number" min="0" max="999999"/></label>
-                <label><span>Kill experience</span><input type="number" min="0" max="999999"/></label>
+                <label><span>Drop money</span><input v-model="form.money" type="number" min="0" max="65535"/></label>
+                <label><span>Total experience</span><input v-model="form.exp" type="number" min="0" max="999999"/></label>
+                <label><span>Kill experience</span><input v-model="form.bonus_exp" type="number" min="0" max="999999"/></label>
                 <label><span>Inventory</span><div><div><select>
                     <option value="0">-- select item --</option>
                 </select></div><div><select>
@@ -277,6 +573,20 @@ onMounted(init);
         </x-form>
         <div class="button-panel"><button @click="import_files">Import files</button></div>
         <div class="button-panel"><button @click="create_new_project">Create empty</button></div>
+    </div>
+    <div class="new-enemy-window" v-if="new_enemy_type !== undefined">
+        <x-form>
+            <label><span>Enemy graphic</span><select v-model="new_enemy_type">
+                <option v-for="g of list_graphics" :key="g" :value="g">{{ g }}</option>
+            </select></label>
+        </x-form>
+        <div class="button-panel"><button @click="createEnemy" :disabled="!new_enemy_type">Add</button><button @click="new_enemy_type=undefined">Cancel</button></div>
+    </div>
+    <div class="edit-seq" v-if="edit_seq">
+        <div>
+            <AssetToolSeq v-model="edit_seq" />
+            <button @click="edit_seq=undefined">X</button>
+        </div>
     </div>
 </template>
 
@@ -311,7 +621,7 @@ onMounted(init);
 .buttons>button {
     flex-grow: 1;
 }
-.files-not-found {
+.files-not-found,.new-enemy-window {
     position: absolute;
     left: 50%;
     top: 10vw;
@@ -321,9 +631,15 @@ onMounted(init);
     border: 1px solid;
     background-color: white;
     text-align: center;
+    box-shadow: 3px 3px 5px black;
 }
 
-.files-not-found x-form {
+.new-enemy-window {
+    padding-top: 1em;
+    height: 5em;
+}
+ 
+.files-not-found x-form, .new-enemy-window x-form {
     padding: 0 2em;
 }
 .files-not-found x-form > label > input {
@@ -336,6 +652,14 @@ onMounted(init);
     
 }
 
+.button-panel {
+    border-top: 1px solid;
+    padding-top:  1em;
+}
+
+.button-panel button {
+    width: 5em;
+}
 .enemy-not-found input {
     display: block;
     margin: 1em auto;
@@ -378,5 +702,42 @@ div.multiple {
 div.multiple > *{
     flex-grow: 1;
 }
+
+.appearence {
+    position: relative;
+    height: 25em;
+}
+
+.appearence > div {
+    position: absolute;    
+    left: 50%;
+    top: 50%;
+    width: fit-content;
+    height: fit-content;
+}
+.edit-seq > div{
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    margin-left: -410px;
+    width: 820px;
+    background-color: #eee;
+    padding: 10px;
+    border: 1px black;
+    box-shadow: 3px 3px 5px black;
+}
+
+.edit-seq > div  > button{
+    position: absolute;
+    display: block;
+    right: 5px;
+    top: 5px;  
+}
+.edit-seq {
+    position: absolute;
+    left: 0;top: 0;right: 0;bottom: 0;
+    background-color: #0008;
+}
+
 
 </style>
