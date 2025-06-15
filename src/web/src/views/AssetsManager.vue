@@ -13,6 +13,7 @@ import AssetToolSeq from '@/components/AssetToolSeq.vue';
 import AssetsFloorAndCeil from '@/components/AssetsFloorAndCeil.vue';
 import AssetsToolUpload from '@/components/AssetsToolUpload.vue';
 import HexView from '@/components/HexView.vue';
+import AssetsFontsViewer from '@/components/AssetsFontsViewer.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -43,7 +44,8 @@ function select_tool() : string | null {
                                     return  "icons";
                                 else
                                     return "items";
-        case AssetGroup.UI: return  "uigfx";break;
+        case AssetGroup.UI: return  "uigfx";
+        case AssetGroup.FONTS: return "fonts";
         case AssetGroup.DIALOGS: if (cur_file_model.value.name.endsWith(".HI")) 
                                         return "dialogshi";
                                 else if (cur_file_model.value.name.endsWith(".PCX"))
@@ -118,6 +120,7 @@ function delete_file() {
             <option value="seqedit">Enemy animation sets</option>
             <option value="uigfx">UI and other</option>
             <option value="dialogshi">Dialog portraits</option>
+            <option value="fonts">Fonts</option>            
             <option value="upload">Upload and download</option>
             <option value="hexview">HexView</option>
             <option value="ddlinfo">Manage DDL</option>
@@ -137,6 +140,7 @@ function delete_file() {
             <AssetsToolUpload v-if="selected_tool == 'upload'" @upload="onUploadDone"
                 v-model:file="selected_file" v-model:group="selected_group" />
             <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
+            <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
             <div v-if="selected_tool.startsWith('goto_editor:')">
                 <div class="hint-link"><RouterLink :to="`/${selected_tool.split(':')[1]}`">Open editor</RouterLink></div>
             </div>
@@ -148,19 +152,22 @@ function delete_file() {
 
 <style scoped>
 .left-panel {
-    width: 15em;
+    width: 15rem;
     position: absolute;
     top: 2.25rem;
     bottom: 0px;
 }
 .middle-panel {
-    margin-left: 15em;    
     text-align: center;
     display:flex;
     flex-direction: column;
-    height: 100%;
+    
     background-color: #CCC;
-    position: relative;
+    position: absolute;
+    left: 15rem;
+    right: 0;
+    top: 2.25rem;
+    bottom: 0;    
 }
 
 .middle-panel > select {
@@ -169,6 +176,8 @@ function delete_file() {
 }
 .middle-panel > .tools {
     overflow: auto;
+    position: relative;
+
     
 }
 

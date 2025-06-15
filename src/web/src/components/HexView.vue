@@ -1,5 +1,5 @@
 <template>
-  <x-workspace>
+  <div>
     <!-- Offset input -->
     <div class="stk">
         <button @click="offset = Math.max(0,offset-MAX_BYTES)" :disabled="offset == 0">&lt;&lt;</button>
@@ -18,7 +18,7 @@
         {{ line }}
       </div>
     </div>
-  </x-workspace>
+  </div>
 </template>
 
 <style scoped>

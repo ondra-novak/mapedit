@@ -271,6 +271,11 @@ export class BinaryWriter {
     getBuffer() : ArrayBuffer{
         return new Uint8Array(this.buffer).buffer;
     }
+
+    write_buffer(buff : ArrayBuffer) {
+        const s = new Uint8Array(buff);
+        this.buffer.push(...s);
+    }
 }
 
 export function splitArrayBuffer(arr: ArrayBuffer , separator: number) : ArrayBuffer[]{
@@ -315,4 +320,37 @@ export function joinUint8Arrays(arrays: ArrayBuffer[], separator : number) {
   return result;
 }
 
+interface SectionInfo {
+    type: number;
+    data: BinaryIterator;
+}
 
+const section_header : Schema= {
+    block: "char[8]",
+    type: "uint32",
+    size: "uint32",
+    offs: "uint32"
+}
+
+export function parseSection(iter:BinaryIterator ) : SectionInfo {
+    const hdr = iter.parse(section_header);
+    if (hdr.block != "<BLOCK>") throw Error("Corrupted section in source file");
+    const buff = iter.readBytes(hdr.size);
+    return {
+        type  : hdr.type,
+        data: new BinaryIterator(buff)
+    };
+}
+
+export function writeSection(target: BinaryWriter, type: number, data: BinaryWriter) {
+    const buff = data.getBuffer();
+    const hdr = {
+        block: "<BLOCK>",
+        type: type,
+        size: buff.byteLength,
+        offs: 0        
+    };
+    target.write(section_header, hdr);
+    target.write_buffer(buff);
+    
+}
