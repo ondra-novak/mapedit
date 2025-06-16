@@ -6,5 +6,6 @@ add_executable(mapedit_server
     interface.cpp
     mgifdecomp.cpp
     utils/mgifmem.c
+    utils/mgifcreate.cpp
     )
 add_dependencies(mapedit_server frontend)
