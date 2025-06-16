@@ -13,6 +13,7 @@ import AssetToolSeq from '@/components/AssetToolSeq.vue';
 import AssetsFloorAndCeil from '@/components/AssetsFloorAndCeil.vue';
 import AssetsToolUpload from '@/components/AssetsToolUpload.vue';
 import HexView from '@/components/HexView.vue';
+import AssetsToolMGF from '@/components/AssetsToolMGF.vue';
 import AssetsFontsViewer from '@/components/AssetsFontsViewer.vue';
 
 const selected_tool = ref<string>("");
@@ -32,6 +33,7 @@ watch([selected_tool], ()=>{
 
 function select_tool() : string | null {
     if (!cur_file_model.value) return null;
+    if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
     switch (cur_file_model.value.group) {
         case AssetGroup.WALLS: return "walls";
         case AssetGroup.ENEMIES:if (cur_file_model.value.name.endsWith(".SEQ") )
@@ -115,6 +117,7 @@ function delete_file() {
             <option value="floorceil">Floors and ceils</option>
             <option value="items">Items</option>
             <option value="icons">Icons (items)</option>
+            <option value="mgf">Animation MGF</option>
             <option value="enemies">Enemies</option>
             <option value="coledit">Enemy colors</option>
             <option value="seqedit">Enemy animation sets</option>
@@ -141,6 +144,7 @@ function delete_file() {
                 v-model:file="selected_file" v-model:group="selected_group" />
             <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
             <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
+            <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" />
             <div v-if="selected_tool.startsWith('goto_editor:')">
                 <div class="hint-link"><RouterLink :to="`/${selected_tool.split(':')[1]}`">Open editor</RouterLink></div>
             </div>

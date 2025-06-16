@@ -29,7 +29,7 @@ const charcolors =
 
 function drawChar(img: ImageData , fontraw: ArrayBuffer, x: number, y:number,  code:number) {
     const font =  new Uint8Array(fontraw);
-
+    let limiter = 65535;
 
     const scr_linelen2 = img.width*4;
     let edi = (x + y * img.width) * 4;
@@ -67,6 +67,7 @@ function drawChar(img: ImageData , fontraw: ArrayBuffer, x: number, y:number,  c
             }
             ebx+=scr_linelen2;
             dh--;
+            if (--limiter == 0)  throw Error("Too many cycles, invalid format");
         } while (dh!=0);
         edi+=4;
         cl--;

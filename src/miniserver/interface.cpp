@@ -1,5 +1,6 @@
 #include "interface.hpp"
 #include "handler_map.hpp"
+#include "mgifdecomp.hpp"
 #include <fstream>
 #include <mutex>
 
@@ -13,6 +14,7 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::GET, "/api/maps", &WebInterface::serve_map_list},
     {Method::GET, "/api/maps/{}", &WebInterface::serve_maps},
     {Method::GET, "/api/ddl", &WebInterface::ddl_list},
+    {Method::GET, "/api/ddl/mgf/{}", &WebInterface::ddl_mpg_get},
     {Method::GET, "/api/ddl/{}", &WebInterface::ddl_get},
     {Method::PUT, "/api/ddl/{}", &WebInterface::ddl_put},
     {Method::DELETE, "/api/ddl/{}", &WebInterface::ddl_delete},
@@ -209,6 +211,24 @@ bool WebInterface::ddl_compact(Request &req)
     std::lock_guard _(_mx);
     _user.compact();
     return req.response({202,"Accepted"},{},"");
+}
+
+bool WebInterface::ddl_mpg_get(Request &req)
+{
+    std::shared_lock _(_mx);       
+    auto f = _user.get(req.path_vars[0]);
+    if (!f) {
+        f = _game.get(req.path_vars[0]);
+        if (!f) return false;
+    }    
+    auto stream = decompress_mgf(f->data());
+    if (stream.empty()) {
+        return false;
+    }
+    return req.response({200},{
+        {"Content-Type","application/octet-stream"}
+            },std::string_view(reinterpret_cast<const char *>(stream.data()), stream.size()));
+   
 }
 
 WebInterface::WebInterface(Config cfg)

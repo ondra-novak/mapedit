@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <string.h>
 #include "mgifmem.h"
 
 #define MGIF "MGIF"
@@ -24,7 +27,7 @@ typedef struct mgf_play_state {
   int nextgroup;
   int bitsize,init_bitsize ;
   char old_value;
-  MGIF_PROC show_proc;
+  MGIF_PROC show_proc; 
   void *context;
 } MGF_PLAY_STATE;
 
@@ -51,7 +54,7 @@ void reinit_lzw(MGF_PLAY_STATE *st)
 MGF_PLAY_STATE *init_lzw_compressor(int dic_size)
   {
 
-  MGF_PLAY_STATE *st = malloc(sizeof(MGF_PLAY_STATE));
+  MGF_PLAY_STATE *st = (MGF_PLAY_STATE *)malloc(sizeof(MGF_PLAY_STATE));
   memset(st,0,sizeof(*st));
   st->compress_dic=(DOUBLE_S *)malloc(sizeof(CODE_TABLE));
   st->clear_code=1<<dic_size;
@@ -61,6 +64,7 @@ MGF_PLAY_STATE *init_lzw_compressor(int dic_size)
   st->init_bitsize=st->bitsize=dic_size+1;
   st->lzw_buffer=malloc(LZW_BUFFER);
   do_clear_code(st);
+  return st;
   }
 
 
@@ -70,13 +74,6 @@ void done_lzw_compressor(MGF_PLAY_STATE *st)
   free(st->compress_dic);
   st->compress_dic=NULL;
   free(st);
-  }
-
-void mgif_install_proc(const void *mgif, MGIF_PROC proc, void *ctx)
-  {
-    MGIF_HEADER_T *hdr = (MGIF_HEADER_T *)mgif;
-    hdr->state->show_proc=proc;
-    hdr->state->context=ctx;
   }
 
 struct mgif_header load_mgif_header(const char **mgif) {
@@ -95,15 +92,15 @@ struct mgif_header load_mgif_header(const char **mgif) {
     return r;
 }
 
-const void *open_mgif(const void *mgif) 
+const void *open_mgif(const void *mgif, MGIF_PROC proc, void *ctx)
   {
 
 
-  const char *c = mgif;
+  const char *c = (const char *)mgif;
   MGIF_HEADER_T hdr = load_mgif_header(&c);
 
   if (strncmp(hdr.sign,MGIF,4)) return NULL;
-  MGIF_HEADER_T *ins = malloc(sizeof(MGIF_HEADER_T));
+  MGIF_HEADER_T *ins = (MGIF_HEADER_T *)malloc(sizeof(MGIF_HEADER_T));
   *ins = hdr;
   ins->nx_frame = c;
   ins->cur_frame = 0;
@@ -111,6 +108,8 @@ const void *open_mgif(const void *mgif)
   ins->accnums[0] = 0;
   ins->accnums[1] = 0;
   ins->state = init_lzw_compressor(8);
+  ins->state->show_proc = proc;
+  ins->state->context = ctx;
   return ins;
   }
 
@@ -126,7 +125,7 @@ void close_mgif(const void *mgif)           //dealokuje buffery pro prehravani
 
 int input_code(const void *source,int32_t *bitepos,int bitsize,int mask)
   {
-      const uint8_t *esi = source;            //    mov esi,source
+      const uint8_t *esi = (const uint8_t *)source;            //    mov esi,source
       int32_t *edi = bitepos;           //    mov edi,bitepos
       int ebx = bitsize;                //    mov ebx,bitsize
       int edx = mask;                   //    mov edx,mask
@@ -292,14 +291,14 @@ end:
     */
   }
 
-void lzw_decode(MGF_PLAY_STATE *st, void *source,char *target)
+int lzw_decode(MGF_PLAY_STATE *st, const void *source,char *target)
   {
   int32_t bitpos=0;
   int code;
   int old,i;
   int old_first;
 
-  uint8_t old_value;
+  uint8_t old_value;  
 
   for(i=0;i<LZW_MAX_CODES;i++) st->compress_dic[i].first=0;
   uint8_t *t = (uint8_t *)target;
@@ -335,7 +334,8 @@ void lzw_decode(MGF_PLAY_STATE *st, void *source,char *target)
         old=code;
         }
      }
-    }
+  return t - (uint8_t *)target ;
+  }
 
 
 typedef struct frame_header_t {
@@ -376,31 +376,33 @@ char mgif_play(const void *mgif) //dekoduje a zobrazi frame
 //  int acts,size,act,csize;
   const void *scr_sav = 0;
   int scr_act=-1;
+  int bytes = 0;
 
 
 
-  pf=hdr->nx_frame;
+  pf=(const char *)hdr->nx_frame;
   FRAME_HEADER_T frame_hdr = read_frame_header(&pf);
   pc = pf;
   pf += frame_hdr.size;
   for (uint8_t i = 0; i < frame_hdr.count; ++i) {
       CHUNK_HEADER_T chunk_hdr = read_chunk_header(&pc);
       if (chunk_hdr.type == MGIF_LZW || chunk_hdr.type == MGIF_DELTA) {
-          ff=st->lzw_buffer;
-          lzw_decode(st, pc,ff);
-          scr_sav=ff;
+          ff=(char *)st->lzw_buffer;
+          bytes = lzw_decode(st, pc,ff);
+          scr_sav=ff;          
           scr_act=chunk_hdr.type;
       } else if (chunk_hdr.type==MGIF_COPY) {
           //scr_sav=ff;scr_act=act;
           //strange code
           scr_sav = pc;
           scr_act = chunk_hdr.type;
+          bytes = chunk_hdr.size;
       } else {
-          show_proc(hdr,chunk_hdr.type,pc,chunk_hdr.size);
+          hdr->state->show_proc(hdr,chunk_hdr.type,pc,chunk_hdr.size, hdr->state->context);
       }
       pc+=chunk_hdr.size;
   }
-  if (scr_act!=-1) show_proc(hdr, scr_act,scr_sav,0);
+  if (scr_act!=-1) hdr->state->show_proc(hdr, scr_act,scr_sav,bytes, hdr->state->context);
   hdr->cur_frame+=1;
   if (hdr->cur_frame==hdr->frames) return 0;
   hdr->nx_frame = pf;

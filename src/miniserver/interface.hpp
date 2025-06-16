@@ -42,6 +42,7 @@ protected:
     bool ddl_delete(Request &req);
     bool ddl_stats(Request &req);
     bool ddl_compact(Request &req);
+    bool ddl_mpg_get(Request &req);
 
 };
 

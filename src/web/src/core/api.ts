@@ -50,6 +50,15 @@ export class ApiClient {
         }
     }
 
+    async getDDLMGFFile(id: string): Promise<Uint8Array> {
+        const response = await fetch(`api/ddl/mgf/${encodeURIComponent(id)}`);
+        if (response.ok) {
+            return response.bytes();
+        } else {
+            throw Error("Get File Status: " + response.status);
+        }
+    }
+
     async putDDLFile(id: string, data: ArrayBuffer, group: number): Promise<void> {
         const response = await fetch(`api/ddl/${encodeURIComponent(id)}?group=${group}`, {
             method: "PUT",
