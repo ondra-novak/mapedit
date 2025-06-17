@@ -5,7 +5,7 @@ typedef struct lzwstate_t LZWSTATE_T;
 #ifdef __cplusplus 
     extern "C" {
 #endif
-LZWSTATE_T *lzw_init(int dic_size);
+LZWSTATE_T *lzw_init(char incremental);
 void lzw_done(LZWSTATE_T *st);
 long lzw_encode(LZWSTATE_T *st, const unsigned char *source,void *target,int size);
 void lzw_decode(LZWSTATE_T *st, const void *source,unsigned char *target);
@@ -17,7 +17,7 @@ void lzw_decode(LZWSTATE_T *st, const void *source,unsigned char *target);
 
 class LZW_t {
 public:
-    LZW_t():_ptr(lzw_init(8)) {}
+    LZW_t(bool incremental):_ptr(lzw_init(incremental?1:0)) {}
     long encode(const unsigned char *data, int data_size, void *target) {
         return lzw_encode(_ptr.get(),data, target, data_size);
     }

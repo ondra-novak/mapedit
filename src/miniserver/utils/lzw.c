@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <stdint.h>
 #include <string.h>
 #include "lzw.h"
 
@@ -25,7 +25,8 @@ typedef struct lzwstate_t
    int nextgroup;
    int bitsize;
    int init_bitsize;
-   char old_value;   
+   char incremental;
+   unsigned char old_value;   
 } LZWSTATE_T;
 
 
@@ -51,19 +52,18 @@ void reinit_lzw(LZWSTATE_T *st)
   do_clear_code(st);
   }
 
-LZWSTATE_T *lzw_init(int dic_size)
-  //dic size je velikost slovniku(bitova)
-  //pro 8 bitove hodnoty zde vloz 8.
+LZWSTATE_T *lzw_init(char incremental)
   {
    LZWSTATE_T *st = (LZWSTATE_T *)malloc(sizeof(LZWSTATE_T));
    memset(st, 0, sizeof(LZWSTATE_T));
    st->compress_dic=(DOUBLE_S *)malloc(sizeof(CODE_TABLE));
    memset(st->compress_dic, 0, sizeof(CODE_TABLE));
-   st->clear_code=1<<dic_size;
+   st->clear_code=1<<8;
    st->end_code=st->clear_code+1;
    st->free_code=st->end_code+1;
    st->nextgroup=st->free_code;
-   st->init_bitsize=st->bitsize=dic_size+1;
+   st->incremental = incremental;
+   st->init_bitsize=st->bitsize=8+1;
    do_clear_code(st);
    return st;
   }
@@ -74,6 +74,22 @@ void lzw_done(LZWSTATE_T *st)
   free(st->compress_dic);
   free(st);
   }
+
+unsigned char incremental_encode(LZWSTATE_T *st, unsigned char srcbyte) {
+   if (st->incremental) {
+      unsigned char res = srcbyte - st->old_value;
+      st->old_value = srcbyte;
+      srcbyte = res;
+   }
+   return srcbyte;
+}
+
+unsigned char incremental_decode(LZWSTATE_T *st, unsigned char srcbyte) {
+   if (st->incremental) {
+      srcbyte = st->old_value + srcbyte;
+   }
+   return srcbyte;
+}
 
 static long output_code_c(void *target,long bitepos,int bitesize,int data)
   {
@@ -135,10 +151,11 @@ long lzw_encode(LZWSTATE_T *st, const unsigned char *source,void *target,int siz
   int f;
 
   clear:
-  st->old_value=p.group=*source++;size--;
+  p.group = incremental_encode(st, *source);
+  size--;
   while (size-->0)
      {
-     p.chr=(int)((unsigned char)(*source++));st->old_value+=p.chr;
+     p.chr=incremental_encode(st,*source++);
      f=find_code(st, &p);
      if (f<0)
         {

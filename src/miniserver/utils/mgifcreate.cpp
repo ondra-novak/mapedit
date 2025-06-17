@@ -225,8 +225,8 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
     trk.add_chunk(colcount*2);
     _delta_data.clear();
     _color_data.clear();
-    _delta_data.resize(4);
-    unsigned int skip_lines = 0;
+    _delta_data.resize(3);
+    _delta_data.push_back(0xFF);
     for (unsigned int y = 0; y < height; ++y) {
         auto ofsy = y * width;
         auto dofs = _delta_data.size();
@@ -254,11 +254,14 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
             }
         }
         if (_delta_data.size() == dofs ) {
-            //no changes on line
-            ++skip_lines;
-            if (skip_lines == 63) {
-                _delta_data.push_back(skip_lines | 0xC0);
-                skip_lines = 0;
+            auto b = _delta_data.back();
+            if (b < 0xFF) {
+                _delta_data.pop_back();
+                ++b;
+                _delta_data.push_back(b);
+            }
+            else {
+                _delta_data.push_back(0xC0);
             }
         } else {
             bool d= false;
@@ -267,20 +270,21 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
                 int n = _delta_data[dofs];
                 n *= 2;
                 if (d) {       
-                    int end = n;
+                    int end = n+start;
                     for (int i = start; i < end; ++i) {
                         _color_data.push_back(pixdata[ofsy+i]);
                     }
+                    start = end;
+                
                 } else {
                     start += n;                     
                 }
                 d = !d;
                 ++dofs;
             }
-            skip_lines = 0;
+            _delta_data.push_back(0xC0);
         }
     }
-    _delta_data.push_back(skip_lines | 0xC0);
     std::uint32_t n = _delta_data.size() - 4;
     _delta_data[0] = n & 0xFF;
     _delta_data[1] = (n>>8) & 0xFF;
@@ -293,8 +297,8 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
     long len = lzw.encode(_delta_data.data(),_delta_data.size(), _color_data.data());
     trk.add_chunk(len);;
     push_chunk(trk.chunks, trk.size);
-    push_chunk(MGIF_DELTA, len);
     push_palette(pal, colcount);
-    push_data(std::string_view(reinterpret_cast<const char *>(_color_data.data()), _color_data.size()));
+    push_chunk(MGIF_DELTA, len);
+    push_data(std::string_view(reinterpret_cast<const char *>(_color_data.data()), len));
 
 }
