@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import EnemiesEditor from '@/views/EnemiesEditor.vue'
 import AssetsManager from '@/views/AssetsManager.vue'
 import FactsDB from '@/views/FactsDB.vue'
+import ItemsEditor from '@/views/ItemsEditor.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -21,6 +22,11 @@ const router = createRouter({
       path: '/assets',
       name: 'Assets',
       component: AssetsManager
+    },
+    {
+      path: '/items',
+      name: 'Items',
+      component: ItemsEditor
     },
     {
       path: '/facts',

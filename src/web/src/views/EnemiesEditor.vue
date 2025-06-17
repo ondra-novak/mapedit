@@ -2,6 +2,7 @@
 import AssetsToolCol from '@/components/AssetsToolCol.vue';
 import AssetToolSeq from '@/components/AssetToolSeq.vue';
 import CanvasView from '@/components/CanvasView.vue';
+import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { COLPaletteSet } from '@/core/col_palette_set';
@@ -12,8 +13,11 @@ import { readFileToArrayBuffer } from '@/core/read_file';
 import { SeqFile } from '@/core/seqfile';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
-const missing_sound_dat = ref<boolean>(false);
-const missing_enemy_dat = ref<boolean>(false);
+const required_files : FileItem[] =[
+    {name:"ENEMY.DAT",group:AssetGroup.MAPS,ovr:false},
+    {name:"SOUND.DAT",group:AssetGroup.MAPS,ovr:false},
+    {name:"ITEMS.DAT",group:AssetGroup.MAPS,ovr:false},
+];
 
 const enemies = ref<EnemyDef[]>([]);
 const sounds = ref<EnemySounds>([]);
@@ -35,7 +39,6 @@ const edit_seq = ref<string>();
 let dont_save_now = false;
 let need_save = false;
 
-type RefFile = typeof import_enemy_dat_file;
 
 async function  load_files() {
     const ep = server.getDDLFile("ENEMY.DAT");
@@ -44,13 +47,11 @@ async function  load_files() {
         enemies.value = enemyFromArrayBuffer((await ep).buffer);
     } catch (e) {
         console.warn("failed to load ENEMY.DAT",e);
-        missing_enemy_dat.value = true;
     }
     try {
         sounds.value = enemySoundsFromArrayBuffer((await sp).buffer);
     } catch (e) {
         console.warn("failed to load SOUND.DAT",e);
-        missing_sound_dat.value = true;
     }
     if (enemies.value && sounds.value) {
         enemies.value.forEach(enm=>{
@@ -60,34 +61,6 @@ async function  load_files() {
             }
         });
     }
-}
-
-async function import_files() {
-    const files = [
-        [import_enemy_dat_file,"ENEMY.DAT",missing_enemy_dat],
-        [import_sound_dat_file,"SOUND.DAT",missing_sound_dat],
-    ]
-
-    for (let fdef of files) {
-        const file = fdef[0] as RefFile;
-        const name = fdef[1] as string;
-        const mis = fdef[2] as typeof missing_enemy_dat;
-        if (file.value) {
-            if (file.value.name != name) {
-                alert("File "+file.value.name +" is not "+name);
-                return;
-            }
-            const buff = await readFileToArrayBuffer(file.value);
-            try {
-                await server.putDDLFile(name, buff, AssetGroup.MAPS);
-                mis.value=false;
-            } catch (e) {
-                alert(e);
-                return;
-            }
-        }
-    }
-    load_files();
 }
 
 
@@ -107,8 +80,6 @@ function assign_import_file(event: Event, what:number) {
 function create_new_project() {
     enemies.value = [];
     sounds.value = [];
-    missing_enemy_dat.value = false;
-    missing_sound_dat.value = false;    
 }
 
 async function load_graphics() {
@@ -379,7 +350,7 @@ function saveEnemyData() {
         enm.dosah = form.engagerange;
         enm.dialog = form.dialognum;
         enm.paletts_count = form.palette;
-        enm.casting = form.spe
+        enm.casting = form.casting;
         enm.sound_files = [];
         enm.sound_files[EnemySounds.MBS_HIT] = form.snd_damage;
         enm.sound_files[EnemySounds.MBS_ATTACK] = form.snd_attack;
@@ -565,15 +536,8 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
     </div>
     </div>
 
-    <div class="files-not-found" v-if="missing_enemy_dat || missing_sound_dat">
-        <p>Some files are missing. Do you want to import them from the original game</p>
-        <x-form>
-            <label v-if="missing_enemy_dat"><span>ENEMY.DAT</span><input type="file" @change="event =>assign_import_file(event, 0)" accept=".dat"></label>    
-            <label v-if="missing_sound_dat"><span>SOUND.DAT</span><input type="file" @change="event =>assign_import_file(event, 1)" accept=".dat"></label>
-        </x-form>
-        <div class="button-panel"><button @click="import_files">Import files</button></div>
-        <div class="button-panel"><button @click="create_new_project">Create empty</button></div>
-    </div>
+    <MissingFiles :files="required_files" @imported="load_files" @created_new="create_new_project"></MissingFiles>
+
     <div class="new-enemy-window" v-if="new_enemy_type !== undefined">
         <x-form>
             <label><span>Enemy graphic</span><select v-model="new_enemy_type">
@@ -621,7 +585,7 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
 .buttons>button {
     flex-grow: 1;
 }
-.files-not-found,.new-enemy-window {
+.new-enemy-window {
     position: absolute;
     left: 50%;
     top: 10vw;
@@ -639,17 +603,8 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
     height: 5em;
 }
  
-.files-not-found x-form, .new-enemy-window x-form {
+.new-enemy-window x-form {
     padding: 0 2em;
-}
-.files-not-found x-form > label > input {
-    width: 65%;
-}
-
-.files-not-found .button-panel {
-    border-top: 1px solid;
-    padding: 0.5em;
-    
 }
 
 .button-panel {

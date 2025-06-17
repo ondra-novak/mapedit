@@ -10,6 +10,7 @@ import { RouterLink, RouterView } from 'vue-router'
     <RouterLink to="/assets">Assets manager</RouterLink>
     <RouterLink to="/maps">Maps</RouterLink>
     <RouterLink to="/items">Items</RouterLink>
+    <RouterLink to="/spells">Spells</RouterLink>
     <RouterLink to="/enemies">Enemies</RouterLink>
     <RouterLink to="/characters">Characters</RouterLink>
     <RouterLink to="/dialogs">Dialogs</RouterLink>
