@@ -151,7 +151,7 @@ long lzw_encode(LZWSTATE_T *st, const unsigned char *source,void *target,int siz
   int f;
 
   clear:
-  p.group = incremental_encode(st, *source);
+  p.group = incremental_encode(st, *source++);
   size--;
   while (size-->0)
      {
@@ -203,12 +203,12 @@ static int expand_code(LZWSTATE_T *st, int code,unsigned char **target)
      {
      assert(st->compress_dic[code].group<code);
      expand_code(st, st->compress_dic[code].group,target);
-     **target=st->old_value=st->compress_dic[code].chr;
+     **target=incremental_decode(st,st->compress_dic[code].chr);
      (*target)++;
      }
   else
      {
-     **target=st->old_value=code;
+     **target=incremental_decode(st,code);
      (*target)++;
      first=code;
      }

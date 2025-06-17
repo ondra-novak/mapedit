@@ -144,7 +144,7 @@ function delete_file() {
                 v-model:file="selected_file" v-model:group="selected_group" />
             <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
             <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
-            <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" />
+            <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" @upload="onUploadDone"/>
             <div v-if="selected_tool.startsWith('goto_editor:')">
                 <div class="hint-link"><RouterLink :to="`/${selected_tool.split(':')[1]}`">Open editor</RouterLink></div>
             </div>

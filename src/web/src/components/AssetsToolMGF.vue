@@ -7,6 +7,7 @@ import { readFileToArrayBuffer, readFileToImage } from '@/core/read_file';
 import { findQuantizationAndGeneratePalette } from '@/core/image_manip';
 import { ColorLUT } from '@/core/lut';
 import { PCX } from '@/core/pcx';
+import { dosname_sanitize } from '@/core/dosname';
 
 const MGF_Action = {
     "MGIF_EMPTY":  0,
@@ -109,6 +110,7 @@ function updateCanvasByDelta(frame: ArrayBuffer) {
 }
 
 function load_next_frame() {
+    if (converting.value) return;
     if (animation_pos + 8 > animation.byteLength) {
         animation_pos = 0;
         return;
@@ -138,10 +140,10 @@ function load_next_frame() {
 }
 
 async function loadAnim() {
-    animation_pos = 0;
     if (filename.value) {
         try {
             const data = await server.getDDLMGFFile(filename.value);
+            animation_pos = 0;
             animation = data.buffer;
         } catch (e) {
             console.warn("Failed to open MGF: ", e);
@@ -169,6 +171,8 @@ onUnmounted(cleanup);
 
 const selected_files = ref<FileList>();
 const new_name = ref<string>();
+const converting = ref<boolean>(false);
+let stop_req = false;
 
 
 function select_files(event: Event) {
@@ -187,6 +191,8 @@ function setProgress(c:number,t:number) {
 }
 
 async function start() {
+    converting.value = true;
+    stop_req = false;
     progress_percent.value = "0%";
     if (!selected_files.value || !new_name.value || !canvas.value) return;
     const c = canvas.value;
@@ -197,6 +203,7 @@ async function start() {
     setProgress(1, files.length+2);
     const session = await server.mgfCreate(new_name.value,AssetGroup.ITEMS,files.length,true);
     for (let i = 0; i < files.length; ++i) {
+        if (stop_req) break;
         const f = files[i];
         const img = await readFileToImage(f);
         const ctx = c.getContext("2d", { willReadFrequently: true });
@@ -217,9 +224,16 @@ async function start() {
         if (st.need == 'N') break;
         setProgress(i+2, files.length+2);    
     }
-    const cst = await server.mgfClose(session);
-    emit("upload", new_name.value);
-    setProgress(1,1);    
+    try {
+        const cst = await server.mgfClose(session);
+        filename.value = new_name.value;   
+        loadAnim();
+        emit("upload", new_name.value);
+        setProgress(1,1);    
+    } catch (e) {
+        if (!stop_req) alert(e);
+    }
+    converting.value = false;
 }
 
 
@@ -234,10 +248,11 @@ async function start() {
 <div>
     <div>
         <input type="file" multiple @change="event => select_files(event)" />
-        <input type="text" placeholder="ANIMNAME.MGF" v-model="new_name" />
+        <input type="text" placeholder="ANIMNAME.MGF" v-model="new_name" @input="new_name=dosname_sanitize(new_name || '')" maxlength="12"/>
     </div>
     <div>
-        <button @click="start">Start</button>
+        <button @click="start" v-if="!converting" :disabled="!new_name || !new_name.endsWith('.MGF') || !selected_files || !select_files.length ">Start</button>
+        <button @click="stop_req = true" v-if="converting">Stop</button>
     </div>
     <div class="progress">
         <div :style="{width: progress_percent}"></div>

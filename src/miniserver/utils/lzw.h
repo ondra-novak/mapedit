@@ -17,7 +17,7 @@ void lzw_decode(LZWSTATE_T *st, const void *source,unsigned char *target);
 
 class LZW_t {
 public:
-    LZW_t(bool incremental):_ptr(lzw_init(incremental?1:0)) {}
+    explicit LZW_t(bool incremental):_ptr(lzw_init(incremental?1:0)) {}
     long encode(const unsigned char *data, int data_size, void *target) {
         return lzw_encode(_ptr.get(),data, target, data_size);
     }

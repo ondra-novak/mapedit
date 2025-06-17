@@ -76,6 +76,7 @@ bool MGIFCreator::put_image(const RGB *palette, std::string_view imgdata, bool t
     col_use[0] = 0;
 
     uint8_t pixdata[width*height];
+    uint8_t *outiter = pixdata;
     for (char b: imgdata) {
         uint8_t c = static_cast<uint8_t>(b);
         int new_idx = col_use[c];
@@ -84,6 +85,8 @@ bool MGIFCreator::put_image(const RGB *palette, std::string_view imgdata, bool t
             reduced[nx] = palette[c];
             ++nx;
         }
+        *outiter = static_cast<uint8_t>(new_idx);
+        ++outiter;
     }
     std::uint16_t palette16[256];
     for (int i = 0; i < nx; ++i) {
@@ -134,7 +137,7 @@ void MGIFCreator::create_lzw_copy(bool transp, const std::uint16_t *pal, unsigne
     for (std::size_t i = 0; i < total_sz; ++i) {
         _color_buffer[i] =  calc_koef(transp && (pixdata[i] == 0), pal[pixdata[i]]);
     }
-    LZW_t lzw;
+    LZW_t lzw(true);
     long sz = lzw.encode(pixdata, total_sz, outbuff);
     if (sz>total_sz) {
         trk.add_chunk(total_sz);
@@ -209,7 +212,8 @@ bool MGIFCreator::is_same(const Lab &a, const Lab &b) const {
     int dL = a.L - b.L;
     int da = a.a - b.a;
     int db = a.b - b.b;
-    return q2 <= (dL*dL + da*da + db*db);
+    bool same =  q2 > (dL*dL + da*da + db*db);
+    return same;
 }
 
 void MGIFCreator::push_palette(const std::uint16_t *pal, unsigned int colcount) {
@@ -249,9 +253,12 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
                 ++skip_cols;
             } else {
                 _delta_data.push_back(static_cast<std::uint8_t>(skip_cols));
-                skip_cols = 0;             
+                skip_cols = 1;             
                 skipm = !skipm;
             }
+        }
+        if (!skipm) {
+            _delta_data.push_back(static_cast<std::uint8_t>(skip_cols));
         }
         if (_delta_data.size() == dofs ) {
             auto b = _delta_data.back();
@@ -293,7 +300,7 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
     _delta_data.insert(_delta_data.end(), _color_data.begin(), _color_data.end());
     _color_data.clear();
     _color_data.resize(_delta_data.size() *2);
-    LZW_t lzw;
+    LZW_t lzw(true);
     long len = lzw.encode(_delta_data.data(),_delta_data.size(), _color_data.data());
     trk.add_chunk(len);;
     push_chunk(trk.chunks, trk.size);

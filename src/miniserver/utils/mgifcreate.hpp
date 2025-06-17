@@ -80,7 +80,7 @@ protected:
     unsigned int _samples_per_frame = 0; //samples per frame;
     unsigned int _prebuffer = 256*1024; //prebuffer sound frames;
     unsigned int _frames; //remainig frames
-    int _quality = 1;
+    int _quality = 9;
 
     template<typename T>
     requires(std::is_trivially_copyable_v<T>)
