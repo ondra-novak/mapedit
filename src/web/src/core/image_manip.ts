@@ -1,10 +1,6 @@
 import type { RGBPalette } from "./colors";
 
-export interface ImageDataResult {
-    width: number;
-    height: number;
-    data: Uint8ClampedArray;
-}
+type ImageDataResult = ImageData;
 
 /**
  * Extracts dimensions and RGBA pixel data from an HTMLImageElement.
@@ -32,6 +28,7 @@ export function extractImageData(img: HTMLImageElement): Promise<ImageDataResult
                 width: canvas.width,
                 height: canvas.height,
                 data: imageData.data,
+                colorSpace: "srgb"
             };
         }
     });

@@ -5,7 +5,9 @@ add_executable(mapedit_server
     ddlman.cpp 
     interface.cpp
     mgifdecomp.cpp
+    mgifcomp.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
+    utils/lzw.c
     )
 add_dependencies(mapedit_server frontend)

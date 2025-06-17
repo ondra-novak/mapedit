@@ -46,12 +46,8 @@ void do_clear_code(MGF_PLAY_STATE *st)
      }
   }
 
-void reinit_lzw(MGF_PLAY_STATE *st)
-  {
-  do_clear_code(st);
-  }
 
-MGF_PLAY_STATE *init_lzw_compressor(int dic_size)
+static MGF_PLAY_STATE *init_lzw_compressor(int dic_size)
   {
 
   MGF_PLAY_STATE *st = (MGF_PLAY_STATE *)malloc(sizeof(MGF_PLAY_STATE));
@@ -68,7 +64,7 @@ MGF_PLAY_STATE *init_lzw_compressor(int dic_size)
   }
 
 
-void done_lzw_compressor(MGF_PLAY_STATE *st)
+static void done_lzw_compressor(MGF_PLAY_STATE *st)
   {
   free(st->lzw_buffer);
   free(st->compress_dic);
@@ -143,7 +139,7 @@ int input_code(const void *source,int32_t *bitepos,int bitsize,int mask)
   }
 
 
-int de_add_code(MGF_PLAY_STATE *st, int group,int chr,int mask)
+static int de_add_code(MGF_PLAY_STATE *st, int group,int chr,int mask)
   {
   DOUBLE_S *q;
 
@@ -291,7 +287,7 @@ end:
     */
   }
 
-int lzw_decode(MGF_PLAY_STATE *st, const void *source,char *target)
+int mgif_lzw_decode(MGF_PLAY_STATE *st, const void *source,char *target)
   {
   int32_t bitpos=0;
   int code;
@@ -388,7 +384,7 @@ char mgif_play(const void *mgif) //dekoduje a zobrazi frame
       CHUNK_HEADER_T chunk_hdr = read_chunk_header(&pc);
       if (chunk_hdr.type == MGIF_LZW || chunk_hdr.type == MGIF_DELTA) {
           ff=(char *)st->lzw_buffer;
-          bytes = lzw_decode(st, pc,ff);
+          bytes = mgif_lzw_decode(st, pc,ff);
           scr_sav=ff;          
           scr_act=chunk_hdr.type;
       } else if (chunk_hdr.type==MGIF_COPY) {
@@ -419,7 +415,7 @@ char mgif_play(const void *mgif) //dekoduje a zobrazi frame
      if (act==MGIF_LZW || act==MGIF_DELTA)
         {
         ff=lzw_buffer;
-        lzw_decode(pc,ff);
+        mgif_lzw_decode(pc,ff);
         scr_sav=ff;
         scr_act=act;
         }

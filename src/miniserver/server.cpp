@@ -293,12 +293,22 @@ namespace server
             iter = std::format_to(iter, "{}: {}\r\n", content_type, application_json);                                
         } else {
             content_length = std::get<std::unique_ptr<IReader> >(body)->size();
-        }                                
+        }  
+        
+        bool nobody = status.code == 204 || status.code == 304;
 
-        iter = std::format_to(iter, "Content-Length: {}\r\n", content_length);                                
+        if (!nobody) {
+            iter = std::format_to(iter, "Content-Length: {}\r\n", content_length);                                
+        }
         iter = std::format_to(iter, "\r\n");
 
+
         if (!send_block(socket.get(), {buffer, iter})) return false;
+
+        if (nobody) {
+            complete = true;
+            return true;
+        }
 
         if (std::holds_alternative<std::string_view>(body)) {
             return complete =  send_block(socket.get(), std::get<std::string_view>(body));

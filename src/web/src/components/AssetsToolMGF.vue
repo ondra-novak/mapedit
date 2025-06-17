@@ -2,6 +2,11 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import CanvasView from './CanvasView.vue';
 import { server } from '@/core/api';
+import { AssetGroup } from '@/core/asset_groups';
+import { readFileToArrayBuffer, readFileToImage } from '@/core/read_file';
+import { findQuantizationAndGeneratePalette } from '@/core/image_manip';
+import { ColorLUT } from '@/core/lut';
+import { PCX } from '@/core/pcx';
 
 const MGF_Action = {
     "MGIF_EMPTY":  0,
@@ -15,8 +20,15 @@ const MGF_Action = {
 } as const;
 
 
+const emit = defineEmits<{
+  (e: 'upload', name: string): void
+}>();
+
+
 const filename = defineModel<string | null>();
 const canvas = ref<HTMLCanvasElement>(document.createElement("Canvas") as HTMLCanvasElement);
+
+type RGBA = number[];
 
 let animation = new ArrayBuffer();
 let animation_pos = 0;
@@ -48,11 +60,13 @@ function copyFrameToCanvas(frame: ArrayBuffer) {
         img.data[idx*4+3] = col[3];
     });
     const ctx =canvas.value.getContext("2d",{ willReadFrequently: true });
+    if (!ctx) return;
     ctx.putImageData(img, 0,0 );
 }
 
 function updateCanvasByDelta(frame: ArrayBuffer) {
     const ctx =canvas.value.getContext("2d",{ willReadFrequently: true });
+    if (!ctx) return;
     const img = ctx.getImageData(0,0,320,180);
     const dv = new DataView(frame);
     const offset = dv.getUint32(0, true);
@@ -153,13 +167,96 @@ watch([filename], loadAnim);
 onMounted(init);
 onUnmounted(cleanup);
 
+const selected_files = ref<FileList>();
+const new_name = ref<string>();
+
+
+function select_files(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const files = target.files;
+    if (files && files.length) {
+        selected_files.value = files; 
+    }
+}
+
+const progress_percent = ref<string>("0%");
+
+function setProgress(c:number,t:number) {
+    const prgs = Math.round(c/t*100);
+    progress_percent.value = `${prgs}%`;
+}
+
+async function start() {
+    progress_percent.value = "0%";
+    if (!selected_files.value || !new_name.value || !canvas.value) return;
+    const c = canvas.value;
+    c.width=320;
+    c.height=180;
+    const files = selected_files.value;
+    if (files.length == 0) return ;
+    setProgress(1, files.length+2);
+    const session = await server.mgfCreate(new_name.value,AssetGroup.ITEMS,files.length,true);
+    for (let i = 0; i < files.length; ++i) {
+        const f = files[i];
+        const img = await readFileToImage(f);
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("Failed to get canvas");
+        ctx.clearRect(0, 0, c.width, c.height);
+        ctx.drawImage(img,0,0,c.width,c.height);
+        const imgdata = ctx.getImageData(0,0,c.width,c.height);
+        const pal = findQuantizationAndGeneratePalette(imgdata,254,128,255);
+        const lut = new ColorLUT(pal, 5);
+        const pcx = new PCX(imgdata.width, imgdata.height);
+        pal.unshift([0,0,0]);
+        pcx.set_palete(pal);
+        pcx.clear(0);
+        pcx.convertImageData(imgdata, lut,1, 128, 255);            
+        const pcxbuff = pcx.toArrayBuffer();
+        const st = await server.mgfPutImage(session,pcxbuff);
+        if (!st.processed) throw new Error("Process error: "+ st.error);
+        if (st.need == 'N') break;
+        setProgress(i+2, files.length+2);    
+    }
+    const cst = await server.mgfClose(session);
+    emit("upload", new_name.value);
+    setProgress(1,1);    
+}
+
+
 </script>
 
 <template>
 <div class="place checkerboard">
     <CanvasView :canvas="canvas"></CanvasView>
 </div>
-<p>Create animation: TBD</p>
+<hr>
+<h2>Create</h2>
+<div>
+    <div>
+        <input type="file" multiple @change="event => select_files(event)" />
+        <input type="text" placeholder="ANIMNAME.MGF" v-model="new_name" />
+    </div>
+    <div>
+        <button @click="start">Start</button>
+    </div>
+    <div class="progress">
+        <div :style="{width: progress_percent}"></div>
+    </div>
+
+</div>
 
     
 </template>
+<style scoped>
+.progress {
+    border: 1px solid;
+    width: 400px;    
+    height: 2em;
+    margin: 2em auto;
+}
+
+.progress > div {
+    background-color: green;
+    height: 100%;
+}
+</style>

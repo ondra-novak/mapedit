@@ -21,6 +21,11 @@ export interface DDLFiles {
     stats: Stats;
 }
 
+export interface PutImageStatus {
+    need: string;
+    processed: boolean;
+    error: string;
+};
 
 export class ApiClient {
 
@@ -90,6 +95,52 @@ export class ApiClient {
             throw new Error(`Compact failed. Status: ${response.status}. Message: ${text}`);
        }
     }
+
+    async mgfCreate(name: string, group: number, frames:number, transparent: boolean): Promise<string> {
+        const response = await fetch(`api/ddl/mgf`, {
+            method: "POST",
+            body: JSON.stringify({
+                filename: name,
+                frames: frames,
+                transparent: transparent,
+                group: group
+            }),
+            headers: {
+                "Content-Type":"application/json"
+            }
+        });
+        if (response.status !== 201) {
+            const text = await response.text();
+            throw new Error(`mgfCreate failed. Status: ${response.status}. Message: ${text}`);
+        }
+        return await response.text()
+    }
+
+    async mgfPutImage(session: string, pcx_data: ArrayBuffer):Promise<PutImageStatus> {
+        const response = await fetch(`api/mgf_session/${session}?a=image`, {
+            method: "PUT",
+            body: pcx_data,
+            headers: {
+                "Content-Type":"application/octet-stream"
+            }
+        });
+        if (response.status !== 202) {
+            const text = await response.text();
+            throw new Error(`mgfPutImage failed. Status: ${response.status}. Message: ${text}`);
+        }
+        return await response.json();
+    }
+
+    async mgfClose(session: string): Promise<string> {
+        const response = await fetch(`api/mgf_session/${session}?a=close`, {
+            method: "PUT",
+        });
+        if (response.status !== 201) {
+            const text = await response.text();
+            throw new Error(`mgfPutImage failed. Status: ${response.status}. Message: ${text}`);
+        }
+        return await response.text();
+    } 
 
     getDownloadLink(id:string):string {
         return `api/ddl/${encodeURIComponent(id)}`;

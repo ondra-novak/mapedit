@@ -3,6 +3,8 @@
 #include "mgifdecomp.hpp"
 #include <fstream>
 #include <mutex>
+#include <json/serializer.h>
+#include <json/parser.h>
 
 namespace server {
 
@@ -15,11 +17,13 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::GET, "/api/maps/{}", &WebInterface::serve_maps},
     {Method::GET, "/api/ddl", &WebInterface::ddl_list},
     {Method::GET, "/api/ddl/mgf/{}", &WebInterface::ddl_mpg_get},
+    {Method::POST, "/api/ddl/mgf", &WebInterface::ddl_mpg_create},
     {Method::GET, "/api/ddl/{}", &WebInterface::ddl_get},
     {Method::PUT, "/api/ddl/{}", &WebInterface::ddl_put},
     {Method::DELETE, "/api/ddl/{}", &WebInterface::ddl_delete},
     {Method::POST, "/api/ddl/compact", &WebInterface::ddl_compact},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
+    {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
     {Method::GET, "/{}", &WebInterface::webserver},
     {Method::GET, "/", &WebInterface::webserver_index}
 };
@@ -240,6 +244,74 @@ WebInterface::WebInterface(Config cfg)
 {
 
 }
+
+
+bool WebInterface::ddl_mpg_create(Request &req)
+{
+    std::lock_guard _(_mgfcomp_mx);
+    json::value jrq;
+    try {
+        jrq = json::value::from_json(req.body);
+    } catch (std::exception &e) {
+        return req.response({400,"Bad Request"},{{"Content-Type","text/plain"}}, e.what());        
+    }
+    auto fname = jrq["filename"];
+    auto frames = jrq["frames"];
+    auto transp = jrq["transparent"];    
+    auto group = jrq["group"];
+    std::string_view err = {};
+    if (fname.type() != json::type::string) err = "Missing or invalid 'filename'";
+    else if (frames.type() != json::type::number || frames.as<int>() < 1) err = "Missing or invalid 'frames'";
+    else if (group.type() != json::type::number || group.as<int>() < 0) err = "Missing or invalid 'group'";
+    else if (transp.type() != json::type::boolean) err = "Missing or invalid 'transparent'";
+    if (!err.empty()) {
+        return req.response({400,"Bad Request"},{{"Content-Type","text/plain"}}, err);        
+    }
+
+    auto uuid = _mgfcomp.create_mgif(fname.as<std::string>(), group.as<int>(), frames.as<unsigned int>(), transp.as<bool>());
+
+    return req.response({201, "Created"},{{"Location","/api/mgf_session/"+uuid}},uuid);
+}
+
+bool WebInterface::ddl_mpg_session_put(Request &req)
+{
+    std::lock_guard _(_mgfcomp_mx);
+    std::string_view action;
+    std::string uuid = req.path_vars[0];
+    for (const auto &[k,v]: req.query) if (k == "a") action = v;
+    if (action.empty()) {
+        return req.response({400,"Bad Request"},{{"Content-Type","text/plain"}}, "Action 'a' is not defined");
+    }
+    if (action == "image") {        
+        auto st = _mgfcomp.put_image_pcx(uuid, req.body);
+        char need = static_cast<char>(st.need);
+        json::value status = {
+            {"need", std::string_view(&need,1)},
+            {"processed", st.processed},
+            {"error", st.reason}
+        };
+        return req.response({202}, {{"Content-Type","application/json"}}, status.to_json());        
+    }
+    if (action == "close") {
+        auto r = _mgfcomp.close(uuid);
+        if (!r.creator ) {
+            return req.response({410}, {}, "");        
+        }
+        if (r.creator->getNeed() != MGIFCreator::nothing) {
+            return req.response({204}, {}, "");
+        }
+         std::lock_guard _(_mx);
+         const auto &data = r.creator->get_data();
+         _user.put(r.name, {reinterpret_cast<const char *>(data.data()),data.size()},r.group);
+        return req.response({201},{{"Location","/api/ddl/"+r.name}},r.name);
+
+    }
+
+ 
+    return false;
+}
+
+
 
 
 }

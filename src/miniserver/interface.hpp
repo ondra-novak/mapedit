@@ -3,6 +3,7 @@
 #include "config.hpp"
 #include "ddlman.hpp"
 #include "server.hpp"
+#include "mgifcomp.hpp"
 #include <shared_mutex>
 
 
@@ -26,6 +27,9 @@ protected:
     std::filesystem::path _app_dir;
     std::filesystem::path _assets_dir;
 
+    MGifComp _mgfcomp;
+    std::mutex _mgfcomp_mx;
+
     bool webserver(Request &req);
     bool webserver_index(Request &req);
     bool webserver_assets(Request &req);
@@ -43,6 +47,8 @@ protected:
     bool ddl_stats(Request &req);
     bool ddl_compact(Request &req);
     bool ddl_mpg_get(Request &req);
+    bool ddl_mpg_create(Request &req);
+    bool ddl_mpg_session_put(Request &req);
 
 };
 

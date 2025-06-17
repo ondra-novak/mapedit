@@ -20,16 +20,22 @@ public:
         mp3,
     };
 
-    enum Need {
-        picture,
-        sound
+    enum Need : char{
+        //nothing, done
+        nothing = 'N',
+        //need picture
+        picture = 'P',
+        //need sound
+        sound = 'S',
+
     };
 
     /// @brief Initialize creator
+    /// @param frames count of frames
     /// @param s specifies sound type
     /// @param fps frames per seconds, ignored when nosound
     /// @param freq frequence of sound, ignored when nosound
-    void init(Sound s = nosound, unsigned int fps = 20, unsigned int freq = 44100);
+    void init(unsigned int frames, Sound s = nosound, unsigned int fps = 20, unsigned int freq = 44100);
 
     Need getNeed() const;
 
@@ -49,13 +55,44 @@ public:
 
     /// @brief set compression quality
     /// @param quality 1 - best, 10 - bad
-    void set_quality(int quality);
+    void set_quality(int quality) {
+        _quality = quality;
+    }
+
+    const std::vector<std::uint8_t> & get_data() const {
+        return _data;
+    }
 
 protected:
+
+    struct Lab {
+        bool t;
+        std::int8_t L;
+        std::int8_t a;
+        std::int8_t b;
+    };
+
     std::vector<std::uint8_t> _data;
-    std::vector<std::uint16_t> _color_buffer;
+    std::vector<Lab> _color_buffer;        
+    std::vector<std::uint8_t> _delta_data;
+    std::vector<std::uint8_t> _color_data;
     unsigned int _samples_left = 0; //samples count left in decoder;
     unsigned int _samples_per_frame = 0; //samples per frame;
     unsigned int _prebuffer = 256*1024; //prebuffer sound frames;
+    unsigned int _frames; //remainig frames
     int _quality = 1;
+
+    template<typename T>
+    requires(std::is_trivially_copyable_v<T>)
+    void push_data(const T &data) {
+        push_data(std::string_view(reinterpret_cast<const char *>(&data),sizeof(data)));
+    }
+
+    void push_data(std::string_view data);
+    void create_lzw_copy(bool transp, const std::uint16_t *pal, unsigned int colcount, const uint8_t *pixdata);
+    void create_lzw_delta(bool transp, const std::uint16_t *pal, unsigned int colcount, const uint8_t *pixdata);
+    void push_chunk(std::uint8_t type, std::uint32_t len);
+    static Lab calc_koef(bool transp, std::uint16_t color);
+    bool is_same(const Lab &a, const Lab &b) const;
+    void push_palette(const std::uint16_t *pal, unsigned int colcount);
 };
