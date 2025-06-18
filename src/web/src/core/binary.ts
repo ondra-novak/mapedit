@@ -320,7 +320,7 @@ export function joinUint8Arrays(arrays: ArrayBuffer[], separator : number) {
   return result;
 }
 
-interface SectionInfo {
+export interface SectionInfo {
     type: number;
     data: BinaryIterator;
 }
