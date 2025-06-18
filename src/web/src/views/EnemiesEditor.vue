@@ -44,12 +44,12 @@ async function  load_files() {
     const ep = server.getDDLFile("ENEMY.DAT");
     const sp = server.getDDLFile("SOUND.DAT");
     try {
-        enemies.value = enemyFromArrayBuffer((await ep).buffer);
+        enemies.value = enemyFromArrayBuffer((await ep));
     } catch (e) {
         console.warn("failed to load ENEMY.DAT",e);
     }
     try {
-        sounds.value = enemySoundsFromArrayBuffer((await sp).buffer);
+        sounds.value = enemySoundsFromArrayBuffer((await sp));
     } catch (e) {
         console.warn("failed to load SOUND.DAT",e);
     }
@@ -63,19 +63,6 @@ async function  load_files() {
     }
 }
 
-
-
-
-function assign_import_file(event: Event, what:number) {
-    const target = event.target as HTMLInputElement;
-    if (target && target.files && target.files[0]) {
-        const f = target.files[0];
-        switch(what) {
-            case 0: import_enemy_dat_file.value =f;break;
-            case 1: import_sound_dat_file.value =f;break;
-        }
-    }
-}
 
 function create_new_project() {
     enemies.value = [];
@@ -213,10 +200,10 @@ async function loadAppearence() {
          if (e.mobs_name) {                    
             try {
                 const seqdata = await server.getDDLFile(e.mobs_name + ".SEQ");
-                const seq = SeqFile.fromArrayBuffer(seqdata.buffer);
+                const seq = SeqFile.fromArrayBuffer(seqdata);
                 const suffix= seq.animation[0][0].suffix;
                 const imgdata = await server.getDDLFile(e.mobs_name+suffix+".PCX");
-                const pcx = PCX.fromArrayBuffer(imgdata.buffer);
+                const pcx = PCX.fromArrayBuffer(imgdata);
                 appearence.value = pcx;
                 let ofs = seq.animation[0][0].offset_x;
                 if (ofs < -999) ofs = pcx.width/2;
@@ -236,7 +223,7 @@ async function loadColors() {
         if (e.mobs_name) {
             try {
                 const paldata = await server.getDDLFile(e.mobs_name + ".COL");
-                palettes.value = COLPaletteSet.fromArrayBuffer(paldata.buffer);
+                palettes.value = COLPaletteSet.fromArrayBuffer(paldata);
             }
             catch (e) {
                 console.warn("Can't load palette", e);

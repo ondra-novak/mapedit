@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import MissingFiles from '@/components/MissingFiles.vue';
-import type { FileItem } from '@/core/api';
+import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { itemsFromArrayBuffer, ItemType, ItemTypeName, type ItemDef } from '@/core/items_struct';
 
 
 const required_files: FileItem[] = [
@@ -10,9 +11,24 @@ const required_files: FileItem[] = [
 ];
 
 const selected_item = ref<number>();
-const filteredAndSortedItems = computed(()=>{
-    return [];
-});
+
+const item_list = ref<ItemDef[]>([]);
+const filter_kind = ref<number>(-1);
+
+async function loadItems() {
+    try {
+        item_list.value = itemsFromArrayBuffer((await server.getDDLFile("ITEMS.DAT")));
+
+    } catch (e) {
+        alert("Failed to load items:"+e);
+    }
+}
+
+function init() {
+    loadItems();
+
+}
+
 
 function deleteItem() {
 
@@ -32,12 +48,33 @@ function onImported() {
 
 }
 
+const filteredAndSortedItems = computed(() => {
+    const mp =  item_list.value.filter(x=>x.jmeno.length>0)
+        .map((x,idx)=>{return [x, idx];}) as [ ItemDef, number][];
+    const srt = mp.sort((a,b)=>{
+                    return a[0].jmeno.localeCompare(b[0].jmeno);
+                });
+    return srt;
+
+});
+
+
+onMounted(init);
+
 </script>
 <template>
+    <x-workspace>
 
     <div class="left-panel">
+        <div class="filter">
+            <select v-model="filter_kind">
+            <option value="-1">-- all --</option>
+            <option v-for="(v,idx) in ItemTypeName" :key="idx" :value="idx">{{ v }}</option>
+            </select>
+            
+        </div>
         <select v-model="selected_item" size="20" class="item-list">
-            <option v-for="e in filteredAndSortedItems" :key="e[1]" :value="e[1]">{{ e[0].name }}</option>
+            <option v-for="e in filteredAndSortedItems" :key="e[1]" :value="e[1]">{{ e[0].jmeno }}</option>
         </select>
         <div class="buttons">
             <button @click="deleteItem">Delete</button>
@@ -50,6 +87,8 @@ function onImported() {
     <div class="editor" v-if="selected_item !== undefined">
     </div>
     </div>
+     </x-workspace>
+
 
 
 <MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
@@ -61,10 +100,17 @@ function onImported() {
 .left-panel {
     width: 200px;
     position: absolute;
-    top: 2.25rem;
+    top: 2rem;
     bottom: 0px;
     display: block;
     box-sizing: border-box;
+}
+.left-panel .filter {
+    position:absolute;
+    top:-2rem;
+    display: flex;
+    height: 2em;
+    justify-items: stretch;
 }
 .item-list {
     position: absolute;

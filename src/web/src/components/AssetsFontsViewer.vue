@@ -89,7 +89,7 @@ async function loadFont() {
                 let y = 0;
                 let h = 0;
                 for (let i = 0;i < 255; ++i) {
-                    let [cw,ch] = getCharDim(data.buffer, i);
+                    let [cw,ch] = getCharDim(data, i);
                     if (h < ch) h = ch;
                     if (x+cw >= canvas.value.width) {
                         x = 0;

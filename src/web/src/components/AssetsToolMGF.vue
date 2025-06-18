@@ -144,7 +144,7 @@ async function loadAnim() {
         try {
             const data = await server.getDDLMGFFile(filename.value);
             animation_pos = 0;
-            animation = data.buffer;
+            animation = data;
         } catch (e) {
             console.warn("Failed to open MGF: ", e);
         }

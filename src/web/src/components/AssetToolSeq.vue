@@ -88,7 +88,7 @@ async function onChangeFrame() {
         let w = 0;
         if (frinfo) {
             cur_face.value = frinfo.suffix;
-            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(face2filename(frinfo.suffix))).buffer);
+            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(face2filename(frinfo.suffix))));
             w = cur_image.value.width ;
             if (frinfo.offset_x <= -1000) {
                 frinfo.offset_x = w/2;                

@@ -29,7 +29,7 @@ async function load() {
         while (true) {
             const name = lib_name(idx);
             const file = await server.getDDLFile(name);
-            const lib = IconLib.fromArrayBuffer(file.buffer);
+            const lib = IconLib.fromArrayBuffer(file);
             if (!icons.value) {
                 icons.value = [];
             }
@@ -77,7 +77,8 @@ function replace(idx: number) {
                 const imgdata:ImageDataResult = {
                     width:d.width,
                     height:d.height,
-                    data:d.data
+                    data:d.data,
+                    colorSpace:"srgb"
                 };
                 const pal = findQuantizationAndGeneratePalette(imgdata,254,128,255);
                 const lut = new ColorLUT(pal, 6);

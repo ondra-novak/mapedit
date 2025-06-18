@@ -27,6 +27,10 @@ export interface PutImageStatus {
     error: string;
 };
 
+interface ArrayBufferWithBuffer extends ArrayBuffer {
+    buffer: ArrayBuffer;
+}
+
 export class ApiClient {
 
     // DDL
@@ -46,19 +50,21 @@ export class ApiClient {
         return json;
     }
 
-    async getDDLFile(id: string): Promise<Uint8Array> {
+    async getDDLFile(id: string): Promise<ArrayBuffer> {
         const response = await fetch(`api/ddl/${encodeURIComponent(id)}`);
         if (response.ok) {
-            return response.bytes();
+            const n = ((await response.bytes()).buffer);
+            return n
         } else {
             throw Error("Get File Status: " + response.status);
         }
     }
 
-    async getDDLMGFFile(id: string): Promise<Uint8Array> {
+    async getDDLMGFFile(id: string): Promise<ArrayBuffer> {
         const response = await fetch(`api/ddl/mgf/${encodeURIComponent(id)}`);
         if (response.ok) {
-            return response.bytes();
+            const n = ((await response.bytes()).buffer);
+            return n
         } else {
             throw Error("Get File Status: " + response.status);
         }

@@ -70,7 +70,7 @@ watch([buffer], ()=>offset.value = 0);
 async function loadFile() {
     if (filename.value) {
         try {            
-            buffer.value = (await server.getDDLFile(filename.value)).buffer;
+            buffer.value = (await server.getDDLFile(filename.value));
         } catch (e) {
             alert(e);
         }

@@ -1,6 +1,6 @@
 import type { RGBPalette } from "./colors";
 
-type ImageDataResult = ImageData;
+export type ImageDataResult = ImageData;
 
 /**
  * Extracts dimensions and RGBA pixel data from an HTMLImageElement.

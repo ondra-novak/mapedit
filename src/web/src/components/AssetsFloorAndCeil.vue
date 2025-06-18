@@ -82,7 +82,7 @@ async function finalize_image(imageData: ImageDataResult) {
 async function generate_floor() {
     if (tile1ImageData && tile2ImageData) {
         const targetData :ImageDataResult = {
-            width:640,height:199,data:new Uint8ClampedArray(640*480*4)
+            width:640,height:199,data:new Uint8ClampedArray(640*480*4), colorSpace:"srgb"
         }        
         createFloorCeil(tile1ImageData, tile2ImageData, targetData, "floor");
         await finalize_image(targetData);
@@ -92,7 +92,7 @@ async function generate_floor() {
 async function generate_ceil() {
     if (tile1ImageData && tile2ImageData) {
         const targetData :ImageDataResult = {
-            width:640,height:90,data:new Uint8ClampedArray(640*480*4)
+            width:640,height:90,data:new Uint8ClampedArray(640*480*4), colorSpace:"srgb"
         }        
         createFloorCeil(tile1ImageData, tile2ImageData, targetData, "ceil");
         await finalize_image(targetData);

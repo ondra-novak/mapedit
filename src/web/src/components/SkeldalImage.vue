@@ -48,15 +48,15 @@ async function update() {
     if (model.value) {
         try {
             const data = await server.getDDLFile(model.value.name);
-            if (PCX.isSupported(data.buffer)) {
-                const pcx = PCX.fromArrayBuffer(data.buffer);
+            if (PCX.isSupported(data)) {
+                const pcx = PCX.fromArrayBuffer(data);
                 const profile = determineProfile(model.value.name, model.value.group, pcx);
                 if (props.palette) pcx.set_palete(props.palette);
                 set_canvas( pcx.createCanvas(profile));
                 width.value = pcx.width;
                 height.value = pcx.height;
-            } else if (HIFormat.isSupported(data.buffer)) {
-                const hi = HIFormat.fromArrayBuffer(data.buffer);
+            } else if (HIFormat.isSupported(data)) {
+                const hi = HIFormat.fromArrayBuffer(data);
                 set_canvas( hi.createCanvas());
                 width.value = hi.width;
                 height.value = hi.height;

@@ -39,7 +39,7 @@ function save_col(name : string) {
 async function prepareImage(fname: string) {
     try {
         const data = await server.getDDLFile(fname);
-        enemy_image.value = PCX.fromArrayBuffer(data.buffer);
+        enemy_image.value = PCX.fromArrayBuffer(data);
     } catch (e) {
         alert(e);
     }
@@ -66,7 +66,7 @@ async function onUpdatePalete(newValue:[string|undefined], oldValue:[string|unde
         try {
             if (oldValue[0]) await save_col(oldValue[0]);
             const data = await server.getDDLFile(palete_col_name.value);
-            palete_col.value = COLPaletteSet.fromArrayBuffer(data.buffer);
+            palete_col.value = COLPaletteSet.fromArrayBuffer(data);
         } catch (e) {
             palete_col.value = new COLPaletteSet();
             palete_col.value.addPalette(enemy_image.value?.get_palette());            

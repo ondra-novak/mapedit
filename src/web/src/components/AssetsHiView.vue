@@ -24,7 +24,7 @@ const emit = defineEmits<{
 async function load_file(file: string) {
     try {
         const data = await server.getDDLFile(file);
-        const pic = HIFormat.fromArrayBuffer(data.buffer);
+        const pic = HIFormat.fromArrayBuffer(data);
         return pic.createCanvas();
     } catch (e) {
         alert(e);
