@@ -118,7 +118,7 @@ onMounted(init);
 <style scoped>
 
 .left-panel {
-    width: 200px;
+    width: 240px;
     position: absolute;
     top: 2rem;
     bottom: 0px;
@@ -131,7 +131,7 @@ onMounted(init);
     display: flex;
     height: 2em;
     justify-items: stretch;
-    width:200px;
+    width:240px;
 }
 .left-panel .filter > * {
     flex-grow: 1;
@@ -162,8 +162,8 @@ onMounted(init);
 
 .editor-bgr {
     position: absolute;
-    left: 200px;
-    top:2.25em;right:0;bottom: 0;
+    left: 240px;
+    top:0;right:0;bottom: 0;
     padding: 1em;
     background-color: #ccc;
     box-sizing: border-box;

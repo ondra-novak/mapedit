@@ -384,144 +384,146 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
 
 </script>
 
-<template>    
-    <div class="left-panel">
-        <select v-model="selected_enemy" size="20" class="enemy-list">
-            <option v-for="e in filteredAndSortedEnemies" :key="e[1]" :value="e[1]">{{ e[0].name }}</option>
-        </select>
-        <div class="buttons">
-            <button @click="deleteEnemy">Delete</button>
-            <button @click="cloneEnemy">Clone</button>
-            <button @click="addEnemy">New</button>
-        </div>
-    </div>
-
-    <div class="editor-bgr">
-    <div class="editor" v-if="selected_enemy !== undefined">
-        <div class="multiple">
-            <x-section>
-                <x-section-title>Basic parameters</x-section-title>
-                <x-form>
-                    <label><span>Name</span><input type="text" v-model="form.name" maxlength="29"></label>
-                    <label><span>Color</span><select v-model="form.palette">
-                        <option value="0">Original color</option>
-                        <option v-if="palettes && palettes.palettes.length>0" :value="palettes.palettes.length">Randomize</option>
-                        <option v-for="(p, idx) of (palettes?palettes.palettes:[])" :key="idx" :value="-idx-1">Palette {{ idx }}</option>
-                    </select></label>
-                    <label><span>Speed (px per frame)</span><input type="number" v-model="form.speed"></label>
-                    <label><span>Sight range</span><input type="number" v-model="form.sightrange"></label>
-                    <label><span>Engage range</span><input type="number" v-model="form.engagerange"></label>
-                </x-form>
-            </x-section>
-            <x-section>
-                <x-section-title>Flags</x-section-title>
-                <x-form>
-                <label><input type="checkbox" v-model="chk_f2.MOB_PASSABLE"/><span>Through (not blocking)</span></label>
-                <label><input type="checkbox" v-model="chk_f2.MOB_MOBILE"/><span>Just traveling sound effect</span></label>
-                <label><input type="checkbox" v-model="chk_f2.MOB_RELOAD"/><span>Respawn</span></label>
-                </x-form>
-            </x-section>
-            <x-section>
-                <x-section-title>Sounds</x-section-title>
-                <x-form>
-                    <label><span>Walk</span><select v-model="form.snd_walk"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
-                    <label><input v-model="chk_f2.MOB_SAMPLE_LOOP" type="checkbox" /><span>Loop</span></label>
-                    <label><span>Attack</span><select v-model="form.snd_attack"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
-                    <label><span>Damaged</span><select v-model="form.snd_damage"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
-                </x-form>
-            </x-section>
-        </div>
-        <x-section class="appearence">
-            <x-section-title>Appearence</x-section-title>
-            <div :style="{margin: appearence_margin}" @click="edit_seq = enemies[selected_enemy || 0].mobs_name + '.SEQ'">
-                <CanvasView :canvas="appearence?appearence.createCanvas(PCXProfile.enemy,palettes && form.palette<0?palettes.palettes[-form.palette-1]:undefined):null" />
+<template>      
+    <x-workspace>
+        <div class="left-panel">
+            <select v-model="selected_enemy" size="20" class="enemy-list">
+                <option v-for="e in filteredAndSortedEnemies" :key="e[1]" :value="e[1]">{{ e[0].name }}</option>
+            </select>
+            <div class="buttons">
+                <button @click="deleteEnemy">Delete</button>
+                <button @click="cloneEnemy">Clone</button>
+                <button @click="addEnemy">New</button>
             </div>
-        </x-section>
-        <x-section>
-            <x-form>
-                <x-section-title>Stats</x-section-title>
-                <label><span>Hit points</span><input v-model="form.stat_hp" type="number" min="0" max="65535"/></label>
-                <label><span>Strength</span><input v-model="form.stat_str"type="number" min="0" max="100"/></label>
-                <label><span>Magic (% of casting)</span><input v-model="form.stat_mg" type="number" min="0" max="100"/></label>
-                <label><span>Movement (/15 actions)</span><input v-model="form.stat_mv" type="number" min="0" max="100"/></label>
-                <label><span>Dexterity</span><input v-model="form.stat_dex" type="number" min="0" max="100"/></label>
-                <label><span>Defense</span><div><input v-model="form.stat_def_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_def_max" type="number" min="0" max="65535"/></div></label>
-                <label><span>Attack</span><div><input v-model="form.stat_att_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_att_max" type="number" min="0" max="65535"/></div></label>
-                <label><span>Extra damage</span><input v-model="form.stat_damage" type="number" /></label>
-                <label><span>Magic attack</span><div><input v-model="form.stat_mg_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_mg_min" type="number" min="0" max="65535"/></div></label>
-                <label><span>Magic attack type</span><div><select v-model="form.stat_mg_type">
-                    <option value="-1">--select--</option>
-                    <option value="0">fire</option>
-                    <option value="1">water</option>
-                    <option value="2">earth</option>
-                    <option value="3">air</option>
-                    <option value="4">mind</option>
-                </select></div></label>
-                <label><span>Protection (fire)</span><input  v-model="form.stat_prot_f" type="number" min="0" max="100"/></label>
-                <label><span>Protection (water)</span><input  v-model="form.stat_prot_w" type="number" min="0" max="100"/></label>
-                <label><span>Protection (earth)</span><input  v-model="form.stat_prot_e" type="number" min="0" max="100"/></label>
-                <label><span>Protection (air)</span><input  v-model="form.stat_prot_a" type="number" min="0" max="100"/></label>
-                <label><span>Protection (mind)</span><input  v-model="form.stat_prot_m" type="number" min="0" max="100"/></label>
-                <label><span>Regeneration</span><input v-model="form.stat_reg" type="number" min="0" max="65535"/></label>
-            </x-form>
-        </x-section>
-        <x-section>
-            <x-section-title>Effects</x-section-title>
-            <x-form>
-                <label><input type="checkbox" v-model="chk_eff.SPL_INVIS"/><span>Invisible</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_OKO"/><span>Eye by eye</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_DRAIN"/><span>Live drain</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_SANC"/><span>Physical resistance (50%)</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_HSANC"/><span>Magical resistance (50%)</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_BLIND"/><span>Blinded</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_REGEN"/><span>Regenerate during battle</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_KNOCK"/><span>Hit knock back</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_FEAR"/><span>Fear (flee from battle)</span></label>
-                <label><input type="checkbox" v-model="chk_eff.SPL_STONED"/><span>Stoned</span></label>
-            </x-form>
-        </x-section>
-        <x-section>
-            <x-section-title>Behavior</x-section-title>
-            <x-form>
-                <label><input type="checkbox" v-model="chk_f1.MOB_WALK"/><span>Walking</span></label>
-                <label><input type="checkbox" v-model="chk_f1.MOB_WATCH"/><span>Engage player</span></label>
-                <label><input type="checkbox" v-model="chk_f1.MOB_LISTEN"/><span>Can hear sound</span></label>
-                <label><input type="checkbox" v-model="chk_f2.MOB_SENSE"/><span>See invisible</span></label>
-                <label><input type="checkbox" v-model="chk_f1.MOB_GUARD"/><span>Guarding the home room</span></label>
-                <label><input type="checkbox" v-model="chk_f1.MOB_PICK"/><span>Scavenger</span></label>
-                <label><input type="checkbox" v-model="chk_f2.MOB_CASTING"/><span>Spellcaster - spell id: <input v-model="form.casting" type="number"></span></label>
-                <label><input type="checkbox" v-model="chk_f1.MOB_ROGUE"/><span>Ranger (shoots): </span></label>
-                <label><span>Flee probability [%]</span><input v-model="form.flee_prob" type="number" min="0" max="100"/></label>
-                <label><span>Special Behavior</span><select v-model="form.specproc">
-                    <option value="0">Nothing</option>
-                    <option value="2">Turn around in cycle</option>
-                    <option value="3">Cast random spell(defunc)</option>
-                    <option value="4">Ranger - keep distance</option>
-                    <option value="5">Open door</option>
-                    <option value="6">Open door in battle</option>
-                    <option value="7">Alarm (send sound)</option>
-                    <option value="8">Attack at wimpy</option>
-                    <option value="9">Held on place</option>
-                </select></label>
-                <label><span>Dialog number</span><input type="number" v-model="form.dialognum"></label>
-            </x-form>
-        </x-section>
-        <x-section>
-            <x-section-title>Other properties</x-section-title>
-            <x-form>
-                <label><span>Drop money</span><input v-model="form.money" type="number" min="0" max="65535"/></label>
-                <label><span>Total experience</span><input v-model="form.exp" type="number" min="0" max="999999"/></label>
-                <label><span>Kill experience</span><input v-model="form.bonus_exp" type="number" min="0" max="999999"/></label>
-                <label><span>Inventory</span><div><div><select>
-                    <option value="0">-- select item --</option>
-                </select></div><div><select>
-                    <option value="0">-- select item --</option>
-                </select></div></div></label>
+        </div>
 
-            </x-form>
-        </x-section>
-    </div>
-    </div>
+        <div class="editor-bgr">
+        <div class="editor" v-if="selected_enemy !== undefined">
+            <div class="multiple">
+                <x-section>
+                    <x-section-title>Basic parameters</x-section-title>
+                    <x-form>
+                        <label><span>Name</span><input type="text" v-model="form.name" maxlength="29"></label>
+                        <label><span>Color</span><select v-model="form.palette">
+                            <option value="0">Original color</option>
+                            <option v-if="palettes && palettes.palettes.length>0" :value="palettes.palettes.length">Randomize</option>
+                            <option v-for="(p, idx) of (palettes?palettes.palettes:[])" :key="idx" :value="-idx-1">Palette {{ idx }}</option>
+                        </select></label>
+                        <label><span>Speed (px per frame)</span><input type="number" v-model="form.speed"></label>
+                        <label><span>Sight range</span><input type="number" v-model="form.sightrange"></label>
+                        <label><span>Engage range</span><input type="number" v-model="form.engagerange"></label>
+                    </x-form>
+                </x-section>
+                <x-section>
+                    <x-section-title>Flags</x-section-title>
+                    <x-form>
+                    <label><input type="checkbox" v-model="chk_f2.MOB_PASSABLE"/><span>Through (not blocking)</span></label>
+                    <label><input type="checkbox" v-model="chk_f2.MOB_MOBILE"/><span>Just traveling sound effect</span></label>
+                    <label><input type="checkbox" v-model="chk_f2.MOB_RELOAD"/><span>Respawn</span></label>
+                    </x-form>
+                </x-section>
+                <x-section>
+                    <x-section-title>Sounds</x-section-title>
+                    <x-form>
+                        <label><span>Walk</span><select v-model="form.snd_walk"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                        <label><input v-model="chk_f2.MOB_SAMPLE_LOOP" type="checkbox" /><span>Loop</span></label>
+                        <label><span>Attack</span><select v-model="form.snd_attack"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                        <label><span>Damaged</span><select v-model="form.snd_damage"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                    </x-form>
+                </x-section>
+            </div>
+            <x-section class="appearence">
+                <x-section-title>Appearence</x-section-title>
+                <div :style="{margin: appearence_margin}" @click="edit_seq = enemies[selected_enemy || 0].mobs_name + '.SEQ'">
+                    <CanvasView :canvas="appearence?appearence.createCanvas(PCXProfile.enemy,palettes && form.palette<0?palettes.palettes[-form.palette-1]:undefined):null" />
+                </div>
+            </x-section>
+            <x-section>
+                <x-form>
+                    <x-section-title>Stats</x-section-title>
+                    <label><span>Hit points</span><input v-model="form.stat_hp" type="number" min="0" max="65535"/></label>
+                    <label><span>Strength</span><input v-model="form.stat_str"type="number" min="0" max="100"/></label>
+                    <label><span>Magic (% of casting)</span><input v-model="form.stat_mg" type="number" min="0" max="100"/></label>
+                    <label><span>Movement (/15 actions)</span><input v-model="form.stat_mv" type="number" min="0" max="100"/></label>
+                    <label><span>Dexterity</span><input v-model="form.stat_dex" type="number" min="0" max="100"/></label>
+                    <label><span>Defense</span><div><input v-model="form.stat_def_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_def_max" type="number" min="0" max="65535"/></div></label>
+                    <label><span>Attack</span><div><input v-model="form.stat_att_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_att_max" type="number" min="0" max="65535"/></div></label>
+                    <label><span>Extra damage</span><input v-model="form.stat_damage" type="number" /></label>
+                    <label><span>Magic attack</span><div><input v-model="form.stat_mg_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_mg_min" type="number" min="0" max="65535"/></div></label>
+                    <label><span>Magic attack type</span><div><select v-model="form.stat_mg_type">
+                        <option value="-1">--select--</option>
+                        <option value="0">fire</option>
+                        <option value="1">water</option>
+                        <option value="2">earth</option>
+                        <option value="3">air</option>
+                        <option value="4">mind</option>
+                    </select></div></label>
+                    <label><span>Protection (fire)</span><input  v-model="form.stat_prot_f" type="number" min="0" max="100"/></label>
+                    <label><span>Protection (water)</span><input  v-model="form.stat_prot_w" type="number" min="0" max="100"/></label>
+                    <label><span>Protection (earth)</span><input  v-model="form.stat_prot_e" type="number" min="0" max="100"/></label>
+                    <label><span>Protection (air)</span><input  v-model="form.stat_prot_a" type="number" min="0" max="100"/></label>
+                    <label><span>Protection (mind)</span><input  v-model="form.stat_prot_m" type="number" min="0" max="100"/></label>
+                    <label><span>Regeneration</span><input v-model="form.stat_reg" type="number" min="0" max="65535"/></label>
+                </x-form>
+            </x-section>
+            <x-section>
+                <x-section-title>Effects</x-section-title>
+                <x-form>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_INVIS"/><span>Invisible</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_OKO"/><span>Eye by eye</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_DRAIN"/><span>Live drain</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_SANC"/><span>Physical resistance (50%)</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_HSANC"/><span>Magical resistance (50%)</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_BLIND"/><span>Blinded</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_REGEN"/><span>Regenerate during battle</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_KNOCK"/><span>Hit knock back</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_FEAR"/><span>Fear (flee from battle)</span></label>
+                    <label><input type="checkbox" v-model="chk_eff.SPL_STONED"/><span>Stoned</span></label>
+                </x-form>
+            </x-section>
+            <x-section>
+                <x-section-title>Behavior</x-section-title>
+                <x-form>
+                    <label><input type="checkbox" v-model="chk_f1.MOB_WALK"/><span>Walking</span></label>
+                    <label><input type="checkbox" v-model="chk_f1.MOB_WATCH"/><span>Engage player</span></label>
+                    <label><input type="checkbox" v-model="chk_f1.MOB_LISTEN"/><span>Can hear sound</span></label>
+                    <label><input type="checkbox" v-model="chk_f2.MOB_SENSE"/><span>See invisible</span></label>
+                    <label><input type="checkbox" v-model="chk_f1.MOB_GUARD"/><span>Guarding the home room</span></label>
+                    <label><input type="checkbox" v-model="chk_f1.MOB_PICK"/><span>Scavenger</span></label>
+                    <label><input type="checkbox" v-model="chk_f2.MOB_CASTING"/><span>Spellcaster - spell id: <input v-model="form.casting" type="number"></span></label>
+                    <label><input type="checkbox" v-model="chk_f1.MOB_ROGUE"/><span>Ranger (shoots): </span></label>
+                    <label><span>Flee probability [%]</span><input v-model="form.flee_prob" type="number" min="0" max="100"/></label>
+                    <label><span>Special Behavior</span><select v-model="form.specproc">
+                        <option value="0">Nothing</option>
+                        <option value="2">Turn around in cycle</option>
+                        <option value="3">Cast random spell(defunc)</option>
+                        <option value="4">Ranger - keep distance</option>
+                        <option value="5">Open door</option>
+                        <option value="6">Open door in battle</option>
+                        <option value="7">Alarm (send sound)</option>
+                        <option value="8">Attack at wimpy</option>
+                        <option value="9">Held on place</option>
+                    </select></label>
+                    <label><span>Dialog number</span><input type="number" v-model="form.dialognum"></label>
+                </x-form>
+            </x-section>
+            <x-section>
+                <x-section-title>Other properties</x-section-title>
+                <x-form>
+                    <label><span>Drop money</span><input v-model="form.money" type="number" min="0" max="65535"/></label>
+                    <label><span>Total experience</span><input v-model="form.exp" type="number" min="0" max="999999"/></label>
+                    <label><span>Kill experience</span><input v-model="form.bonus_exp" type="number" min="0" max="999999"/></label>
+                    <label><span>Inventory</span><div><div><select>
+                        <option value="0">-- select item --</option>
+                    </select></div><div><select>
+                        <option value="0">-- select item --</option>
+                    </select></div></div></label>
+
+                </x-form>
+            </x-section>
+        </div>
+        </div>
+    </x-workspace>
 
     <MissingFiles :files="required_files" @imported="load_files" @created_new="create_new_project"></MissingFiles>
 
@@ -543,9 +545,9 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
 
 <style scoped>
 .left-panel {
-    width: 200px;
+    width: 240px;
     position: absolute;
-    top: 2.25rem;
+    top: 0;
     bottom: 0px;
     display: block;
     box-sizing: border-box;
@@ -610,8 +612,8 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
 
 .editor-bgr {
     position: absolute;
-    left: 200px;
-    top:2.25em;right:0;bottom: 0;
+    left: 240px;
+    top:0;right:0;bottom: 0;
     padding: 1em;
     background-color: #ccc;
     box-sizing: border-box;

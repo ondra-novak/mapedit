@@ -2,7 +2,7 @@
 import AssetsPcxView from '@/components/AssetsPcxView.vue';
 import AssetsHiView from '@/components/AssetsHiView.vue';
 import AssetsList from '../components/AssetsList.vue'
-import { ref, watch, onMounted, computed, defineEmits, onUnmounted } from 'vue';
+import { ref, watch, onMounted, computed, defineEmits, onUnmounted, getCurrentInstance } from 'vue';
 import { AssetGroup } from '@/core/asset_groups';
 import type {AssetGroupType}from '@/core/asset_groups';
 import { server, type FileItem } from '@/core/api';
@@ -15,6 +15,7 @@ import AssetsToolUpload from '@/components/AssetsToolUpload.vue';
 import HexView from '@/components/HexView.vue';
 import AssetsToolMGF from '@/components/AssetsToolMGF.vue';
 import AssetsFontsViewer from '@/components/AssetsFontsViewer.vue';
+import TextsEditor from '@/components/TextsEditor.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -34,6 +35,7 @@ watch([selected_tool], ()=>{
 function select_tool() : string | null {
     if (!cur_file_model.value) return null;
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
+    if (cur_file_model.value.name.endsWith(".TXT")) return "strings";
     switch (cur_file_model.value.group) {
         case AssetGroup.WALLS: return "walls";
         case AssetGroup.ENEMIES:if (cur_file_model.value.name.endsWith(".SEQ") )
@@ -124,6 +126,7 @@ function delete_file() {
             <option value="uigfx">UI and other</option>
             <option value="dialogshi">Dialog portraits</option>
             <option value="fonts">Fonts</option>            
+            <option value="strings">Texts</option>            
             <option value="upload">Upload and download</option>
             <option value="hexview">HexView</option>
             <option value="ddlinfo">Manage DDL</option>
@@ -144,6 +147,7 @@ function delete_file() {
                 v-model:file="selected_file" v-model:group="selected_group" />
             <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
             <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
+            <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" @upload="onUploadDone"/>
             <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" @upload="onUploadDone"/>
             <div v-if="selected_tool.startsWith('goto_editor:')">
                 <div class="hint-link"><RouterLink :to="`/${selected_tool.split(':')[1]}`">Open editor</RouterLink></div>
