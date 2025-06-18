@@ -157,42 +157,40 @@ export function itemsFromArrayBuffer(buffer: ArrayBuffer) : ItemDef[]{
 }
 
 export const ItemType = {
-IT_UNSPECIFIED:    0,
-
-IT_ARMOR:    1,
-IT_WEAPON:   2,
-IT_SCROLL:   3,
-IT_SHOOTING: 4,
-IT_THROW:    5,
-IT_LEKTVAR:  6,
-IT_JIDLO:    7,
-IT_BATOH:    8,
-IT_SPECIAL:  9,
-IT_RUNE:    10,
-IT_MONEY:   11,
-IT_TEXTSCROLL: 12,
-IT_DUST:    13,
-IT_OTHER:    14,
+TYP_CONTAINER: 0,
+TYP_UTOC: 1,
+TYP_VRHACI: 2,
+TYP_STRELNA: 3,
+TYP_ZBROJ: 4,
+TYP_SVITEK: 5,
+TYP_LEKTVAR: 6,
+TYP_VODA: 7,
+TYP_JIDLO: 8,
+TYP_SPECIALNI: 9,
+TYP_RUNA: 10,
+TYP_PENIZE: 11,
+TYP_SVITXT: 12,
+TYP_PRACH: 13,
+TYP_OTHER: 14,
 } as const;
 
-export const ItemTypeName = [
-  [ItemType.IT_ARMOR,"Armor"],
-  [ItemType.IT_WEAPON,"Melee Weapon"],
-  [ItemType.IT_SCROLL,"Scroll/Wand"],
-  [ItemType.IT_SHOOTING,"Ranged Weapon"],
-  [ItemType.IT_THROW,"Throwing Weapon" ],
-  [ItemType.IT_LEKTVAR,"Potion"],
-  [ItemType.IT_JIDLO,"Food"],
-  [ItemType.IT_BATOH,"Container"],
-  [ItemType.IT_SPECIAL,"Special"],
-  [ItemType.IT_SPECIAL,"Special"],
-  [ItemType.IT_UNSPECIFIED,"Unspecified"],
-  [ItemType.IT_RUNE,"Rune"],
-  [ItemType.IT_MONEY,"Money"],
-  [ItemType.IT_TEXTSCROLL,"Scroll with text"],
-  [ItemType.IT_DUST,"Dust"],
-  [ItemType.IT_OTHER,"Other"],
-].reduce((a,b:any[])=>{
-  a[b[0]] = b[1];
+export const ItemTypeName: string[] = [
+  [ItemType.TYP_CONTAINER, "Container"],
+  [ItemType.TYP_UTOC, "Melee Weapon"],
+  [ItemType.TYP_VRHACI, "Throwing"],
+  [ItemType.TYP_STRELNA, "Ranged Weapon"],
+  [ItemType.TYP_ZBROJ, "Clothing"],
+  [ItemType.TYP_SVITEK, "Scroll/Wand"],
+  [ItemType.TYP_LEKTVAR, "Potion"],
+  [ItemType.TYP_VODA, "Water"],
+  [ItemType.TYP_JIDLO, "Food"],
+  [ItemType.TYP_SPECIALNI, "Special"],
+  [ItemType.TYP_RUNA, "Rune"],
+  [ItemType.TYP_PENIZE, "Money"],
+  [ItemType.TYP_SVITXT, "Book Page"],
+  [ItemType.TYP_PRACH, "Dust"],
+  [ItemType.TYP_OTHER, "Other"]
+].reduce<string[]>((a, b) => {
+  a[b[0] as number] = b[1] as string;
   return a;
-},[] as string[]);
+}, []);

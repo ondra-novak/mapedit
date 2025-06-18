@@ -14,6 +14,7 @@ const selected_item = ref<number>();
 
 const item_list = ref<ItemDef[]>([]);
 const filter_kind = ref<number>(-1);
+const filter_search = ref<string>("");
 
 async function loadItems() {
     try {
@@ -31,7 +32,11 @@ function init() {
 
 
 function deleteItem() {
-
+    if (selected_item.value !== undefined && item_list.value) {
+        if (confirm("Are you sure delete item: " + item_list.value[selected_item.value].jmeno)) {
+            item_list.value[selected_item.value].jmeno = "";
+        }
+    }
 }
 function cloneItem() {
 
@@ -49,12 +54,25 @@ function onImported() {
 }
 
 const filteredAndSortedItems = computed(() => {
+
     const mp =  item_list.value.filter(x=>x.jmeno.length>0)
+        .filter(x=>(!filter_kind.value === undefined|| filter_kind.value<0 || filter_kind.value == x.druh)
+                && (!filter_search.value ||  
+                    x.jmeno.indexOf(filter_search.value) != -1 || x.popis.indexOf(filter_search.value) != -1
+                ))
         .map((x,idx)=>{return [x, idx];}) as [ ItemDef, number][];
     const srt = mp.sort((a,b)=>{
-                    return a[0].jmeno.localeCompare(b[0].jmeno);
+                    return (a[0].druh - b[0].druh )||  (a[0].jmeno.localeCompare(b[0].jmeno));
                 });
-    return srt;
+    const res = [];
+    for (const itm of srt) {
+        if (res.length == 0 || res[res.length-1].cat != itm[0].druh) {
+            res.push({cat:itm[0].druh, items:[itm]});
+        } else{
+            res[res.length-1].items.push(itm);
+        }
+    }
+    return res;
 
 });
 
@@ -71,10 +89,12 @@ onMounted(init);
             <option value="-1">-- all --</option>
             <option v-for="(v,idx) in ItemTypeName" :key="idx" :value="idx">{{ v }}</option>
             </select>
-            
+            <input type="search" v-model="filter_search">
         </div>
         <select v-model="selected_item" size="20" class="item-list">
-            <option v-for="e in filteredAndSortedItems" :key="e[1]" :value="e[1]">{{ e[0].jmeno }}</option>
+            <optgroup v-for="e of filteredAndSortedItems" :key="e.cat" :label="ItemTypeName[e.cat]">
+                <option v-for="i of e.items" :value="i[1]"> {{ i[0].jmeno }}</option>
+            </optgroup>
         </select>
         <div class="buttons">
             <button @click="deleteItem">Delete</button>
@@ -111,6 +131,11 @@ onMounted(init);
     display: flex;
     height: 2em;
     justify-items: stretch;
+    width:200px;
+}
+.left-panel .filter > * {
+    flex-grow: 1;
+    width: 45%;
 }
 .item-list {
     position: absolute;
