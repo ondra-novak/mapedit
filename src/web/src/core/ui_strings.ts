@@ -176,6 +176,17 @@ export const MainStringtable = [
 [254,"Shop: RejectionSeverity 3 alt"],
 [255,"Shop: RejectionSeverity 4 alt"],
 [256,"Shop: Rejection last item alt"],
+[73,"Spell: Death by forbidden magic %s (he)"],
+[74,"Spell: Death by forbidden magic %s (she)"],
+[175,"# Unused (175)"],
+[176,"# Unused (176)"],
+[32,"# Unused (32)"],
+[33,"# Unused (33)"],
+[52,"# Unused (52)"],
+[67,"# Unused (67)"],
+[68,"# Unused (68)"],
+[8,"# Unused (8)"],
+[9,"# Unused (9)"],
 ].reduce<string[]>((a, b) => {
   a[b[0] as number] = b[1] as string;
   return a;

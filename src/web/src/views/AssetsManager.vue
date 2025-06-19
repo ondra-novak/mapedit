@@ -22,6 +22,38 @@ const selected_file = ref<string>("");
 const selected_group = ref<AssetGroupType>(AssetGroup.UNKNOWN);
 const cur_file_model = ref<FileItem>();
 const disable_delete = ref<boolean>(true);
+const editor_exists = ref<string>();
+
+const listOfTools = {
+    "walls":"Wall",
+    "floorceil":"Floor/Ceil",
+    "items":"Item",
+    "icons":"Icons",
+    "mgf":"MGF Animation",
+    "enemies":"Enemy",
+    "coledit":"Enemy colors",
+    "seqedit":"Enemy animation",
+    "uigfx":"Other graphic",
+    "dialogshi":"Dialog portrait",
+    "fonts":"Font",
+    "strings":"Text editor",
+    "upload":"Upload/Download",
+    "hexview":"Hex viewer",
+    "ddlinfo":"Manage DDL",
+};
+
+const listOfEditors : Record<string,string>= {
+    "ENEMY.DAT":"enemies",
+    "SOUND.DAT":"enemies",
+    "ITEMS.DAT":"items",
+    "KOUZLA.DAT":"spells",
+    "KNIHA.TXT":"book",
+    "POSTAVY.DAT":"characters",
+    "DIALOGY.DAT":"dialogs",
+    "DIALOGY.JSON":"dialogs",
+    ".MAP":"maps"
+};
+
 
 watch([selected_tool], ()=>{
     switch (selected_tool.value) {
@@ -33,7 +65,13 @@ watch([selected_tool], ()=>{
 });
 
 function select_tool() : string | null {
+    editor_exists.value = undefined;
     if (!cur_file_model.value) return null;
+    for (let v in listOfEditors) {
+        if (cur_file_model.value.name.endsWith(v)) {
+            return editor_exists.value = "#"+listOfEditors[v];
+        }
+    }
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
     if (cur_file_model.value.name.endsWith(".TXT")) return "strings";
     switch (cur_file_model.value.group) {
@@ -56,15 +94,6 @@ function select_tool() : string | null {
                                         return  "uigfx";
                                 else    
                                     return null;        
-        case AssetGroup.MAPS:
-                if (cur_file_model.value.name == "ENEMY.DAT" 
-                    || cur_file_model.value.name == "SOUND.DAT") {
-                        return "goto_editor:enemies";
-                }
-                if (cur_file_model.value.name == "FACTS.JSON") {
-                    return "goto_editor:facts";
-                }
-                return null;
         default:  return null;
     }    
 }
@@ -93,15 +122,16 @@ async function onUploadDone(filename:string, done?:Promise<void>) {
 
 function delete_file() {
     if (cur_file_model.value) {
-        if (confirm("Are you sure to delete file: "+cur_file_model.value.name)) {
             server.deleteDDLFile(cur_file_model.value.name);
             assetList.value?.reload();
             cur_file_model.value = undefined;
             selected_tool.value="ddlinfo";
-        }
     }
 }
 
+function tool_click(id:string) {
+    selected_tool.value = id;
+}
 
 </script>
 
@@ -110,49 +140,45 @@ function delete_file() {
     <div class="left-panel">
     <AssetsList v-model="cur_file_model" ref="assetList" />
     </div>
-    <button class="right-top" :disabled="disable_delete" @click="delete_file" >Delete file</button>
 
-    <div class="middle-panel">
-        <select v-model="selected_tool">
-            <option value="">--- choose tool ---</option>
-            <option value="walls">Walls and arcs</option>
-            <option value="floorceil">Floors and ceils</option>
-            <option value="items">Items</option>
-            <option value="icons">Icons (items)</option>
-            <option value="mgf">Animation MGF</option>
-            <option value="enemies">Enemies</option>
-            <option value="coledit">Enemy colors</option>
-            <option value="seqedit">Enemy animation sets</option>
-            <option value="uigfx">UI and other</option>
-            <option value="dialogshi">Dialog portraits</option>
-            <option value="fonts">Fonts</option>            
-            <option value="strings">Texts</option>            
-            <option value="upload">Upload and download</option>
-            <option value="hexview">HexView</option>
-            <option value="ddlinfo">Manage DDL</option>
-        </select>
-        <div class="tools">
-            <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" 
-                v-model:file="selected_file" v-model:group="selected_group"
-                @upload="onUploadDone" />
-            <AssetsHiView v-if="selected_tool == 'dialogshi'"
-                v-model="selected_file" @upload="onUploadDone" />
-            <AssetsToolCol v-if="selected_tool == 'coledit'" 
-                v-model="selected_file" @upload="onUploadDone" />
-            <AssetToolIcons v-if="selected_tool == 'icons'" @upload="onUploadDone"/>
-            <AssetToolSeq v-if="selected_tool == 'seqedit'" v-model="selected_file" @upload="onUploadDone"/>
-            <AssetsFloorAndCeil v-if="selected_tool == 'floorceil'"  @upload="onUploadDone"/>
-            <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />
-            <AssetsToolUpload v-if="selected_tool == 'upload'" @upload="onUploadDone"
-                v-model:file="selected_file" v-model:group="selected_group" />
-            <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
-            <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
-            <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" @upload="onUploadDone"/>
-            <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" @upload="onUploadDone"/>
-            <div v-if="selected_tool.startsWith('goto_editor:')">
-                <div class="hint-link"><RouterLink :to="`/${selected_tool.split(':')[1]}`">Open editor</RouterLink></div>
+    <div class="middle-panel-pos">
+        <div class="middle-panel">
+            <div class="tools-pos">
+                <div class="tools">
+                    <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" 
+                        v-model:file="selected_file" v-model:group="selected_group"
+                        @upload="onUploadDone" />
+                    <AssetsHiView v-if="selected_tool == 'dialogshi'"
+                        v-model="selected_file" @upload="onUploadDone" />
+                    <AssetsToolCol v-if="selected_tool == 'coledit'" 
+                        v-model="selected_file" @upload="onUploadDone" />
+                    <AssetToolIcons v-if="selected_tool == 'icons'" @upload="onUploadDone"/>
+                    <AssetToolSeq v-if="selected_tool == 'seqedit'" v-model="selected_file" @upload="onUploadDone"/>
+                    <AssetsFloorAndCeil v-if="selected_tool == 'floorceil'"  @upload="onUploadDone"/>
+                    <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />
+                    <AssetsToolUpload v-if="selected_tool == 'upload'" @upload="onUploadDone"
+                        v-model:file="selected_file" v-model:group="selected_group" />
+                    <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
+                    <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
+                    <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" @upload="onUploadDone"/>
+                    <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" @upload="onUploadDone"/>
+                    <div v-if="selected_tool == editor_exists" class="goto-tool">
+                        <div class="hint-link"><RouterLink :to="`/${selected_tool.substring(1)}`">Open editor</RouterLink></div>
+                    </div>
+                    <div v-if="selected_tool == 'delete'" class="delete-file">
+                        <p>Confirm you want to delete file:</p>
+                        <p>{{ selected_file }}</p>
+                        <button @click="delete_file">Delete</button>
+                    </div>
+                    
+
+                </div>
             </div>
-
+            <div class="tool-bar">
+                <div v-for="(t,id) in listOfTools" :class="{selected: selected_tool == id}" :key="id" @click="tool_click(id)"> {{ t }} </div>
+                <div v-if="!disable_delete" :class="{selected: selected_tool == 'delete'}"  @click="tool_click('delete')">Delete file</div>
+                <div v-if="editor_exists" :class="{selected: selected_tool == editor_exists}" @click="tool_click(editor_exists)">Goto editor</div>
+            </div>            
         </div>
     </div>
 
@@ -165,37 +191,74 @@ function delete_file() {
     top: 2.25rem;
     bottom: 0px;
 }
-.middle-panel {
-    text-align: center;
-    display:flex;
-    flex-direction: column;
-    
-    background-color: #CCC;
+
+.middle-panel-pos {
     position: absolute;
     left: 15rem;
     right: 0;
     top: 2.25rem;
-    bottom: 0;    
+    bottom: 0;        
+    background-color: #CCC;
 }
 
-.middle-panel > select {
-    display: block;
-    margin: 1em auto;
+
+.middle-panel {
+    text-align: center;
+    position: relative;        
+    height: 100%;
 }
-.middle-panel > .tools {
+
+.middle-panel > .tools-pos {
+    padding-right: 10rem;
+    height: 100%;
+    box-sizing: border-box;
+}
+.middle-panel > .tools-pos > .tools {
     overflow: auto;
     position: relative;
+    height: 100%;
+    box-sizing: border-box;
 
     
 }
 
-.right-top {
+.tool-bar {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
     position: absolute;
-    right: 1em;
-    top: 3em;
-    width: 6em;
-    display: block;
-    z-index: 2;
+    text-align: left;    
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #aaa;
+    width: 10rem;
+    gap: 1px
+}
+
+.tool-bar > * {
+    padding: 0.5rem 1rem;
+    background: linear-gradient(-90deg, white, #ccc);
+    border-radius: 0 1em 1em 0;
+    cursor: pointer;
+    width: 10rem;
+    box-sizing: border-box;
+    
+    
+
+}
+.tool-bar > .selected {
+    font-weight: bold;
+    background: linear-gradient(-90deg, #aaa, #ccc);
+}
+
+.delete-file, .goto-tool {
+    border: 1px solid;
+    background-color: white;
+    width: 20rem;
+    padding: 1rem;
+    margin: auto;
+    margin-top: 20vh;
 }
 
 </style>

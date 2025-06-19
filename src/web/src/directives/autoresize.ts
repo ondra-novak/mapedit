@@ -14,10 +14,8 @@ export default {
 }
 
 function resize(el: HTMLTextAreaElement) {
-    setTimeout(()=>{
-        el.style.height = 'auto'
-        setTimeout(()=>{
-            el.style.height = el.scrollHeight + 'px'    
-        },1)
-    },1);
+  el.style.height = 'auto'
+  nextTick(()=>{
+    el.style.height = el.scrollHeight + 'px'    
+  });
 }
