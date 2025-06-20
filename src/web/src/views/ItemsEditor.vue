@@ -2,8 +2,8 @@
 import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { computed, onMounted, reactive, ref, shallowRef, watch, type Ref } from 'vue';
-import { itemsFromArrayBuffer, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName, type ItemDef } from '@/core/items_struct';
+import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch, type Ref } from 'vue';
+import { itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName, type ItemDef } from '@/core/items_struct';
 import CanvasView from '@/components/CanvasView.vue';
 import { PCX, PCXProfile, type PCXProfileType } from '@/core/pcx';
 import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
@@ -31,13 +31,7 @@ const allAnimationsList = shallowRef<string[]>();
 
 const left_hand_place = ref<HTMLCanvasElement|null>(null);
 const right_hand_place = ref<HTMLCanvasElement|null>(null);
-
-async function loadIcons() {
-}
-
-async function loadItems() {
-    
-}
+const changed = ref<boolean>(false);
 
 function init() {
     server.getDDLFile("CHAR00.PCX").then(x=>{
@@ -62,24 +56,36 @@ function init() {
 
 function deleteItem() {
     if (selected_item.value !== undefined && item_list.value) {
-        if (confirm("Are you sure delete item: " + item_list.value[selected_item.value].jmeno)) {
-            item_list.value[selected_item.value].jmeno = "";
+        const lst = item_list.value;
+        if (confirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
+            lst[selected_item.value].jmeno = "";
         }
+        while (lst.length && !lst[lst.length-1].jmeno) lst.pop();
     }
 }
-function cloneItem() {
-
-}
 function addItem() {
-
+    let pos = 0;
+    if (!item_list.value) {
+        item_list.value = [];        
+        item_list.value.push({} as ItemDef);
+    } else {
+        pos = item_list.value.findIndex(x=>x.jmeno.length == 0);
+        if (pos == -1) {
+            pos = item_list.value.length;   
+            item_list.value.push({} as ItemDef);         
+        }
+    }
+    form.jmeno = "New Item";
+    selected_item.value = pos;
+    saveItemData();
 }
 
 function onCreateNew() {
-
+        item_list.value = [];  
 }
 
 function onImported() {
-
+    init();
 
 }
 
@@ -245,8 +251,10 @@ function saveItemData() {
         itm.v_letu_files = form.v_letu_files;
         itm.flags = itm_flags.value || 0;
         if (!key_mode.value) itm.keynum = 0;
-        else if (key_mode.value < 0) itm.keynum = -1;
-        console.log(preview_canvas.value?.clientTop);}
+        else if (key_mode.value < 0 && itm.keynum >=0) itm.keynum = -1;
+        else if (key_mode.value > 0 && itm.keynum <=0) itm.keynum = 0;
+        changed.value = true;
+    }
 
 }
 
@@ -345,7 +353,21 @@ const allArrows = computed(() : {idx:number,id:number|null, name:string}[] =>{
     }
 })
 
+const negative_keylock_id=computed({
+    get:()=>-form.keynum,
+    set:(n:number)=>form.keynum=-n,
+});
+
+
+function save() {
+    if (item_list.value) {
+        const buff = itemsToArrayBuffers(item_list.value);
+        server.putDDLFile("ITEMS.DAT",buff, AssetGroup.MAPS);
+    }
+}
+
 onMounted(init);
+onUnmounted(save);
 
 </script>
 <template>
@@ -366,8 +388,7 @@ onMounted(init);
         </select>
         <div class="buttons">
             <button @click="deleteItem">Delete</button>
-            <button @click="cloneItem">Clone</button>
-            <button @click="addItem">New</button>
+            <button @click="addItem">New / Clone</button>
         </div>
     </div>
 
@@ -396,12 +417,8 @@ onMounted(init);
                 <label><span>Name</span><input type="text" maxlength="31" v-model="form.jmeno"/></label>
                 <label><span>Description</span><input type="text" maxlength="31" v-model="form.popis"/></label>
                 <label><span>Icon</span>
-                    <CanvasView :canvas="decorateElement( allIcons && item_list && selected_item !== undefined
-                            ?itemCanvas(PCXProfile.transp0,allIcons[form.ikona]):null,{
-                        class:'checkerboard',
-                        style:'cursor:pointer',
-
-                    })" @click="change_icon"/></label>
+                    <div class="icon" @click="change_icon">
+                    <CanvasView :canvas="allIcons?allIcons[form.ikona].createCanvas(PCXProfile.transp0):null" /></div></label>
                 <label><span>Kind</span><select v-model="form.druh">
                     <option v-for="(n, v) of ItemTypeName" :key="v" :value="v"> {{ n }}</option>                
                 </select></label>
@@ -440,14 +457,15 @@ onMounted(init);
                     </span><input type="number" v-model="form.spell"  v-watch-range min="0" max="10000"/></label>
                 </template>
                 <label  v-if="form.umisteni == ItemWearPlace.PL_BATOH"><span>Capacity</span><input type="number" v-watch-range min="1" max="24" v-model="form.nosnost"/></label>
-                <label><span>Can open locks</span><div><select v-model="key_mode">
-                    <option value="0">Not, not key</option>
-                    <option value="-1">Picklock</option>
-                    <option value="1">Yes, it is key</option>
-                </select></div></label>
-                <label v-if="key_mode == 1"><span>Key ID</span><input type="number"   v-model="form.keynum" list="itemsKeys323"/></label>                    
                 <label><input type="checkbox" v-model="chk_flags.DESTROY"><span>Destroy on hit when thrown</span></label>
                 <label><input type="checkbox" v-model="chk_flags.NOREMOVE"><span>Destroy when removed</span></label>
+                <label><span>Acts as Key</span><div><select v-model="key_mode">
+                    <option :value=0>Disabled</option>
+                    <option :value=1>Enabled</option>
+                    <option :value=-1>Picklock</option>
+                </select></div></label>
+                <label v-if="key_mode == 1"><span>Lock/Key reference ID</span><input type="number"   v-model="form.keynum" list="itemsKeys323"/></label>                    
+                <label v-if="key_mode == -1"><span>Picklock bonus</span><input type="number"   v-model="negative_keylock_id"/></label>                    
             </x-form>
         </x-section>
         <div class="multi">
@@ -489,7 +507,7 @@ onMounted(init);
                     <label v-if="form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR"><span>Avatar pos X,Y</span><input v-watch-range  min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
                     <template v-if="form.umisteni == ItemWearPlace.PL_RUKA || form.umisteni== ItemWearPlace.PL_OBOUR">
                     <label><span>Left hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
-                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][1]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]"></label>
+                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][0]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]"></label>
                     </template>
                     </template>
                 </x-form>
@@ -744,6 +762,12 @@ background-position: 0px 2px, 4px 35px, 29px 31px, 34px 6px;
 
 .multi > * {
     flex-grow: 1;
+}
+
+.icon {
+    width:45px;
+    background-color: #444;
+    cursor:pointer;
 }
 
 

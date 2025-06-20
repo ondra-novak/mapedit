@@ -59,4 +59,40 @@ export const CharacterStats = {
     "VLS_KOUZLA":  23,
 } as const;
 
+
+
 export const EnemyStats = CharacterStats;
+
+
+export class StringList3 {
+	map : Record<string, number> =  {};
+	lst1: string[] = [];
+	lst2: string[] = [];
+	lst3: string[] = [];
+	
+	add( s1:string, s2:string, s3:string) : number{
+        if (!s1 && !s2 && !s3) return 0;
+        const key = `${s1}\n${s2}\n${s3}`;
+        const v = this.map[key];
+        if (v !== undefined) return v;
+        this.lst1.push(s1);
+        this.lst2.push(s2);
+        this.lst3.push(s3);
+        this.map[key] = this.lst1.length;
+        return this.lst1.length;
+	}
+};
+
+export class StringList1 {
+	map: Record<string, number> = {};
+	lst: string[] = [];
+	add( s1: string) : number {
+		if (!s1) return 0;
+        const v = this.map[s1];
+        if (v !== undefined) return v;
+        this.lst.push(s1);
+        this.map[s1] = this.lst.length;
+        return this.lst.length;
+
+	}
+};

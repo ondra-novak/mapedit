@@ -9,6 +9,7 @@ import { COLPaletteSet } from '@/core/col_palette_set';
 import { EnemyStats, SpellEffects } from '@/core/common_defs';
 import { EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,enemyToArrayBuffer,newEnemy,type EnemyDef } from '@/core/enemy_struct';
 import { useBitmaskCheckbox, useBitmaskCheckbox2 } from '@/core/flags';
+import { itemsFromArrayBuffer, type ItemDef } from '@/core/items_struct';
 import { PCXProfile, PCX } from '@/core/pcx';
 import { readFileToArrayBuffer } from '@/core/read_file';
 import { SeqFile } from '@/core/seqfile';
@@ -22,6 +23,7 @@ const required_files : FileItem[] =[
 
 const enemies = ref<EnemyDef[]>([]);
 const sounds = ref<EnemySounds>([]);
+const items = ref<ItemDef[]>([]);
 
 const selected_enemy = ref<number>();
 
@@ -44,6 +46,7 @@ let need_save = false;
 async function  load_files() {
     const ep = server.getDDLFile("ENEMY.DAT");
     const sp = server.getDDLFile("SOUND.DAT");
+    const ip = server.getDDLFile("ITEMS.DAT");
     try {
         enemies.value = enemyFromArrayBuffer((await ep));
     } catch (e) {
@@ -61,6 +64,11 @@ async function  load_files() {
                 enm.sound_files[i] = sounds.value[enm.sounds[i]-1] || "";
             }
         });
+    }
+    try {
+        items.value = itemsFromArrayBuffer(await ip);
+    } catch (e){
+        console.warn("failed to load ITEMS.DAT")
     }
 }
 
@@ -274,7 +282,8 @@ const form = reactive({
     specproc:4,
     exp:0,
     bonus_exp:0,
-    money:0
+    money:0,
+    inventory:new Array(16).fill(0)
 });
 
 function loadEnemyData() {
@@ -322,6 +331,7 @@ function loadEnemyData() {
         form.stat_prot_m =enm.vlastnosti[EnemyStats.VLS_MYSL]
         form.stat_reg =enm.vlastnosti[EnemyStats.VLS_HPREG]
         enm_eff.value =enm.vlastnosti[EnemyStats.VLS_KOUZLA]
+        form.inventory = enm.inv;
         loadAppearence();
         loadColors();
     }
@@ -371,11 +381,40 @@ function saveEnemyData() {
         enm.stay_strategy = enm_f1.value;
         enm.vlajky = enm_f2.value
         enm.vlastnosti[EnemyStats.VLS_KOUZLA] = enm_eff.value;
+        enm.inv = form.inventory;
         need_save = true;
     }
 
 }
 
+function inventory_erase(n:number) {
+    const idx = form.inventory.findIndex(x=>x==n);
+    if (idx != -1) form.inventory[idx]= 0;
+}
+
+function inventory_add(t : HTMLInputElement) {
+    if (items.value) {
+        const idx = items.value.findIndex(x=>x.jmeno == t.value);
+        if (idx != -1) {
+            const pos =form.inventory.findIndex(x=>!x);
+            if (pos != -1) {
+                form.inventory[pos] = idx+1;
+                t.value = "";
+                if (t.parentElement && t.parentElement.firstChild) t.parentElement.firstChild.textContent="";
+            }
+        }
+    }
+}
+
+function inventory_add_blur(event: Event) {
+    inventory_add(event.target as HTMLInputElement);
+}
+
+function inventory_add_press_return(event: Event) {
+    if ((event as KeyboardEvent).key == "Enter") {
+        inventory_add(event.target as HTMLInputElement);
+    }
+}
 
 watch([selected_enemy], loadEnemyData);
 watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
@@ -386,6 +425,7 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
 </script>
 
 <template>      
+    <datalist id="enemiesItems400"><option v-for="(n) of items.map(x=>x.jmeno).filter(x=>x)" :value="n" :key="n"></option></datalist>
     <x-workspace>
         <div class="left-panel">
             <select v-model="selected_enemy" size="20" class="enemy-list">
@@ -514,11 +554,15 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
                     <label><span>Drop money</span><input v-model="form.money" type="number" min="0" max="65535"/></label>
                     <label><span>Total experience</span><input v-model="form.exp" type="number" min="0" max="999999"/></label>
                     <label><span>Kill experience</span><input v-model="form.bonus_exp" type="number" min="0" max="999999"/></label>
-                    <label><span>Inventory</span><div><div><select>
-                        <option value="0">-- select item --</option>
-                    </select></div><div><select>
-                        <option value="0">-- select item --</option>
-                    </select></div></div></label>
+                    <label><span>Inventory</span></label>
+                    <div class="inventory">
+                     <div v-for="n of form.inventory.filter(x=>x)">{{ items[n-1].jmeno }} <button @click="inventory_erase(n)">X</button></div>
+                     <div><div class="wrap"><span></span><input type="text" list="enemiesItems400" placeholder="add item"
+                        @keydown="$event=>inventory_add_press_return($event)" 
+                        @blur="$event=>inventory_add_blur($event)"
+                        oninput="this.parentElement.firstChild.textContent = this.value"></div></div>
+                     </div>
+                    
 
                 </x-form>
             </x-section>
@@ -678,5 +722,41 @@ div.multiple > *{
     background-color: #0008;
 }
 
+.inventory {
+    margin-top: 0.4rem;
+    border: 1px solid;
+    padding: 0.4rem;
+}
+.inventory > div {
+    display: inline-block;
+    border: 1px solid;    
+    margin: 0.1rem;
+    padding: 0.1rem;
+    background-color: #EEC;
+    vertical-align: middle;;
+}
+
+.inventory .wrap {
+    position: relative;
+    height: 1rem;    
+    padding: 0.1rem;
+    padding-right: 2em;
+    vertical-align: middle;
+    min-width: 4em;
+}
+
+.inventory .wrap input{
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    top:1px;
+    font-size: 1rem;
+    padding: 0;
+}
+
+.inventory  button, .inventory input {
+    border: none;
+    background-color: #EEC;
+}
 
 </style>

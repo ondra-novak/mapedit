@@ -342,15 +342,15 @@ export function parseSection(iter:BinaryIterator ) : SectionInfo {
     };
 }
 
-export function writeSection(target: BinaryWriter, type: number, data: BinaryWriter) {
-    const buff = data.getBuffer();
+export function writeSection(target: BinaryWriter, type: number, data: ArrayBuffer) {
     const hdr = {
         block: "<BLOCK>",
         type: type,
-        size: buff.byteLength,
+        size: data.byteLength,
         offs: 0        
     };
     target.write(section_header, hdr);
-    target.write_buffer(buff);
+    target.write_buffer(data);
     
 }
+

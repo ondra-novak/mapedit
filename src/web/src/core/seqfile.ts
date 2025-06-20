@@ -15,12 +15,16 @@ export const AnimationTypeIndex = {
     WALK_BACK: 2,
     WALK_RIGHT: 3,
     COMBAT: 4,
-    DAMAGED: 5
+    DAMAGED: 5,
+    IDLE_FRONT: 6,
+    IDLE_LEFT: 7,
+    IDLE_BACK: 8,
+    IDLE_RIGHT: 9,
 } as const;
 
 export type AnimationTypeIndexType = typeof AnimationTypeIndex[keyof typeof  AnimationTypeIndex];
 export const AnimationTypeLetter : string[] = ['F','L','B','L','C','H'] as const;
-export const AnimationTypeMirror = [false,false,false,true,false,false] as const;
+export const AnimationTypeMirror = [false,false,false,true,false,false,false,true,false,false] as const;
 
 
 
@@ -42,7 +46,7 @@ export class SeqFile {
         const decoder = new TextDecoder('utf-8');
         const str = decoder.decode(buffer);
         const all_lines =  str.split("\r\n");
-        const set : AnimationSet = [];
+        const set : AnimationSet = (new Array(10)).fill(0).map(()=>new Array());
         let big : boolean = false;
         let hit_pos = undefined;
         if (all_lines[0] == "ver2") {
@@ -55,7 +59,9 @@ export class SeqFile {
                 const [ph,fr,ofsx,ofsy,hit,name] = ln.split(",",6);
                 const phn = parseInt(ph);
                 const frn = parseInt(fr);
-                if (!set[phn]) set[phn] = [];
+
+                if (isNaN(phn) || isNaN(frn)) return;
+                
                 set[phn][frn] = {
                     suffix:name,
                     offset_x:parseInt(ofsx),
@@ -73,9 +79,8 @@ export class SeqFile {
                     offset_x: -1000,
                     offset_y: 0
                 }))) as AnimationSet;
-            set.push(...a);
-
-        }
+            set.splice(0,6,...a);
+        }        
         return new SeqFile(set, hit_pos, big);
 
     };

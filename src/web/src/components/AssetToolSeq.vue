@@ -260,13 +260,17 @@ onUnmounted(done);
 <template>
     <div class="workspace">
         <div class="left-panel">
-            <select v-model="cur_phase" size="6">
+            <select v-model="cur_phase" size="10">
                 <option value="0">Stand/Walk front</option>
                 <option value="1">Stand/Walk left</option>
                 <option value="3">Stand/Walk right</option>
                 <option value="2">Stand/Walk back</option>
                 <option value="4">Attack</option>
                 <option value="5">Damaged (hit)</option>
+                <option value="6">Idle front (opt)</option>
+                <option value="7">Idle left (opt)</option>
+                <option value="9">Idle right (opt)</option>
+                <option value="8">Idle back (opt)</option>
             </select>
             <select v-model="cur_face" size="16" @change="onChangeFace">
                 <option v-for="v of list_files" :value="filename2face(v)" :key="v">{{ v }} </option>
