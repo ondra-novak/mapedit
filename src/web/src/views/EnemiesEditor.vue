@@ -6,7 +6,8 @@ import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { COLPaletteSet } from '@/core/col_palette_set';
-import { EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,EnemyStats,enemyToArrayBuffer,newEnemy,SpellEffects,type EnemyDef } from '@/core/enemy_struct';
+import { EnemyStats, SpellEffects } from '@/core/common_defs';
+import { EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,enemyToArrayBuffer,newEnemy,type EnemyDef } from '@/core/enemy_struct';
 import { useBitmaskCheckbox, useBitmaskCheckbox2 } from '@/core/flags';
 import { PCXProfile, PCX } from '@/core/pcx';
 import { readFileToArrayBuffer } from '@/core/read_file';
@@ -538,7 +539,7 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
     <div class="edit-seq" v-if="edit_seq">
         <div>
             <AssetToolSeq v-model="edit_seq" />
-            <button @click="edit_seq=undefined">X</button>
+            <button @click="edit_seq=undefined" class="close"></button>
         </div>
     </div>
 </template>
@@ -671,12 +672,6 @@ div.multiple > *{
     box-shadow: 3px 3px 5px black;
 }
 
-.edit-seq > div  > button{
-    position: absolute;
-    display: block;
-    right: 5px;
-    top: 5px;  
-}
 .edit-seq {
     position: absolute;
     left: 0;top: 0;right: 0;bottom: 0;

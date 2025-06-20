@@ -89,3 +89,19 @@ x-workspace {
     display:block;
     background-color: #ccc;
 }
+
+button {
+  cursor: pointer;
+}
+
+
+
+button.close {
+    position: absolute;
+    display: block;
+    right: 5px;
+    top: 5px;
+}
+button.close::before {
+  content: "X";
+}

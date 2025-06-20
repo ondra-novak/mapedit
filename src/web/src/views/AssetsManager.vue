@@ -243,6 +243,7 @@ function tool_click(id:string) {
     cursor: pointer;
     width: 10rem;
     box-sizing: border-box;
+    white-space: nowrap;
     
     
 

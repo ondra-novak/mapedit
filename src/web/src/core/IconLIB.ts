@@ -85,3 +85,32 @@ export class IconLib {
     }
 
 }
+
+export function lib_name(idx:number): string {
+    return `IKONY${idx.toString().padStart(2, '0')}.LIB`;
+}
+
+
+export async function loadSingleIcon(idx: number, loader: (name: string) => Promise<ArrayBuffer>) {
+    const libIndex = Math.floor(idx/18);
+    const pos = idx - (libIndex *18);
+    const lib = IconLib.fromArrayBuffer(await loader(lib_name(libIndex)));
+    return lib.icons[pos];
+}
+
+export async function loadAllIcons(loader: (name: string) => Promise<ArrayBuffer>) {
+    const res : PCX[] = [];
+    let idx = 0;
+    try {
+
+        while (true) {
+            const lib = IconLib.fromArrayBuffer(await loader(lib_name(idx)));
+            ++idx;
+            res.push(...lib.icons);
+        }
+
+    } catch (e) {
+        return res;
+    }
+    
+}

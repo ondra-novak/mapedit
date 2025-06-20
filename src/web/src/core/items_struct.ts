@@ -22,7 +22,7 @@ const ItemsSchema : Schema =  {
   "keynum": "int16",
   "polohy": ["int16",2,2],
   "typ_zbrane": "uint8",
-  "unused": "uint8",
+  "druh_sipu": "uint8",
   "sound": "int16",
   "v_letu": ["int16",16],
   "cena":"int32",
@@ -56,7 +56,7 @@ export interface ItemDef  {
   keynum:number;
   polohy: number[][];
   typ_zbrane: number;
-  unused: number;
+  druh_sipu: number;
   sound: number;
   sound_file?:string;
   v_letu: number[];
@@ -194,3 +194,50 @@ export const ItemTypeName: string[] = [
   a[b[0] as number] = b[1] as string;
   return a;
 }, []);
+
+export const ItemWearPlace: Record<string, number> = {
+  PL_NIKAM: 0,
+  PL_BATOH: 1,
+  PL_TELO_H: 2,
+  PL_TELO_D: 3,
+  PL_HLAVA: 4,
+  PL_NOHY: 5,
+  PL_KUTNA: 6,
+  PL_KRK: 7,
+  PL_RUKA: 8,
+  PL_OBOUR: 9,
+  PL_PRSTEN: 10,
+  PL_SIP: 11,
+} as const;
+
+export const ItemWearPlaceName: string[] = [
+  [ItemWearPlace.PL_NIKAM, "Nowhere"],
+  [ItemWearPlace.PL_BATOH, "Back Slot"],
+  [ItemWearPlace.PL_TELO_H, "Upper Body"],
+  [ItemWearPlace.PL_TELO_D, "Lower Body"],
+  [ItemWearPlace.PL_HLAVA, "Head"],
+  [ItemWearPlace.PL_NOHY, "Feet"],
+  [ItemWearPlace.PL_KUTNA, "Full Body (Robe)"],
+  [ItemWearPlace.PL_KRK, "Neck"],
+  [ItemWearPlace.PL_RUKA, "Hand"],
+  [ItemWearPlace.PL_OBOUR, "Two-Handed"],
+  [ItemWearPlace.PL_PRSTEN, "Ring"],
+  [ItemWearPlace.PL_SIP, "Quiver"],
+].reduce<string[]>((a, b) => {
+  a[b[0] as number] = b[1] as string;
+  return a;
+}, []);
+
+export const WeaponType = {
+  MEC: 0,
+  SEKERA: 1,
+  KLADIVO: 2,
+  HUL: 3,
+  DYKA: 4,
+  STRELNA: 5,
+  SPECIAL: 6,
+} as const;
+
+export const WeaponTypeName = [
+  "Sword","Axe","Hammer","Staff","Dagger","Ranged","Special"
+]
