@@ -32,6 +32,11 @@ export const SpellEffects = {
 } as const;
 export type SpellEffectsType = typeof SpellEffects[keyof typeof SpellEffects];
 
+export const SpellEffectName = [
+    "Invisibility","Eye by eye","Defense Stance","Live Drain","Mana Shield","Psych. resistance","Mag. resistance",
+    "Blind","Battle Regen","Cold protection","Hot protection","Knock back","Fear","Stoned","Levitation","Demon"
+]
+
 export const CharacterStats = {
     "VLS_SILA":    0,
     "VLS_SMAGIE":  1,
@@ -59,6 +64,11 @@ export const CharacterStats = {
     "VLS_KOUZLA":  23,
 } as const;
 
+export const CharacterStatsNames = [
+    "Strength", "Magic", "Speed", "Dexterity", "Max HP","Max Vitality","Max mana","Defense Low","Defense High",
+    "Attack Low", "Attack High","Protection Fire","Protection Water","Protection Earth","Protection Air","Protection Mind",
+    "HP Regeneration","Mana Regeneration","VP regeneration","Magic attack Low", "Magic attack High","Element","Damagae","Effects"
+] as const;
 
 
 export const EnemyStats = CharacterStats;

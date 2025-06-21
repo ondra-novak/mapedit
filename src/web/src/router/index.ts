@@ -4,6 +4,7 @@ import EnemiesEditor from '@/views/EnemiesEditor.vue'
 import AssetsManager from '@/views/AssetsManager.vue'
 import FactsDB from '@/views/FactsDB.vue'
 import ItemsEditor from '@/views/ItemsEditor.vue'
+import SpellsEditor from '@/views/SpellsEditor.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -32,6 +33,11 @@ const router = createRouter({
       path: '/facts',
       name: "Facts",
       component: FactsDB
+    },
+    {
+      path: '/spells',
+      name: "Spells",
+      component: SpellsEditor
     }
   ],
 })
