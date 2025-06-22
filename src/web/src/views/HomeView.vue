@@ -3,7 +3,8 @@
 </script>
 
 <template>
-  <logo>
-    <img src="@/assets/logo.png">
-  </logo> 
+  <div style="text-align:center">
+    <img src="@/assets/logo.png" />
+  </div>
 </template>
+

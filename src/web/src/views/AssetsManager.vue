@@ -188,7 +188,7 @@ function tool_click(id:string) {
 .left-panel {
     width: 15rem;
     position: absolute;
-    top: 2.25rem;
+    top: 0;
     bottom: 0px;
 }
 
@@ -196,7 +196,7 @@ function tool_click(id:string) {
     position: absolute;
     left: 15rem;
     right: 0;
-    top: 2.25rem;
+    top: 0;
     bottom: 0;        
     background-color: #CCC;
 }

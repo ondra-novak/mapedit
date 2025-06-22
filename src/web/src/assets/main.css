@@ -7,11 +7,6 @@ body {
   margin: 0;
 }
 
-logo {
-  display:block;
-  margin-top: 100px;
-  text-align: center;  
-}
 
 x-form {
   display:block;
@@ -84,7 +79,8 @@ x-section-title {
 }
 x-workspace {
     position: absolute;
-    left:0;right: 0;bottom: 0;top:2.2em;
+    left:0;right: 0;bottom: 0;top:0
+    ;
     overflow: auto;
     display:block;
     background-color: #ccc;
@@ -103,5 +99,5 @@ button.close {
     top: 5px;
 }
 button.close::before {
-  content: "X";
+  content: "✖";
 }

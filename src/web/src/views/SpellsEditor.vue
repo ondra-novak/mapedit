@@ -4,9 +4,10 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { CharacterStatsNames, ElementTypeName, SpellEffectName } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
-import { ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
-import { spellsFromArrayBuffer, SpellCommandsArgs ,type TKouzlo, SpellArgument } from '@/core/spell_structs';
-import { computed, onMounted, ref } from 'vue';
+import {type ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
+import { spellsFromArrayBuffer, SpellCommandsArgs ,type TKouzlo, SpellArgument, spellsToArrayBuffer } from '@/core/spell_structs';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import StatusBar from '@/core/status_bar_control'
 
 const required_files: FileItem[] = [
     {group:AssetGroup.MAPS,name:"ITEMS.DAT",ovr:true},
@@ -36,15 +37,32 @@ const ProtectionFlag = ["No","Yes"];
 const FlagsNames = ["---","enemy in front","teleport","enemy in front | teleport"]
 
 function init() {
-    server.getDDLFile("KOUZLA.DAT").then(x=>{
-        spell_list.value = spellsFromArrayBuffer(x);
-    });
+    function reload() {
+        current_spell.value = undefined;
+        server.getDDLFile("KOUZLA.DAT").then(x=>{
+            spell_list.value = spellsFromArrayBuffer(x);
+                nextTick(()=>{
+                    StatusBar.setChangedFlag(false);
+                })
+        });
+    }
+
     server.getDDLFile("ITEMS.DAT").then(x=>{
-        item_list.value = itemsFromArrayBuffer(x);
-    })
+        item_list.value = itemsFromArrayBuffer(x);    
+    });
+    
+    reload();
     server.getDDLFiles(null,null).then(x=>{
         all_animations.value = x.files.map(x=>x.name).filter(x=>x.toUpperCase().endsWith(".MGF"));
         all_sounds.value = x.files.filter(x=>x.group == AssetGroup.SOUNDS).map(x=>x.name);
+    })
+    StatusBar.registerSaveAndRevert(async ()=>{
+    if (spell_list.value) {
+        const b = spellsToArrayBuffer(spell_list.value);
+        await server.putDDLFile("KOUZLA.DAT", b, AssetGroup.MAPS);
+    }
+    },()=>{
+        reload();
     })
 }
 
@@ -77,7 +95,11 @@ function onImported() {
     init();
 }
 
+const shadow_drag_table = ref<HTMLTableElement|null>(null);
+const shadow_drag_content = ref<HTMLElement|null>(null);
+
 onMounted(init);
+onUnmounted(StatusBar.onFinalSave);
 
 
 const [ cur_spell_trackon, chk_trackon ] = useBitmaskCheckbox2({
@@ -100,6 +122,102 @@ function findItem(event: Event, params: any[], index: number) {
 
 }
 
+function begin_drag(event: Event, idx: number) {
+
+    const e = event as MouseEvent;
+    if (e.buttons != 1) return;    
+    
+    if (!shadow_drag_content.value || !shadow_drag_table.value) return;
+    const tbl = shadow_drag_table.value;
+    if (!tbl.hidden) return;
+    let src_element = event.target as HTMLElement|null;
+    let work_element = shadow_drag_table.value.parentElement;
+    if (!work_element) return;
+    const box = work_element.getBoundingClientRect();
+    while (src_element && src_element.tagName.toUpperCase() != 'TR') src_element = src_element.parentElement;
+    if (!src_element) return;
+    const ctx = shadow_drag_content.value;
+    ctx.innerHTML = '';
+    ctx.appendChild(src_element.cloneNode(true));
+    let c1 = ctx.firstChild as HTMLElement;
+    let c2 = src_element.firstChild as HTMLElement;
+    while (c1 && c2) {
+        c1.style.widows = `${c2.offsetWidth}px`;
+        c1=c1.nextElementSibling as HTMLElement;
+        c2=c2.nextElementSibling as HTMLElement;
+    }
+
+    function move_shadow_to(e: MouseEvent) {
+        const rx = 10;
+        const ry = e.clientY - box.top - tbl.clientHeight/2;
+        tbl.style.left = `${rx}px`;
+        tbl.style.top = `${ry}px`;
+        tbl.hidden = false;
+    }
+    e.preventDefault();
+    move_shadow_to(e);
+
+    const move_event =(e:MouseEvent) => {
+        move_shadow_to(e);        
+        e.preventDefault();
+    };
+
+    const move_stop = (e:MouseEvent) => {
+        work_element.removeEventListener("mousemove", move_event);
+        work_element.removeEventListener("mouseup", move_stop);
+        e.preventDefault();
+        tbl.hidden = true;
+        const cont = work_element.getElementsByTagName("TR");
+        let foundId : number | null = null;
+        Array.prototype.forEach.call(cont, (element : HTMLElement)=> {
+            const box = element.getBoundingClientRect();
+            if (e.clientY >= box.top && e.clientY <= box.bottom && element.dataset.index)
+                foundId = parseInt(element.dataset.index);
+        });
+        if (foundId !==null && idx != foundId) {
+            const script = current_spell.value!.script!
+            const r = script[idx];
+            script.splice(idx,1);
+            script.splice(foundId,0,r);
+        }
+    }
+
+
+    work_element.addEventListener("mousemove", move_event);
+    work_element.addEventListener("mouseup", move_stop);
+    
+
+}
+
+function validateCommand(event: Event) {
+    if (!current_spell.value) return
+    const t = event.target as HTMLInputElement;
+    const cmd = SpellCommandsArgs[t.value];
+    if (cmd) {
+        current_spell.value.script!.push({
+            command: t.value,
+            args: new Array(cmd.length).fill(null).map((_,idx:number)=>cmd[idx] < 16?0:""),
+        });
+        t.value = "";
+    }
+}
+
+function validateCommandEnter(event: Event) {
+    const e = event as KeyboardEvent;
+    if (e.key == "Enter") {
+        e.preventDefault();
+        validateCommand(event);
+    }
+}
+
+watch(current_spell, ()=>{    
+    if (current_spell.value) cur_spell_trackon.value = current_spell.value.flags;    
+});
+watch(cur_spell_trackon, ()=>{
+    if (current_spell.value && cur_spell_trackon) current_spell.value.flags = cur_spell_trackon.value;
+});
+
+watch(spell_list, ()=>StatusBar.setChangedFlag(true),{deep:true});
 
 
 </script>
@@ -108,6 +226,7 @@ function findItem(event: Event, params: any[], index: number) {
     <datalist id="spellEditorAnim91"><option v-for="v in all_animations" :key="v" :value="v"></option></datalist>
     <datalist id="spellEditorSounds92"><option v-for="v in all_sounds" :key="v" :value="v"></option></datalist>
     <datalist id="spellEditorItems93"><option v-for="(v,id) in item_list" :key="v.jmeno" :value="`${v.jmeno} #${id}`"></option></datalist>    
+    <datalist id="spellEditorCommands183"><option v-for="(v,id) of SpellCommandsArgs" :key="id" :value="id"></option></datalist>
     <x-workspace>
         <h1>Rune spells</h1>
         <table class="spell-list">
@@ -130,7 +249,7 @@ function findItem(event: Event, params: any[], index: number) {
             </tbody>
         </table>
         <h1>Other spells</h1>
-        <table>
+        <table class="spell-list second">
             <thead>
                 <tr><th>ID</th><th>Name</th><th>Target type</th><th>Protection</th><th>Group</th><th>Flags</th></tr>
             </thead>
@@ -142,6 +261,7 @@ function findItem(event: Event, params: any[], index: number) {
                     <td class="number"> {{  ProtectionFlag[row.povaha] }}</td>
                     <td class="number"> {{  row.accnum }} </td>
                     <td> {{  FlagsNames[row.flags] }}</td>
+                    <td><button @click="spell_list!.splice(spell_list!.findIndex(x=>x.num == row.num),1);$event.stopPropagation()">🞬</button></td>
                 </tr>
             </tbody>
         </table>
@@ -149,57 +269,68 @@ function findItem(event: Event, params: any[], index: number) {
     </x-workspace>
 
     <div class="editor" v-if="current_spell">
-        <x-section>
-            <x-section-title>Basic settings</x-section-title>
-            <x-form>
-                <label v-if="current_spell.num < 105"><span>Rune</span><div><input type="text" readonly="true" size="4" :value="ElementTypeName[Math.floor(current_spell.num/21)]">
-                            <input size="4" type="text" readonly="true" :value="Math.floor((current_spell.num%21)/3)+1">
-                            <input size="4"  type="text" readonly="true" :value="(current_spell.num%3)+1"></div></label>
-                <label><span v-if="current_spell.num < 105 && current_spell.num % 3 == 0">Display name</span>
-                       <span v-if="current_spell.num > 105 || current_spell.num % 3 != 0">Name (not shown)</span>
-                       <input type="text" v-model="current_spell.spellname">
-                </label>
-                <label v-if="current_spell.num < 105"><span>Magic level</span><input type="number" v-model="current_spell.um"></label>
-                <label v-if="current_spell.num < 105"><span>Mana cost</span><input type="number" v-model="current_spell.mge"></label>
-                <label><span>Target / Victim</span><select v-model="current_spell.cil">
-                        <option v-for="(v,id) of TargetType" :key="id" :value="id">{{  v  }}</option>
-                    </select>
-                </label>
-                <label><span>Spell group</span><input type="number" v-model="current_spell.accnum"></label>
-                <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1" :false-value="0"><span>Victim defense roll</span></label>
-                <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TRACKON"><span>Need enemy in front</span></label>
-                <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TELEPORT"><span>Open map for teleport</span></label>
-            </x-form>
-        </x-section>
-        <x-section>
-            <x-section-title>Script</x-section-title>
-            <table>
-                <tbody>
-                    <tr v-for="(v,id) of (current_spell.script || [])" :key="id">
-                        <td>{{  id }} </td>
-                        <td>{{ v.command }}</td>
-                        <td><template v-for="(a, id) of v.args" :key="id">                                                        
-                            <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Number" v-model="v.args[id]" type="number">
-                            <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.AnimationFile" v-model="v.args[id]" type="text" list="spellEditorAnim91">
-                            <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.SoundFile" v-model="v.args[id]" type="text" list="spellEditorSounds92">
-                            <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Item" 
-                                type="text" :value="`${item_list![a as number].jmeno} #${a}`" @change="$event=>findItem($event, v.args, id)" list="spellEditorItems93">
-                            <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Element" v-model="v.args[id]" >
-                                <option v-for="(v,id) of ElementTypeName" :key="id" :value="id"> {{ v }}</option>
-                            </select>
-                            <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Stat" v-model="v.args[id]" >
-                                <option v-for="(v,id) of CharacterStatsNames" :key="id" :value="id"> {{ v }}</option>
-                            </select>
-                            <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.EffectBit" v-model="v.args[id]" >
-                                <option v-for="(v,id) of SpellEffectName" :key="id" :value="1<<id"> {{ v }}</option>
-                            </select>
-                        </template></td>
-                        <td><button>+</button><button>^</button><button>v</button><button>x</button></td>
-                    </tr>
-                </tbody>
-            </table>
-            <button>Add command</button>
-        </x-section>
+        <div>
+            <x-section>
+                <x-section-title>Basic settings</x-section-title>
+                <x-form>
+                    <label v-if="current_spell.num < 105"><span>Rune</span><div><input type="text" readonly="true" size="4" :value="ElementTypeName[Math.floor(current_spell.num/21)]">
+                                <input size="4" type="text" readonly="true" :value="Math.floor((current_spell.num%21)/3)+1">
+                                <input size="4"  type="text" readonly="true" :value="(current_spell.num%3)+1"></div></label>
+                    <label><span v-if="current_spell.num < 105 && current_spell.num % 3 == 0">Display name</span>
+                        <span v-if="current_spell.num > 105 || current_spell.num % 3 != 0">Name (not shown)</span>
+                        <input type="text" v-model="current_spell.spellname">
+                    </label>
+                    <label v-if="current_spell.num < 105"><span>Magic level</span><input type="number" v-model="current_spell.um"></label>
+                    <label v-if="current_spell.num < 105"><span>Mana cost</span><input type="number" v-model="current_spell.mge"></label>
+                    <label><span>Target / Victim</span><div><select v-model="current_spell.cil">
+                            <option v-for="(v,id) of TargetType" :key="id" :value="id">{{  v  }}</option>
+                        </select></div>
+                    </label>
+                    <label><span>Spell group</span><input type="number" v-model="current_spell.accnum"></label>
+                    <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1" :false-value="0"><span>Victim defense roll</span></label>
+                    <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TRACKON"><span>Need enemy in front</span></label>
+                    <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TELEPORT"><span>Open map for teleport</span></label>
+                </x-form>
+            </x-section>
+            <x-section>
+                <table ref="shadow_drag_table" class="drag-preview" hidden="true">
+                    <tbody ref="shadow_drag_content">
+                        <tr><td>Drag</td></tr>
+                    </tbody>
+                </table>
+                <x-section-title>Script</x-section-title>            
+                <table>
+                    <tbody>
+                        <tr v-for="(v,id) of (current_spell.script || [])" :key="id" :data-index="id">
+                            <td>{{  id }} </td>
+                            <td class="grab-handle" @mousedown="$event=>begin_drag($event, id)">≡ {{ v.command }}</td>
+                            <td><template v-for="(a, id) of v.args" :key="id">                                                        
+                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Number" v-model="v.args[id]" type="number">
+                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Percent" v-model="v.args[id]" type="number">
+                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.AnimationFile" v-model="v.args[id]" type="text" list="spellEditorAnim91">
+                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.SoundFile" v-model="v.args[id]" type="text" list="spellEditorSounds92">
+                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Item" 
+                                    type="text" :value="`${(item_list && item_list[a as number] && item_list[a as number].jmeno)||'???'} #${a}`" @change="$event=>findItem($event, v.args, id)" list="spellEditorItems93">
+                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Element" v-model="v.args[id]" >
+                                    <option v-for="(v,id) of ElementTypeName" :key="id" :value="id"> {{ v }}</option>
+                                </select>
+                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Stat" v-model="v.args[id]" >
+                                    <option v-for="(v,id) of CharacterStatsNames" :key="id" :value="id"> {{ v }}</option>
+                                </select>
+                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.EffectBit" v-model="v.args[id]" >
+                                    <option v-for="(v,id) of SpellEffectName" :key="id" :value="1<<id"> {{ v }}</option>
+                                </select>
+                            </template></td>
+                            <td>
+                                <button @click="current_spell!.script!.splice(id,1)">🞬</button></td>
+                        </tr>
+                        <tr><td> {{ current_spell.script!.length }}</td><td colspan="2"><input type="text" list="spellEditorCommands183"
+                            @change="$event=>validateCommand($event)" @keydown="$event=>validateCommandEnter($event)"></td></tr>
+                    </tbody>
+                </table>
+            </x-section>
+        </div>
+        <button class="close" @click="current_spell = undefined"></button>
     </div>
 
 
@@ -225,31 +356,43 @@ table.spell-list tr td {
 
 table.spell-list tr td.number {text-align: center;}
 
+table.spell-list {
+    margin-left: 15rem;
+}
+table.spell-list.second {
+    margin-left: 32rem;
+}
+
 .editor {
-    position: sticky;
+    position: fixed;
     left: 0;
     right: 0;
-    top: 20vh;
+    top: 10vh;
+    bottom: 0;
     width: 30em;
-    margin: auto;
+    margin: 0 auto auto 1rem;
     border: 1px solid;
     box-shadow: 3px 3px 5px black;
-    
+    padding: 1.5em 0 0.5em 0;
     background-color: #ccc;
+    height: fit-content;
 }
+
+.editor > div {
+    max-height: 75vh;
+    overflow:auto;
+}
+
 
 .editor table {
     width: 100%;
     border-collapse: collapse;
+    
 }
 
-.editor table input[type=number] {
-    width: 3rem;
-    text-align: center;
-}
 .editor table input[type=text] {
     width: 10rem;
-    text-align: center;
+    text-align: left;
 }
 
 .editor table td:last-child {
@@ -262,6 +405,32 @@ table.spell-list tr td.number {text-align: center;}
 .editor table td {
     padding: 0.1em;
     border-bottom: 1px dotted
+}
+
+table.drag-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background-color: #ddd;
+    border: 1px solid;
+    opacity: 0.5;
+    width: unset;
+}
+
+table.drag-preview button {
+    display: none;
+}
+    
+.grab-handle {
+    cursor:grab;
+}
+h1 {
+    margin-left: 32rem;
+}
+
+input[type=number] {
+    width: 4rem;
+    text-align: center;
 }
 
 </style>

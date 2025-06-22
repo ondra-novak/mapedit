@@ -1,4 +1,4 @@
-import { BinaryIterator } from "./binary";
+import { BinaryIterator, BinaryWriter } from "./binary";
 
 
 const TKouzloSchema = {
@@ -106,10 +106,10 @@ const SpellSpecialAction = {
 export const SpellArgument = {
     None: 0,
     Number: 1,
+    Percent: 2,
     
-    Element: 2,
-    Stat: 3,
-    Percent: 4,
+    Element: 3,
+    Stat: 4,
     EffectBit: 5,
     Item: 6,
     Special: 7,
@@ -164,8 +164,8 @@ const SpellCommands : Record<string, SpellCommandDesc> = {
     physicalAttack: {instr:[SpellInstruction.hpnorm_min, SpellInstruction.hpnorm_max]},
     elementAttack: {instr:[SpellInstruction.hpzivl_min, SpellInstruction.hpzivl_max]},
     drainLive: {instr:[SpellInstruction.drain_min, SpellInstruction.drain_max]},
-    changeStat: {instr:[SpellInstruction.vlastnost,SpellInstruction.vls_kolik]},
-    changeStatPercent: {instr:[SpellInstruction.vlastnost,SpellInstruction.pvls]},
+    alterStat: {instr:[SpellInstruction.vlastnost,SpellInstruction.vls_kolik]},
+    alterStatPct: {instr:[SpellInstruction.vlastnost,SpellInstruction.pvls]},
     playSound: {instr:[SpellInstruction.zvuk]},
     playAnimation: {instr:[SpellInstruction.animace]},
     waitRounds: {instr:[SpellInstruction.trvani]},
@@ -174,9 +174,9 @@ const SpellCommands : Record<string, SpellCommandDesc> = {
     createItem: {instr:[SpellInstruction.create_item]},
     setEffect: {instr:[SpellInstruction.set]},
     resetEffect: {instr:[SpellInstruction.reset]},
-    changeVitality: {instr:[SpellInstruction.kondice]},
-    changeManaNoClip: {instr:[SpellInstruction.mana]},
-    changeMana: {instr:[SpellInstruction.mana_clip]},
+    alterVitality: {instr:[SpellInstruction.kondice]},
+    alterManaNoClip: {instr:[SpellInstruction.mana]},
+    alterMana: {instr:[SpellInstruction.mana_clip]},
     stealMana:  {instr:[SpellInstruction.mana_steal]},
     createWeapon: {instr:[SpellInstruction.create_weapon]},
  
@@ -189,9 +189,9 @@ const SpellCommands : Record<string, SpellCommandDesc> = {
     spec_gatherAll: {instr:[],action: SpellSpecialAction.SP_PRIPOJENIA},
     spec_earthquake: {instr:[],action: SpellSpecialAction.SP_CHVENI},
     spec_iconSpellEffect: {instr:[],action: SpellSpecialAction.SP_DEFAULT_EFFEKT},
-    spec_enableTrueSeeing: {instr:[],action: SpellSpecialAction.SP_TRUE_SEEING},
-    spec_enableShowHP: {instr:[],action: SpellSpecialAction.SP_SCORE},
-    spec_enableHalucinacion: {instr:[],action: SpellSpecialAction.SP_HALUCINACE},
+    spec_TrueSeeing: {instr:[],action: SpellSpecialAction.SP_TRUE_SEEING},
+    spec_ShowHP: {instr:[],action: SpellSpecialAction.SP_SCORE},
+    spec_Halucinacion: {instr:[],action: SpellSpecialAction.SP_HALUCINACE},
     spec_teleport: {instr:[],action: SpellSpecialAction.SP_TELEPORT},
     spec_summon: {instr:[],action: SpellSpecialAction.SP_SUMMON},
     spec_abyss: {instr:[],action: SpellSpecialAction.SP_HLUBINA1},
@@ -228,7 +228,7 @@ function parseSpellCmdList(buffer : ArrayBuffer) : SpellSimpleCmd[] {
     while (cmd != SpellInstruction.spell_end) {
         const argType = SpellArguments.find(x=>x[0] == cmd)![1];        
         if (argType < 16) {
-            if (argType  == 1) {
+            if (argType  < 3) {
                 const a = iter.parse_type("int16");
                 ret.push({instr: cmd, arg: a, arg_type: argType});
             } else {
@@ -324,4 +324,71 @@ export function spellsFromArrayBuffer(buff: ArrayBuffer) : TKouzlo[] {
         itm.script = createScriptFromCmdList(parseSpellCmdList(buff.slice(itm.start)));
     });
     return lst.sort((a,b)=>a.num-b.num);    
+}
+
+function buildScript(script: SpellScriptCommand[]) {
+    const wr = new BinaryWriter();
+    for (const cmd of script) {
+        const frag = SpellCommands[cmd.command];
+        if (frag && frag.instr.length == cmd.args.length) {
+            for (let i = 0; i < frag.instr.length; i++) {
+                const element = frag.instr[i];
+                const arg = SpellArguments.find(x=>x[0] == element);
+                if (arg) {
+                    wr.write_type("uint8",element);
+                    const type = arg[1];
+                    if (type < 3) {
+                        wr.write_type("int16", cmd.args[i]);
+                    } else if (type < 16) {
+                        wr.write_type("uint16", cmd.args[i]);
+                    } else {
+                        wr.write_stringz(cmd.args[i] as string);
+                    }
+                }                               
+            }
+            if (frag.action) {
+                wr.write_type("uint8", SpellInstruction.special);
+                wr.write_type("uint16", frag.action);
+            }
+        }
+    }
+    wr.write_type("uint8", SpellInstruction.spell_end);
+    return wr.getBuffer();
+}
+
+export function spellsToArrayBuffer(spells: TKouzlo[]) : ArrayBuffer {
+    let len = 104;
+    for (const k of spells) {if (k.num > len) len = k.num;}
+    ++len;
+    const fakeBuff = new ArrayBuffer(1000);
+    const spell_table  = new Array(len).fill(0).map(_=>new BinaryIterator(fakeBuff).parse(TKouzloSchema) as TKouzlo);
+    const all_scripts = new Array(len).fill(null);
+    for (const k of spells) {
+        if (k.script) all_scripts[k.num] = buildScript(k.script);        
+        spell_table[k.num] = {...k, start: 1};
+    }
+
+    const tmp=new BinaryWriter();
+    tmp.write(TKouzloSchema, spell_table[0]);
+    const blen = tmp.getBuffer().byteLength;
+
+    let offset = blen * len;
+
+    for (let i = 0; i < len; ++i) {
+        if (spell_table[i].start) {
+            spell_table[i].start = offset;
+        }
+        if (all_scripts[i]) offset+=all_scripts[i].byteLength;
+    }
+
+    const fin = new BinaryWriter();
+    for (let i = 0; i < len; ++i) {
+        fin.write(TKouzloSchema, spell_table[i]);        
+    }
+    for (let i = 0; i < len; ++i) {
+        if (all_scripts[i]) fin.write_buffer(all_scripts[i]);
+    }
+
+    return fin.getBuffer();
+
 }
