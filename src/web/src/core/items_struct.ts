@@ -248,9 +248,10 @@ export const ItemWearPlace: Record<string, number> = {
 	PL_SIP: 11,
 } as const;
 
+
 export const ItemWearPlaceName: string[] = [
 	[ItemWearPlace.PL_NIKAM, "Nowhere"],
-	[ItemWearPlace.PL_BATOH, "Back Slot"],
+	[ItemWearPlace.PL_BATOH, "Bag Slot"],
 	[ItemWearPlace.PL_TELO_H, "Upper Body"],
 	[ItemWearPlace.PL_TELO_D, "Lower Body"],
 	[ItemWearPlace.PL_HLAVA, "Head"],

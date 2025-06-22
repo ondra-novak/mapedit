@@ -1,5 +1,5 @@
 
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
 type SaveFn = () => void|Promise<void>
 type RevertFn = () => void|Promise<void>
@@ -8,6 +8,8 @@ const fnSave = ref<SaveFn | null>(null)
 const fnRevert = ref<RevertFn | null>(null)
 const changed = ref(false);
 const inprogress = ref(false);
+
+const stack: [SaveFn|null, RevertFn|null, boolean][] =  [];
 
 export default {
 
@@ -56,5 +58,23 @@ export default {
         }
     },
     visible: computed(()=>!!(fnSave.value && fnRevert.value) ),
-    enabled: computed(()=>changed.value && !inprogress.value)
+    enabled: computed(()=>changed.value && !inprogress.value),
+
+
+    push: () => {
+        stack.push([fnSave.value,fnRevert.value,changed.value])
+        fnSave.value=null;
+        fnRevert.value=null;
+        changed.value = false;
+    },
+    pop: () => {
+        const x = stack.pop();
+        if (x) {
+            nextTick(()=>{
+                fnSave.value = x[0];
+                fnRevert.value = x[1];
+                changed.value = x[2];
+            })
+        }
+    }
 }

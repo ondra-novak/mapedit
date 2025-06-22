@@ -6,6 +6,7 @@ import { ref, watch, onMounted, computed, defineEmits, shallowRef, onUnmounted }
 import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import CanvasView from './CanvasView.vue';
 import { PCXProfile, PCX } from '@/core/pcx';
+import StatusBar from '@/core/status_bar_control'
 
 const emit = defineEmits<{
   (e: 'upload', name: string, done?: Promise<void>): void
@@ -22,13 +23,11 @@ const cur_image = shallowRef<PCX>();
 const cur_offset = ref<number>(0);
 const list_files = ref<string[]>([]);
 const big=ref<boolean>(false);
-const changed = ref<boolean>(false);
 let play_anim = false;
 
 
 async function onUpdateModel() {
-    done();
-    changed.value = false;
+    StatusBar.onFinalSave();
     if (filename.value) {
         const f = filename.value;
         if (f.endsWith(".SEQ")) {
@@ -55,7 +54,12 @@ async function onUpdateModel() {
         animations.value = new SeqFile([]);
     }
     
-
+    StatusBar.registerSaveAndRevert(()=>{
+        save();
+    },()=>{
+        StatusBar.setChangedFlag(false);
+        onUpdateModel();
+    })
     onChangePhase();
 }   
 
@@ -118,7 +122,7 @@ function insert_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined) {
         animations.value.animation[cur_phase.value].splice(cur_frame.value,0,animations.value.animation[cur_phase.value][cur_frame.value]);
         while (animations.value.animation[cur_phase.value].length > 16) animations.value.animation[cur_phase.value].pop();
-        changed.value = true;
+        StatusBar.setChangedFlag(true);
     }
     play_anim = false;
 }
@@ -126,7 +130,7 @@ function insert_frame() {
 function delete_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined && animations.value.animation[cur_phase.value].length>1) {
            animations.value.animation[cur_phase.value].splice(cur_frame.value,1);
-           changed.value = true;
+           StatusBar.setChangedFlag(true);
     }
     play_anim = false;
 }
@@ -190,7 +194,7 @@ function onChangeFace () {
             offset_x:cur_offset.value,
             offset_y:0
         };
-        changed.value = true;
+        StatusBar.setChangedFlag(true);
         onChangeFrame();
     }
     play_anim = false;
@@ -211,9 +215,9 @@ function on_play_anim() {
     if (play_anim) play_cycle();
 }
 
-function done() {
+function save() {
     play_anim = false
-    if (animations.value && selfile.value && changed.value) {
+    if (animations.value && selfile.value) {
         let p = server.putDDLFile(selfile.value, animations.value.toArrayBuffer(), AssetGroup.ENEMIES)
         emit("upload", selfile.value, p);
     }
@@ -233,27 +237,23 @@ function sethit() {
     if (animations.value) {
         if (animations.value && animations.value.hit_pos == cur_frame.value) animations.value.hit_pos = null;
         else animations.value.hit_pos = cur_frame.value;
-        changed.value=true;
+        StatusBar.setChangedFlag(true);
     }
 }
 
 function changeBig() {
     if (animations.value) {
         animations.value.big =  big.value;
-        changed.value=true;
+        StatusBar.setChangedFlag(true);
     }
 }
 
-function drop_changes() {
-    changed.value = false;
-    onUpdateModel();
-}
 
 watch([filename], onUpdateModel);
 watch([cur_phase], onChangePhase);
 watch([cur_frame], onChangeFrame);
 onMounted(onUpdateModel);
-onUnmounted(done);
+onUnmounted(StatusBar.onFinalSave);
 
 
 </script>
@@ -283,7 +283,6 @@ onUnmounted(done);
             <button @click="go_next">&gt;&gt;</button>            
             <button @click="insert_frame">+</button>
             <button @click="delete_frame">-</button>
-            <button @click="drop_changes" :disabled="!changed">Reset</button>
         </div>
         <div class="preview checkerboard" :class="{mirror: AnimationTypeMirror[cur_phase]}" @mousedown="event=>onDragStart(event as MouseEvent)"
             @keypress="event=>onKeyPress" tabindex="1">
@@ -304,10 +303,10 @@ onUnmounted(done);
 <style scoped>
 .workspace {
     position: relative;
-    padding-left: 10em;
-    padding-top: 2em;
-    min-height: 25em;
-    width: 40em;
+    padding-left: 10rem;
+    padding-top: 2rem;
+    min-height: 29rem;
+    width: 40rem;
     margin: auto;    
 }
 

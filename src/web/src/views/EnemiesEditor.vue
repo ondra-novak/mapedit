@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import AssetsToolCol from '@/components/AssetsToolCol.vue';
 import AssetToolSeq from '@/components/AssetToolSeq.vue';
 import CanvasView from '@/components/CanvasView.vue';
 import MissingFiles from '@/components/MissingFiles.vue';
@@ -8,12 +7,13 @@ import { AssetGroup } from '@/core/asset_groups';
 import { COLPaletteSet } from '@/core/col_palette_set';
 import { EnemyStats, SpellEffects } from '@/core/common_defs';
 import { EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,enemyToArrayBuffer,newEnemy,type EnemyDef } from '@/core/enemy_struct';
-import { useBitmaskCheckbox, useBitmaskCheckbox2 } from '@/core/flags';
+import { useBitmaskCheckbox2 } from '@/core/flags';
 import { itemsFromArrayBuffer, type ItemDef } from '@/core/items_struct';
 import { PCXProfile, PCX } from '@/core/pcx';
-import { readFileToArrayBuffer } from '@/core/read_file';
 import { SeqFile } from '@/core/seqfile';
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch, WatchHandle } from 'vue';
+import StatusBar from '@/core/status_bar_control'
+
 
 const required_files : FileItem[] =[
     {name:"ENEMY.DAT",group:AssetGroup.MAPS,ovr:false},
@@ -39,8 +39,6 @@ const appearence = ref<PCX>();
 const appearence_margin = ref<string>("");
 const palettes = ref<COLPaletteSet>();
 const edit_seq = ref<string>();
-let dont_save_now = false;
-let need_save = false;
 
 
 async function  load_files() {
@@ -70,6 +68,9 @@ async function  load_files() {
     } catch (e){
         console.warn("failed to load ITEMS.DAT")
     }
+
+    StatusBar.setChangedFlag(false);
+    selected_enemy.value = undefined;
 }
 
 
@@ -120,11 +121,16 @@ function create_soundmap () {
 function init() {
     load_sounds();
     load_files();
+    StatusBar.registerSaveAndRevert(()=>{
+        save_all();
+    },()=>{
+        load_files();
+    })
 
 }
 
 async function save_all() {
-    if (enemies && sounds && need_save) {
+    if (enemies.value && sounds.value) {
         try {
             create_soundmap();
 
@@ -144,7 +150,7 @@ async function save_all() {
 
 }
 
-onUnmounted(save_all);
+onUnmounted(StatusBar.onFinalSave);
 
 
 
@@ -286,10 +292,60 @@ const form = reactive({
     inventory:new Array(16).fill(0)
 });
 
+function saveEnemyData() {
+    if (selected_enemy.value !==undefined  && enemies.value) {
+        const enm = enemies.value[selected_enemy.value];
+        enm.name = form.name;
+        enm.speed = form.speed;
+        enm.dohled = form.sightrange;
+        enm.dosah = form.engagerange;
+        enm.dialog = form.dialognum;
+        enm.paletts_count = form.palette;
+        enm.casting = form.casting;
+        enm.sound_files = [];
+        enm.sound_files[EnemySounds.MBS_HIT] = form.snd_damage;
+        enm.sound_files[EnemySounds.MBS_ATTACK] = form.snd_attack;
+        enm.sound_files[EnemySounds.MBS_WALK] = form.snd_walk;
+        if (!enm.vlastnosti) enm.vlastnosti = new Array(24);
+        enm.vlastnosti[EnemyStats.VLS_MAXHIT] = form.stat_hp;
+        enm.vlastnosti[EnemyStats.VLS_SILA] = form.stat_str;
+        enm.vlastnosti[EnemyStats.VLS_SMAGIE] = form.stat_mg;
+        enm.vlastnosti[EnemyStats.VLS_POHYB] = form.stat_mv;
+        enm.vlastnosti[EnemyStats.VLS_OBRAT] = form.stat_dex;
+        enm.vlastnosti[EnemyStats.VLS_OBRAN_L] = Math.min(form.stat_def_min,form.stat_def_max);
+        enm.vlastnosti[EnemyStats.VLS_OBRAN_H] = Math.max(form.stat_def_min,form.stat_def_max);
+        enm.vlastnosti[EnemyStats.VLS_UTOK_L] = Math.min(form.stat_att_min,form.stat_att_max);
+        enm.vlastnosti[EnemyStats.VLS_UTOK_H] = Math.max(form.stat_att_min,form.stat_att_max);
+        enm.vlastnosti[EnemyStats.VLS_DAMAGE] = form.stat_damage;
+        enm.vlastnosti[EnemyStats.VLS_MGSIL_L] = Math.min(form.stat_mg_min,form.stat_mg_max);
+        enm.vlastnosti[EnemyStats.VLS_MGSIL_H] = Math.max(form.stat_mg_min,form.stat_mg_max);
+        enm.vlastnosti[EnemyStats.VLS_MGZIVEL] = form.stat_mg_type;
+        enm.vlastnosti[EnemyStats.VLS_OHEN] = form.stat_prot_f;
+        enm.vlastnosti[EnemyStats.VLS_VODA] = form.stat_prot_w;
+        enm.vlastnosti[EnemyStats.VLS_ZEME] = form.stat_prot_e;
+        enm.vlastnosti[EnemyStats.VLS_VZDUCH] = form.stat_prot_a;
+        enm.vlastnosti[EnemyStats.VLS_MYSL] = form.stat_prot_m;
+        enm.vlastnosti[EnemyStats.VLS_HPREG] = form.stat_reg;
+        enm.flee_num = form.flee_prob;
+        enm.specproc = form.specproc;
+        enm.experience = form.exp;
+        enm.bonus = form.bonus_exp;
+        enm.money = form.money;
+        enm.stay_strategy = enm_f1.value;
+        enm.vlajky = enm_f2.value
+        enm.vlastnosti[EnemyStats.VLS_KOUZLA] = enm_eff.value;
+        enm.inv = form.inventory;
+        StatusBar.setChangedFlag(true);
+    }
+
+}
+
+const save_watch = ref<WatchHandle>();
+
 function loadEnemyData() {
     if (selected_enemy.value !==undefined && enemies.value) {
-        setTimeout(()=>dont_save_now = false, 100);
-        dont_save_now = true;
+        if (save_watch.value) save_watch.value();
+
         const enm = enemies.value[selected_enemy.value];
         if (!enm.vlastnosti) enm.vlastnosti = new Array(24);
 
@@ -334,58 +390,10 @@ function loadEnemyData() {
         form.inventory = enm.inv;
         loadAppearence();
         loadColors();
+        save_watch.value = watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});        
     }
 }
 
-function saveEnemyData() {
-    if (selected_enemy.value !==undefined  && enemies.value && !dont_save_now) {
-        setTimeout(()=>dont_save_now = false, 100);
-        dont_save_now = true;
-        const enm = enemies.value[selected_enemy.value];
-        enm.name = form.name;
-        enm.speed = form.speed;
-        enm.dohled = form.sightrange;
-        enm.dosah = form.engagerange;
-        enm.dialog = form.dialognum;
-        enm.paletts_count = form.palette;
-        enm.casting = form.casting;
-        enm.sound_files = [];
-        enm.sound_files[EnemySounds.MBS_HIT] = form.snd_damage;
-        enm.sound_files[EnemySounds.MBS_ATTACK] = form.snd_attack;
-        enm.sound_files[EnemySounds.MBS_WALK] = form.snd_walk;
-        if (!enm.vlastnosti) enm.vlastnosti = new Array(24);
-        enm.vlastnosti[EnemyStats.VLS_MAXHIT] = form.stat_hp;
-        enm.vlastnosti[EnemyStats.VLS_SILA] = form.stat_str;
-        enm.vlastnosti[EnemyStats.VLS_SMAGIE] = form.stat_mg;
-        enm.vlastnosti[EnemyStats.VLS_POHYB] = form.stat_mv;
-        enm.vlastnosti[EnemyStats.VLS_OBRAT] = form.stat_dex;
-        enm.vlastnosti[EnemyStats.VLS_OBRAN_L] = Math.min(form.stat_def_min,form.stat_def_max);
-        enm.vlastnosti[EnemyStats.VLS_OBRAN_H] = Math.max(form.stat_def_min,form.stat_def_max);
-        enm.vlastnosti[EnemyStats.VLS_UTOK_L] = Math.min(form.stat_att_min,form.stat_att_max);
-        enm.vlastnosti[EnemyStats.VLS_UTOK_H] = Math.max(form.stat_att_min,form.stat_att_max);
-        enm.vlastnosti[EnemyStats.VLS_DAMAGE] = form.stat_damage;
-        enm.vlastnosti[EnemyStats.VLS_MGSIL_L] = Math.min(form.stat_mg_min,form.stat_mg_max);
-        enm.vlastnosti[EnemyStats.VLS_MGSIL_H] = Math.max(form.stat_mg_min,form.stat_mg_max);
-        enm.vlastnosti[EnemyStats.VLS_MGZIVEL] = form.stat_mg_type;
-        enm.vlastnosti[EnemyStats.VLS_OHEN] = form.stat_prot_f;
-        enm.vlastnosti[EnemyStats.VLS_VODA] = form.stat_prot_w;
-        enm.vlastnosti[EnemyStats.VLS_ZEME] = form.stat_prot_e;
-        enm.vlastnosti[EnemyStats.VLS_VZDUCH] = form.stat_prot_a;
-        enm.vlastnosti[EnemyStats.VLS_MYSL] = form.stat_prot_m;
-        enm.vlastnosti[EnemyStats.VLS_HPREG] = form.stat_reg;
-        enm.flee_num = form.flee_prob;
-        enm.specproc = form.specproc;
-        enm.experience = form.exp;
-        enm.bonus = form.bonus_exp;
-        enm.money = form.money;
-        enm.stay_strategy = enm_f1.value;
-        enm.vlajky = enm_f2.value
-        enm.vlastnosti[EnemyStats.VLS_KOUZLA] = enm_eff.value;
-        enm.inv = form.inventory;
-        need_save = true;
-    }
-
-}
 
 function inventory_erase(n:number) {
     const idx = form.inventory.findIndex(x=>x==n);
@@ -417,9 +425,19 @@ function inventory_add_press_return(event: Event) {
 }
 
 watch([selected_enemy], loadEnemyData);
-watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
 
-
+function openAppearence() {
+    if (selected_enemy.value && enemies.value) {
+        if (!edit_seq.value) StatusBar.push();
+        edit_seq.value = enemies.value[selected_enemy.value || 0].mobs_name + '.SEQ';
+    }
+}
+function closeAppearence() {
+    if (edit_seq.value) {        
+        edit_seq.value = undefined;
+        StatusBar.pop();
+    }
+}
 
 
 </script>
@@ -475,7 +493,7 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
             </div>
             <x-section class="appearence">
                 <x-section-title>Appearence</x-section-title>
-                <div :style="{margin: appearence_margin}" @click="edit_seq = enemies[selected_enemy || 0].mobs_name + '.SEQ'">
+                <div :style="{margin: appearence_margin}" @click="openAppearence">
                     <CanvasView :canvas="appearence?appearence.createCanvas(PCXProfile.enemy,palettes && form.palette<0?palettes.palettes[-form.palette-1]:undefined):null" />
                 </div>
             </x-section>
@@ -583,7 +601,7 @@ watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});
     <div class="edit-seq" v-if="edit_seq">
         <div>
             <AssetToolSeq v-model="edit_seq" />
-            <button @click="edit_seq=undefined" class="close"></button>
+            <button @click="closeAppearence" class="close"></button>
         </div>
     </div>
 </template>

@@ -2,13 +2,14 @@
 import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch, type Ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch, type Ref, type WatchHandle } from 'vue';
 import { itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName, type ItemDef } from '@/core/items_struct';
 import CanvasView from '@/components/CanvasView.vue';
 import { PCX, PCXProfile, type PCXProfileType } from '@/core/pcx';
 import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
 import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
+import StatusBar from '@/core/status_bar_control'
 
 
 const required_files: FileItem[] = [
@@ -31,7 +32,6 @@ const allAnimationsList = shallowRef<string[]>();
 
 const left_hand_place = ref<HTMLCanvasElement|null>(null);
 const right_hand_place = ref<HTMLCanvasElement|null>(null);
-const changed = ref<boolean>(false);
 
 function init() {
     server.getDDLFile("CHAR00.PCX").then(x=>{
@@ -47,10 +47,22 @@ function init() {
     });
     loadAllIcons((name:string)=>server.getDDLFile(name)).then(x=>{
         allIcons.value = x ;
-    })
-    server.getDDLFile("ITEMS.DAT").then(x=>{
-        item_list.value = itemsFromArrayBuffer(x);
-    })
+    });
+    function reload() {
+        server.getDDLFile("ITEMS.DAT").then(x=>{
+            item_list.value = itemsFromArrayBuffer(x);
+            selected_item.value = undefined;
+            nextTick(()=>StatusBar.setChangedFlag(false));
+        });
+    }
+    StatusBar.registerSaveAndRevert(()=>{
+        save();
+    },()=>{
+        reload();
+    });
+    reload();
+
+
 }
 
 
@@ -185,40 +197,7 @@ const form = reactive({
 });
 
 const key_mode = ref<number>(0);
-
-function loadItemData() {
-    if (selected_item.value!==undefined && item_list.value) {
-        const itm = item_list.value[selected_item.value];
-        form.jmeno = itm.jmeno;
-        form.popis = itm.popis;
-        form.zmeny = itm.zmeny;
-        itm_effects.value = itm.zmeny[CharacterStats.VLS_KOUZLA];
-        form.podminky = itm.podminky;
-        form.hmotnost = itm.hmotnost;
-        form.nosnost = itm.nosnost;
-        form.druh = itm.druh;
-        form.umisteni = itm.umisteni;
-        form.spell = itm.spell;
-        form.magie = itm.magie;
-        form.ikona = itm.ikona;
-        form.arrow_type = itm.druh_sipu;
-        form.vzhled_on_ground = itm.vzhled_on_ground || "";
-        form.vzhled_on_male = itm.vzhled_on_male || "";
-        form.vzhled_on_female = itm.vzhled_on_female || "";
-        form.user_value = itm.user_value;
-        form.keynum = itm.keynum;
-        form.polohy = itm.polohy;
-        form.typ_zbrane = itm.typ_zbrane;
-        form.sound_file = itm.sound_file || "";
-        form.cena = itm.cena;
-        form.weapon_animation_file = itm.weapon_animation_file || "";
-        form.hitpos = itm.hitpos;
-        form.shiftup = itm.shiftup == 255?null:itm.shiftup;;
-        if (itm.v_letu_files) form.v_letu_files = itm.v_letu_files;
-        itm_flags.value = itm.flags;
-        key_mode.value = Math.sign(form.keynum);
-    }
-}
+const whandle  = shallowRef<WatchHandle>();
 
 function saveItemData() {
     if (selected_item.value!==undefined && item_list.value) {
@@ -253,10 +232,46 @@ function saveItemData() {
         if (!key_mode.value) itm.keynum = 0;
         else if (key_mode.value < 0 && itm.keynum >=0) itm.keynum = -1;
         else if (key_mode.value > 0 && itm.keynum <=0) itm.keynum = 0;
-        changed.value = true;
+        StatusBar.setChangedFlag(true);
     }
-
 }
+
+function loadItemData() {
+    if (selected_item.value!==undefined && item_list.value) {
+        if (whandle.value) whandle.value();
+        const itm = item_list.value[selected_item.value];
+        form.jmeno = itm.jmeno;
+        form.popis = itm.popis;
+        form.zmeny = itm.zmeny;
+        itm_effects.value = itm.zmeny[CharacterStats.VLS_KOUZLA];
+        form.podminky = itm.podminky;
+        form.hmotnost = itm.hmotnost;
+        form.nosnost = itm.nosnost;
+        form.druh = itm.druh;
+        form.umisteni = itm.umisteni;
+        form.spell = itm.spell;
+        form.magie = itm.magie;
+        form.ikona = itm.ikona;
+        form.arrow_type = itm.druh_sipu;
+        form.vzhled_on_ground = itm.vzhled_on_ground || "";
+        form.vzhled_on_male = itm.vzhled_on_male || "";
+        form.vzhled_on_female = itm.vzhled_on_female || "";
+        form.user_value = itm.user_value;
+        form.keynum = itm.keynum;
+        form.polohy = itm.polohy;
+        form.typ_zbrane = itm.typ_zbrane;
+        form.sound_file = itm.sound_file || "";
+        form.cena = itm.cena;
+        form.weapon_animation_file = itm.weapon_animation_file || "";
+        form.hitpos = itm.hitpos;
+        form.shiftup = itm.shiftup == 255?null:itm.shiftup;;
+        if (itm.v_letu_files) form.v_letu_files = itm.v_letu_files;
+        itm_flags.value = itm.flags;
+        key_mode.value = Math.sign(form.keynum);
+        whandle.value = watch([form,itm_flags,itm_effects,key_mode],saveItemData,{deep:true});
+    }
+}
+
 
 async function onChangeSelection() {
     loadItemData();
@@ -280,7 +295,6 @@ function recalc_place_preview() {
     }
 }
 
-watch([form,itm_flags,itm_effects,key_mode],saveItemData,{deep:true});
 watch(()=>form.vzhled_on_ground,()=>{
     if (form.vzhled_on_ground) {
         server.getDDLFile(form.vzhled_on_ground).then(x=>{
@@ -367,7 +381,7 @@ function save() {
 }
 
 onMounted(init);
-onUnmounted(save);
+onUnmounted(StatusBar.onFinalSave);
 
 </script>
 <template>
