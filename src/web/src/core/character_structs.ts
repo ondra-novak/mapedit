@@ -55,6 +55,13 @@ class Iterator {
         }
         return null;
     }
+    getString() {
+        const c= this.get();
+        if (c) {
+            return c.substring(1);
+        }
+        return c;
+    }
 }
 
 class Runes {
@@ -95,10 +102,12 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
     }
 
     let human = init_struct();
+    let skip_add = true;
 
 
     while (!iter.eof()) {
         const code = iter.getNumber();
+        skip_add = skip_add && code == -1;
         switch (code){
             case 64: case 65: case 66: case 67: case 68: {
                 let z = iter.getNumber();
@@ -110,7 +119,7 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
                 break;
             }
             case 128: 
-                human.jmeno = iter.get() || "";
+                human.jmeno = iter.getString() || "";
             break;
             case 129:
                 human.female = (iter.getNumber() || 0) != 0;
@@ -147,7 +156,8 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
                 human.sipy = iter.getNumber() || 0;
                 break;
             case -1:
-                humans.push(human);
+                if (!skip_add) humans.push(human);
+                skip_add = true;
                 human = init_struct();
                 break;
             default:
