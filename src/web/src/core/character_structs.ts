@@ -9,11 +9,14 @@ export interface THuman {
   exp: number;
   inv: number[];
   wearing: number[];
+  rings: number[];
   stare_vls: number[];
   sipy: number;
+  sip_druh:number;
+  npcflags: number;
 }
 
-const HumanWearPlace = {
+export const HumanWearPlace = {
 BATOH: 0,
 TELO_H: 1,
 TELO_D: 2,
@@ -25,7 +28,7 @@ RUKA_L: 7,
 RUKA_R: 8
 } as const
 
-const HumanWearPlaceName = [
+export const HumanWearPlaceName = [
     "Bag slot","Upper body","Lower body","Head","Feet","Robe","Neck","Left hand","Right hand"
 ] as const;
 
@@ -98,6 +101,9 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
         wearing: [],
         stare_vls: [],
         sipy: 0,
+        sip_druh:0,
+        npcflags:0,
+        rings:[]
         }
     }
 
@@ -155,6 +161,19 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
             case 136:
                 human.sipy = iter.getNumber() || 0;
                 break;
+            case 137: 
+                human.sip_druh = iter.getNumber() || 0;
+                break;
+            case 138:
+                let num = iter.getNumber();
+                while (num !== null && num !== -1) {
+                    human.rings.push(num);
+                    num = iter.getNumber();
+                }
+                break;
+            case 139:
+                human.npcflags = iter.getNumber() || 0;
+                break
             case -1:
                 if (!skip_add) humans.push(human);
                 skip_add = true;

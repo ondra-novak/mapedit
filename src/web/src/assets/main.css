@@ -101,3 +101,7 @@ button.close {
 button.close::before {
   content: "✖";
 }
+
+input, button, select {
+  font-size: 1rem;
+}

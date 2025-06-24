@@ -28,13 +28,12 @@ export const SpellEffects = {
     "SPL_FEAR":    0x1000,      
     "SPL_STONED":  0x2000,      
     "SPL_LEVITATION": 0x4000,   
-    "SPL_DEMON": 0x8000,        
 } as const;
 export type SpellEffectsType = typeof SpellEffects[keyof typeof SpellEffects];
 
 export const SpellEffectName = [
     "Invisibility","Eye by eye","Defense Stance","Live Drain","Mana Shield","Psych. resistance","Mag. resistance",
-    "Blind","Battle Regen","Cold protection","Hot protection","Knock back","Fear","Stoned","Levitation","Demon"
+    "Blind","Battle Regen","Cold protection","Hot protection","Knock back","Fear","Stoned","Levitation"
 ]
 
 export const CharacterStats = {
@@ -67,7 +66,7 @@ export const CharacterStats = {
 export const CharacterStatsNames = [
     "Strength", "Magic", "Speed", "Dexterity", "Max HP","Max Vitality","Max mana","Defense Low","Defense High",
     "Attack Low", "Attack High","Protection Fire","Protection Water","Protection Earth","Protection Air","Protection Mind",
-    "HP Regeneration","Mana Regeneration","VP regeneration","Magic attack Low", "Magic attack High","Element","Damagae","Effects"
+    "HP Regeneration","Mana Regeneration","VP regeneration","Magic attack Low", "Magic attack High","Magic attack element","Damagae","Effects"
 ] as const;
 
 
