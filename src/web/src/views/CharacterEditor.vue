@@ -4,11 +4,12 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control';
-import { humanDataFromArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman } from '@/core/character_structs';
+import { createTHuman, humanDataFromArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman } from '@/core/character_structs';
 import { PCX, PCXProfile } from '@/core/pcx';
-import { itemsFromArrayBuffer, type ItemDef } from '@/core/items_struct';
-import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName } from '@/core/common_defs';
+import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } from '@/core/items_struct';
+import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
+import CanvasView from '@/components/CanvasView.vue';
 
 const missing_files : FileItem[] = [
     {name:"POSTAVY.DAT",group:AssetGroup.MAPS,ovr:true},
@@ -19,19 +20,85 @@ const postavy = ref<THuman[]>([]);
 const selected = ref<number>();
 const items  = ref<ItemDef[]>([]);
 const selected_char = ref<THuman>();
+const list_of_xichts = ref<number[]>();
+const preview_base_canvas  = ref<HTMLCanvasElement>();
+const portraits = ref<HTMLElement[]>([]);
+const portrait_cache =new  Map<number, HTMLCanvasElement>();
+const preview_items = ref<HTMLCanvasElement[]>([]);
+const preview_items_cache = new Map<number, Promise<PCX> >();
+
 
 
 const [npcflags, chk_npcflags] = useBitmaskCheckbox2({
     HIDE_INV: 0x1,
     HIDE_GEAR: 0x2
 });
+const [effects, chk_effects] = useBitmaskCheckbox2(SpellEffects);
 
 watch(selected, ()=>{    
     selected_char.value = postavy.value && selected.value !== undefined ?postavy.value[selected.value]:undefined;
-    if (selected_char.value) npcflags.value = selected_char.value.npcflags;
+    if (selected_char.value) {
+        npcflags.value = selected_char.value.npcflags;
+        effects.value = selected_char.value.stats[CharacterStats.VLS_KOUZLA];
+        server.getDDLFile("CHAR"+selected_char.value.xicht.toString(16).padStart(2,'0').toUpperCase()+".PCX")
+            .then(x=>{
+                const pcx = PCX.fromArrayBuffer(x);
+                if (preview_base_canvas.value) {
+                    const c = preview_base_canvas.value;
+                    c.innerHTML = "";
+                    c.appendChild(pcx.createCanvas(PCXProfile.transp0));
+                }
+        });
+    }
 });
 
+watch([preview_items, selected_char],()=>{
+    if (preview_items.value && selected_char.value && preview_base_canvas.value) {
+
+
+        preview_items.value.forEach((r,idx)=>{
+            const pos = parseInt(r.dataset.pos || "");
+            if (pos == undefined || isNaN(pos)) return;
+            const elem = r as HTMLElement;
+            const item_ref = selected_char.value!.wearing[pos];
+            if (!item_ref) return;
+            const key = item_ref*2+(selected_char.value!.female?1:0);
+            const item = items.value[item_ref];
+            const char = selected_char.value!;
+            let p: Promise<PCX>;
+            if (preview_items_cache.has(key)) {
+                p = preview_items_cache.get(key)!;
+            } else {                                
+                let vzhled_file = char.female?item.vzhled_on_female:item.vzhled_on_male;
+                if (!vzhled_file) vzhled_file = item.vzhled_on_ground;
+                if (!vzhled_file) return;
+                p = server.getDDLFile(vzhled_file).then(x=>PCX.fromArrayBuffer(x));
+                preview_items_cache.set(key,p);
+            }
+            p.then(buff=>{
+                if (!preview_base_canvas.value) return;
+                const parent = preview_base_canvas.value.parentElement;
+                const app_bottom = preview_base_canvas.value.offsetTop + preview_base_canvas.value.offsetHeight;
+                const app_top = preview_base_canvas.value.offsetTop;
+                const app_center = parent?parent.clientWidth / 2.0:0;
+                elem.innerHTML ="";
+                const p = pos == HumanWearPlace.RUKA_R?1:0;
+                const c= buff.createCanvas(PCXProfile.transp0);
+                const x = item.polohy[p][0]+app_center-c.width/2;
+                const y = app_bottom - item.polohy[p][1] - c.height;
+                c.style.left = `${x}px`;
+                c.style.top = `${y}px`;
+
+                elem.appendChild(c);
+            });
+
+        });
+    }
+},{deep:true})
+
+
 watch([npcflags], ()=>{if (selected_char.value && npcflags.value !== undefined) selected_char.value.npcflags = npcflags.value;});
+watch([effects], ()=>{if (selected_char.value && effects.value !== undefined) selected_char.value.stats[CharacterStats.VLS_KOUZLA] = effects.value;});
 
 function init() {
     function reload() {
@@ -118,11 +185,20 @@ function add_item_to_inv(event: Event) {
     if (c[0] && selected_char.value) {
         selected_char.value.inv.push(c[0]);
         (event.target as HTMLInputElement).value="";
+        cur_inv_item.value = "";
     }
 }
 
-const portraits = ref<HTMLElement[]>([]);
-const portrait_cache =new  Map<number, HTMLCanvasElement>();
+function add_item_to_inv_enter(event: Event) {
+    const e = event as KeyboardEvent;
+    if (e.key == "Enter") {
+        e.stopPropagation();
+        e.preventDefault();
+        add_item_to_inv(e);
+    }
+}
+
+
 
 
 function reload_portraits() {
@@ -163,6 +239,26 @@ function delete_item(event: Event, idx: number) {
 watch(portraits, reload_portraits,{deep:true});
 watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
 
+const  cur_inv_item = ref<string>("");
+const portraits_to_select = ref<HTMLElement[]>([]);
+
+async function add_xicht() {
+    list_of_xichts.value = 
+        (await server.getDDLFiles(AssetGroup.UI,null)).files.filter(x=>x.name.startsWith("XICHT")).map(x=>x.name)
+        .map(v =>  parseInt((/XICHT([0-9a-fA-F]+).PCX/.exec(v || '') || ["","0"])[1]))
+        .filter(v=>v && postavy.value && postavy.value.findIndex(w=>w.xicht == v) == -1);
+}
+
+function add_char(xicht: number){
+    const h = createTHuman();
+    h.xicht = xicht;
+    selected.value = postavy.value.length;
+    postavy.value.push(h)
+    list_of_xichts.value = undefined;
+    
+}
+
+
 
 
 </script>
@@ -170,6 +266,7 @@ watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
 <template>
     <datalist id="charactersItems81"><option v-for="(v,idx) of items" :key="idx" :value="v.jmeno"></option></datalist>
     <datalist id="arrowTypes160"><option v-for="(v,idx) of items.filter(x=>x.druh_sipu)" :key="idx" :value="v.druh_sipu"> {{ v.jmeno}}</option></datalist>
+
     <x-workspace>
     <div class="top-panel">
         <div v-for="(p,idx) of postavy" :key="idx" @click="selected = idx" :class="{selected: selected == idx}">
@@ -180,7 +277,7 @@ watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
                 {{ p.jmeno }}
             </div>          
         </div>
-        <div>
+        <div @click="add_xicht">
             <div class="portrait add" >
 
             </div>
@@ -196,11 +293,15 @@ watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
                 <label><span>Name</span><input type="text" v-model="selected_char.jmeno"></label>
                 <label><span>Gender</span><div><span><input v-model="selected_char.female" type="radio" :value="false" />Male</span>
                                             <span><input v-model="selected_char.female" type="radio" :value="true" />Female</span></div></label>
-                <label><span>Level</span><input type="number" v-model="selected_char.level" ></label>
-                <label><span>Experience</span><input type="number" v-model="selected_char.exp" ></label>
+                <label><span>Level</span><input type="number" v-model="selected_char.level" min="1" max="40" v-watch-range ></label>
+                <label><span>Experience</span><input type="number" v-model="selected_char.exp" min="0" max="999999999" v-watch-range></label>
                 <label><input type="checkbox" v-model="chk_npcflags.HIDE_GEAR"><span>Hide gear</span></label>
                 <label><input type="checkbox" v-model="chk_npcflags.HIDE_INV"><span>Hide inventory</span></label>
             </x-form>
+            <div class="preview-items">
+                <div ref="preview_base_canvas" class="base"></div>                
+                <div class="item" v-for="(_,idx) of ItemWearPlaceName" :key="`${idx}-${selected}-${selected_char.wearing[idx]}`" ref="preview_items" :data-pos="idx"></div>
+            </div>
         </x-section>
         <x-section>
             <x-section-title>Wears</x-section-title>
@@ -211,39 +312,85 @@ watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
                 <label v-for="idx in [0,1,2,3]" :key="idx"><span>Ring {{ idx }}</span>
                     <input type="text" list="charactersItems81" :value="get_item_name(selected_char.rings[idx])"
                     @change="$event=>set_item_by_name($event, selected_char!.wearing, idx)"></label>
-                <label><span>Count arrows: </span><input type="number" min="0" max="99" v-model="selected_char.sipy"></label>
-                <label><span>Arrow type: </span><input type="number" min="0" max="99" v-model="selected_char.sip_druh" list="arrowTypes160"></label>
+                <label><span>Count arrows: </span><input type="number" min="0" max="99" v-watch-range v-model="selected_char.sipy"></label>
+                <label><span>Arrow type: </span><input type="number" min="0" max="255" v-watch-range v-model="selected_char.sip_druh" list="arrowTypes160"></label>
 
                 <label><span>Inventory</span><div class="inventory">
-                    <div v-for="(v,idx) of selected_char.inv">{{  get_item_name(v) }}<button @click="$event=>delete_item($event, idx)">X</button></div>
-                    <input type="text"  list="charactersItems81" placeholder="add item" @change="$event=>add_item_to_inv($event)">
+                    <div v-for="(v,idx) of selected_char.inv">{{  get_item_name(v) }}<button @click="$event=>delete_item($event, idx)">×</button></div>
+                    <div class="input"> {{  cur_inv_item }}
+                    <input type="text" v-model="cur_inv_item" list="charactersItems81" placeholder="add item" 
+                    @keydown="$event=>add_item_to_inv_enter($event)" @change="$event=>add_item_to_inv($event)">
+                    </div>
                 </div></label>
             </x-form>
         </x-section>
         <x-section>
             <x-section-title>Stats</x-section-title>
             <x-form>
-                <template v-for="(v,idx) of CharacterStatsNames" :key="idx">
-                    <label v-if="idx < 23"><span>{{ v }}</span><div v-if="idx == CharacterStats.VLS_MGZIVEL">
-                        <select  v-model="selected_char.stare_vls[idx]">
-                            <option v-for="(v,idx) of ElementTypeName" :key="idx" :value="idx"> {{ v }}</option>
-                        </select></div>
-                <input v-if="idx != CharacterStats.VLS_MGZIVEL" type="number" v-model="selected_char.stare_vls[idx]" min="0" max="32767" v-watch-range />
-                </label></template>                
-            </x-form>                    
-            <x-section>
-                <x-form>
-                    <x-section-title>Flags and effects</x-section-title>
-                    <label v-for="(v,idx) of SpellEffectName" :key="idx">
-                        <input type="checkbox" :checked="!!(selected_char.stare_vls[CharacterStats.VLS_KOUZLA] & (1 << idx))">
-                        <span> {{ v }}</span>
-                    </label>
-                </x-form>
-            </x-section>
+                <label><span>Strength</span><input v-model="selected_char.stats[CharacterStats.VLS_SILA]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Magic</span><input v-model="selected_char.stats[CharacterStats.VLS_SMAGIE]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Speed</span><input v-model="selected_char.stats[CharacterStats.VLS_POHYB]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Dexterity</span><input v-model="selected_char.stats[CharacterStats.VLS_OBRAT]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Max hitpoints</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXHIT]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Max vitality</span><input v-model="selected_char.stats[CharacterStats.VLS_KONDIC]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Max mana</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXMANA]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_H]" v-watch-range min="-100" max="100"/></div></label>
+                <label><span>Defese</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_H]" v-watch-range min="-100" max="100"/></div></label>
+                <label><span>Magic attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_H]" v-watch-range min="-100" max="100"/></div></label>
+                <label><span>Magic attack type</span><div><select v-model="selected_char.stats[CharacterStats.VLS_MGZIVEL]">
+                    <option value="-1">--select--</option>
+                    <option value="0">fire</option>
+                    <option value="1">water</option>
+                    <option value="2">earth</option>
+                    <option value="3">air</option>
+                    <option value="4">mind</option>
+                </select></div></label>
+                <label><span>Extra damage</span><input v-model="selected_char.stats[CharacterStats.VLS_DAMAGE]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Protection fire</span><input v-model="selected_char.stats[CharacterStats.VLS_OHEN]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Protection water</span><input v-model="selected_char.stats[CharacterStats.VLS_VODA]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Protection earth</span><input v-model="selected_char.stats[CharacterStats.VLS_ZEME]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Protection air</span><input v-model="selected_char.stats[CharacterStats.VLS_VZDUCH]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Protection mind</span><input v-model="selected_char.stats[CharacterStats.VLS_MYSL]" type="number" v-watch-range min="-100" max="100" /></label>
+            </x-form>
+        </x-section>
+        <x-section>
+            <x-section-title>Flags and effects</x-section-title>
+            <x-form>
+                <label v-for="(v,idx) of Object.keys(SpellEffects)" :key="idx">
+                    <input type="checkbox" v-model="(chk_effects as Record<string, boolean>)[v]"> 
+                    <span> {{ SpellEffectName[idx] }}</span>
+                </label>
+            </x-form>
         </x-section>
 
     </div>
     </x-workspace>
+        <div class="list-of-characters" v-if="list_of_xichts">
+            <button class="close" @click="list_of_xichts=undefined"></button>
+        <div class="lst">
+            <div v-for="v of list_of_xichts" :key="v" @click="add_char(v)">
+                <div class="portrait" :data="v" ref="portraits" :data-xicht="v">
+                </div>
+            </div>
+        </div>
+        <div class="help">
+        <p>To add a new character, choose any two random numbers or letters between A and F, then upload two files using the <RouterLink to="/assets">Assets Manager</RouterLink>:
+            CHAR??.PCX and XICHT??.PCX, where ?? are your chosen characters.            
+        </p>
+        <p class="note">
+            For example, CHAR1D.PCX and XICHT1D.PCX. These files contain the character's body and portrait images.
+        </p>
+        <dl>
+        <dt>CHAR??.PCX</dt>
+        <dd>Whole character's body as shown in inventory (up to 190x300)</dd>
+        <dt>XICHT??.PCX</dt>
+        <dd>Four variants of portraits* image 54x300  (54x75 for each)<br>
+            <br>
+            <span class="note">* The name xicht is a phonetic transcription of the Czech word ksich, which is a dirty word means a face.</span>
+        </dd>
+        </dl>
+        </div>
+    </div>
 
 
 <MissingFiles :files="missing_files"></MissingFiles>
@@ -300,15 +447,13 @@ watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
     text-align: left;
 }
 
-.inventory > input {
-    font-size: 1rem;
-}
 
 .inventory> div {
     display: inline-block;
     border: 1px solid;
     padding: 0.2rem;
     margin-left: 0.2rem;
+    vertical-align: top;
 }
 
 .inventory> div > button {
@@ -319,4 +464,96 @@ watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
     text-align: left;
 }
 
+.main-panel {
+    display:flex;
+    flex-wrap: wrap;
+}
+.main-panel > *{ 
+    width: 20rem;
+}
+
+input[type=number] {
+    width: 5rem;
+    text-align: center;
+}
+
+.inventory .input {
+    position: relative;
+    height: 1.5rem;    
+    min-width: 6rem;
+}
+
+.inventory .input::before {
+    content: "";
+    width: 2rem;
+    display: inline-block;
+}
+
+.inventory .input input {
+    position: absolute;
+    left:0;top:0;right: 0;bottom: 0;
+}
+
+.list-of-characters {
+    position: fixed;
+    left:0;
+    right: 0;
+    width: 60%;
+    top: 15%;
+    margin: auto;
+    background-color: #ddd;
+    padding: 2rem 1rem 1rem 1rem;
+    border: 1px solid;
+    box-shadow: 3px 3px 5px black;
+}
+
+.list-of-characters > div.lst  {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;    
+}
+
+.list-of-characters > div.lst > div {
+    cursor: pointer;
+}
+
+.note {
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+.preview-items {
+    position: relative;
+    text-align: center;
+    height: 350px;
+}
+
+.preview-items .base {
+    position: absolute;
+    left:0;
+    right: 0;
+    margin: auto;
+    top:30px;
+    width: fit-content;
+    height: fit-content;
+    z-index: 1;
+}
+
+.preview-items .item {
+    z-index: 5;
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.preview-items .item > * {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
 </style>

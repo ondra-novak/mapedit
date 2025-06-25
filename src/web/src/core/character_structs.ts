@@ -10,11 +10,30 @@ export interface THuman {
   inv: number[];
   wearing: number[];
   rings: number[];
-  stare_vls: number[];
+  stats: number[];
   sipy: number;
   sip_druh:number;
   npcflags: number;
 }
+
+export  const createTHuman = (): THuman => {
+        return {
+        jmeno: '',
+        female: false,
+        xicht: 0,
+        level: 0,
+        exp: 0,
+        inv: [],
+        wearing: [],
+        stats: new Array(24).fill(0),
+        sipy: 0,
+        sip_druh:0,
+        npcflags:0,
+        rings:[]
+        }
+    }
+
+
 
 export const HumanWearPlace = {
 BATOH: 0,
@@ -90,24 +109,8 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
   const runes: Runes = new Runes();
 
 
-  const init_struct = (): THuman=> {
-        return {
-        jmeno: '',
-        female: false,
-        xicht: 0,
-        level: 0,
-        exp: 0,
-        inv: [],
-        wearing: [],
-        stare_vls: [],
-        sipy: 0,
-        sip_druh:0,
-        npcflags:0,
-        rings:[]
-        }
-    }
 
-    let human = init_struct();
+    let human = createTHuman();
     let skip_add = true;
 
 
@@ -177,11 +180,11 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
             case -1:
                 if (!skip_add) humans.push(human);
                 skip_add = true;
-                human = init_struct();
+                human = createTHuman();
                 break;
             default:
                 const val = iter.getNumber() || 0;
-                human.stare_vls[code || 0] = val;
+                human.stats[code || 0] = val;
                 break;
         }
     }
