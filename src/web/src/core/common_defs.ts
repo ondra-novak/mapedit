@@ -69,6 +69,32 @@ export const CharacterStatsNames = [
     "HP Regeneration","Mana Regeneration","VP regeneration","Magic attack Low", "Magic attack High","Magic attack element","Damagae","Effects"
 ] as const;
 
+export const CharacterStatsMinMaxs = [
+    /*"VLS_SILA":*/    [0,100],
+    /*"VLS_SMAGIE":*/  [0,100],
+    /*"VLS_POHYB":*/   [0,100],
+    /*"VLS_OBRAT":*/   [0,100],
+    /*"VLS_MAXHIT":*/  [0,32767],
+    /*"VLS_KONDIC":*/  [0,32767],
+    /*"VLS_MAXMANA":*/ [0,32767],
+    /*"VLS_OBRAN_L":*/ [0,32767],
+    /*"VLS_OBRAN_H":*/ [0,32767],
+    /*"VLS_UTOK_L":*/  [0,32767],
+    /*"VLS_UTOK_H":*/  [0,32767],
+    /*"VLS_OHEN":*/    [0,100],
+    /*"VLS_VODA":*/    [-100,100],
+    /*"VLS_ZEME":*/    [-100,100],
+    /*"VLS_VZDUCH":*/  [-100,100],
+    /*"VLS_MYSL":*/    [-100,100],
+    /*"VLS_HPREG":*/   [-100,100],
+    /*"VLS_MPREG":*/   [-100,100],
+    /*"VLS_VPREG":*/   [-100,100],
+    /*"VLS_MGSIL_L":*/ [0,32767],
+    /*"VLS_MGSIL_H":*/ [0,32767],
+    /*"VLS_MGZIVEL":*/ [0,4],
+    /*"VLS_DAMAGE":*/  [0,32767],
+    /*"VLS_KOUZLA":*/  [0,32767],
+]
 
 export const EnemyStats = CharacterStats;
 

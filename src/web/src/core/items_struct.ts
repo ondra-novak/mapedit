@@ -280,3 +280,5 @@ export const WeaponType = {
 export const WeaponTypeName = [
 	"Sword","Axe","Hammer","Staff","Dagger","Ranged","Special"
 ]
+
+

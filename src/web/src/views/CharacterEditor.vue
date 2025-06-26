@@ -21,11 +21,13 @@ const selected = ref<number>();
 const items  = ref<ItemDef[]>([]);
 const selected_char = ref<THuman>();
 const list_of_xichts = ref<number[]>();
-const preview_base_canvas  = ref<HTMLCanvasElement>();
 const portraits = ref<HTMLElement[]>([]);
 const portrait_cache =new  Map<number, HTMLCanvasElement>();
-const preview_items = ref<HTMLCanvasElement[]>([]);
 const preview_items_cache = new Map<number, Promise<PCX> >();
+const char_cache = new Map<number, Promise<PCX> >();
+const preview_box = ref<HTMLElement>();
+let ioblouk :Promise<PCX>|undefined;
+
 
 
 
@@ -40,18 +42,86 @@ watch(selected, ()=>{
     if (selected_char.value) {
         npcflags.value = selected_char.value.npcflags;
         effects.value = selected_char.value.stats[CharacterStats.VLS_KOUZLA];
-        server.getDDLFile("CHAR"+selected_char.value.xicht.toString(16).padStart(2,'0').toUpperCase()+".PCX")
-            .then(x=>{
-                const pcx = PCX.fromArrayBuffer(x);
-                if (preview_base_canvas.value) {
-                    const c = preview_base_canvas.value;
-                    c.innerHTML = "";
-                    c.appendChild(pcx.createCanvas(PCXProfile.transp0));
-                }
-        });
     }
 });
 
+const PO_XS:number= 194;
+const PO_YS:number= 340;
+const PO_XSS:number= (PO_XS>>1);
+const PO_YSS:number= (PO_YS>>1);
+
+function place_human_item(img: HTMLCanvasElement, x:number,y:number)
+  {
+    const s = img.style;
+    const xp = PO_XSS-img.width/2+x;
+    const yp = PO_YS-img.height-y-20;
+    s.position = "absolute";
+    s.left = `${xp}px`;
+    s.top = `${yp}px`;
+    s.display = "block";
+    s.width = `${img.width}px`;
+    s.height = `${img.height}px`;
+  }
+
+
+watch([selected_char,preview_box],()=>{
+    if (preview_box.value && selected_char.value) {
+        const bx = preview_box.value;
+        const ch = selected_char.value;
+        if (!ioblouk) {
+            ioblouk = server.getDDLFile("IOBLOUK.PCX").then(buff=>PCX.fromArrayBuffer(buff));            
+        }        
+        let base: Promise<PCX>|undefined;
+        if (char_cache.has(ch.xicht)) {
+            base = char_cache.get(ch.xicht);
+        } else {
+            base = server.getDDLFile(`CHAR${ch.xicht.toString(16).toUpperCase().padStart(2,'0')}.PCX`)
+                        .then(buff=>PCX.fromArrayBuffer(buff));
+            char_cache.set(ch.xicht, base);
+        }
+        if (base) {
+            base.then(async pcx=>{
+                try {          
+                    const obl = await ioblouk;
+                    bx.innerHTML = "";      
+                    if (obl) {
+                        const c = obl.createCanvas(PCXProfile.default);
+                        place_human_item(c,0,-45);
+                        bx.appendChild(c);
+                    }
+                } catch(e) {
+                    bx.innerHTML = "";      
+                    console.error(e);
+                }
+                const c = pcx.createCanvas(PCXProfile.transp0);
+                place_human_item(c,0,0);
+                bx.appendChild(c);
+                ch.wearing.forEach((item_ref: number, idx: number)=>{
+                    let itmpcx: Promise<PCX>|undefined;
+                    const key = item_ref*2+(ch.female?1:0);
+                    const item = items.value[item_ref];
+                    if (preview_items_cache.has(key)) {
+                        itmpcx = preview_items_cache.get(key);
+                    } else {
+                        const vzhled = ch.female?item.vzhled_on_female:item.vzhled_on_male;
+                        if (!vzhled) return;
+                        itmpcx = server.getDDLFile(vzhled).then(buff=>PCX.fromArrayBuffer(buff));
+                        preview_items_cache.set(key, itmpcx);
+                    }
+                    if (itmpcx) {
+                        itmpcx.then(pcx=>{
+                            const c = pcx.createCanvas(PCXProfile.item);
+                            const pl = idx == HumanWearPlace.RUKA_L?item.polohy[1]:item.polohy[0];
+                            place_human_item(c,pl[0],pl[1]);
+                            bx.appendChild(c);
+                        });
+                    }
+                });
+            });
+        }
+    }
+},{deep:true})
+/*
 watch([preview_items, selected_char],()=>{
     if (preview_items.value && selected_char.value && preview_base_canvas.value) {
 
@@ -95,7 +165,7 @@ watch([preview_items, selected_char],()=>{
         });
     }
 },{deep:true})
-
+*/
 
 watch([npcflags], ()=>{if (selected_char.value && npcflags.value !== undefined) selected_char.value.npcflags = npcflags.value;});
 watch([effects], ()=>{if (selected_char.value && effects.value !== undefined) selected_char.value.stats[CharacterStats.VLS_KOUZLA] = effects.value;});
@@ -149,7 +219,7 @@ function set_item_by_name(event: Event, arr:number[], pos:number) {
                 return 
             }
         } else {
-            const f = items.value.findIndex(x=>x.jmeno == v);
+            const f = items.value.findIndex(x=>x.jmeno.trim() == v);
             if (f != -1) {
                 arr[pos] = f;
                 t.value = get_item_name(f);
@@ -258,13 +328,28 @@ function add_char(xicht: number){
     
 }
 
+const HumanPlaceToWearPlace = [
+/*BATOH: 0,*/ ItemWearPlace.PL_BATOH,
+/*TELO_H: 1,*/ ItemWearPlace.PL_TELO_H,
+/*TELO_D: 2,*/ ItemWearPlace.PL_TELO_L,
+/*HLAVA: 3,*/ ItemWearPlace.PL_HLAVA,
+/*NOHY: 4,*/ ItemWearPlace.PL_NOHY,
+/*KUTNA: 5,*/ ItemWearPlace.PL_KUTNA,
+/*KRK: 6,*/ ItemWearPlace.PL_KRK,
+/*RUKA_L: 7,*/ ItemWearPlace.PL_RUKA,
+/*RUKA_R: 8*/ ItemWearPlace.PL_RUKA,
+              ItemWearPlace.PL_PRSTEN
 
+]
 
 
 </script>
 
 <template>
-    <datalist id="charactersItems81"><option v-for="(v,idx) of items" :key="idx" :value="v.jmeno"></option></datalist>
+    <datalist id="charactersItems81"><option v-for="(v,idx) of items" :key="idx" :value="v.jmeno.trim()"></option></datalist>
+    <template v-for="pos of ItemWearPlace" :key="pos">
+        <datalist :id="`charWearList339-${pos}`"><option v-for="(v,idx) of items.filter(itm=>itm.umisteni == pos)" :key="idx" :value="v.jmeno"></option></datalist>
+    </template>
     <datalist id="arrowTypes160"><option v-for="(v,idx) of items.filter(x=>x.druh_sipu)" :key="idx" :value="v.druh_sipu"> {{ v.jmeno}}</option></datalist>
 
     <x-workspace>
@@ -298,20 +383,18 @@ function add_char(xicht: number){
                 <label><input type="checkbox" v-model="chk_npcflags.HIDE_GEAR"><span>Hide gear</span></label>
                 <label><input type="checkbox" v-model="chk_npcflags.HIDE_INV"><span>Hide inventory</span></label>
             </x-form>
-            <div class="preview-items">
-                <div ref="preview_base_canvas" class="base"></div>                
-                <div class="item" v-for="(_,idx) of ItemWearPlaceName" :key="`${idx}-${selected}-${selected_char.wearing[idx]}`" ref="preview_items" :data-pos="idx"></div>
+            <div class="preview-items" ref="preview_box">
             </div>
         </x-section>
         <x-section>
             <x-section-title>Wears</x-section-title>
             <x-form>
                 <label v-for="(v,idx) of HumanWearPlaceName" :key="idx"><span>{{ v }}</span>
-                    <input type="text" list="charactersItems81" :value="get_item_name(selected_char.wearing[idx])"
+                    <input type="text" :list="`charWearList339-${HumanPlaceToWearPlace[idx]}`" :value="get_item_name(selected_char.wearing[idx])"
                     @change="$event=>set_item_by_name($event, selected_char!.wearing, idx)"></label>
                 <label v-for="idx in [0,1,2,3]" :key="idx"><span>Ring {{ idx }}</span>
-                    <input type="text" list="charactersItems81" :value="get_item_name(selected_char.rings[idx])"
-                    @change="$event=>set_item_by_name($event, selected_char!.wearing, idx)"></label>
+                    <input type="text" :list="`charWearList339-${HumanPlaceToWearPlace[9]}`" :value="get_item_name(selected_char.rings[idx])"
+                    @change="$event=>set_item_by_name($event, selected_char!.rings, idx)"></label>
                 <label><span>Count arrows: </span><input type="number" min="0" max="99" v-watch-range v-model="selected_char.sipy"></label>
                 <label><span>Arrow type: </span><input type="number" min="0" max="255" v-watch-range v-model="selected_char.sip_druh" list="arrowTypes160"></label>
 
@@ -327,16 +410,16 @@ function add_char(xicht: number){
         <x-section>
             <x-section-title>Stats</x-section-title>
             <x-form>
-                <label><span>Strength</span><input v-model="selected_char.stats[CharacterStats.VLS_SILA]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Magic</span><input v-model="selected_char.stats[CharacterStats.VLS_SMAGIE]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Speed</span><input v-model="selected_char.stats[CharacterStats.VLS_POHYB]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Dexterity</span><input v-model="selected_char.stats[CharacterStats.VLS_OBRAT]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Max hitpoints</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXHIT]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Max vitality</span><input v-model="selected_char.stats[CharacterStats.VLS_KONDIC]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Max mana</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXMANA]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_H]" v-watch-range min="-100" max="100"/></div></label>
-                <label><span>Defese</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_H]" v-watch-range min="-100" max="100"/></div></label>
-                <label><span>Magic attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_H]" v-watch-range min="-100" max="100"/></div></label>
+                <label><span>Strength</span><input v-model="selected_char.stats[CharacterStats.VLS_SILA]" type="number" v-watch-range min="0" max="32767" /></label>
+                <label><span>Magic</span><input v-model="selected_char.stats[CharacterStats.VLS_SMAGIE]" type="number" v-watch-range min="0" max="32767" /></label>
+                <label><span>Speed</span><input v-model="selected_char.stats[CharacterStats.VLS_POHYB]" type="number" v-watch-range min="0" max="32767" /></label>
+                <label><span>Dexterity</span><input v-model="selected_char.stats[CharacterStats.VLS_OBRAT]" type="number" v-watch-range min="0" max="32767" /></label>
+                <label><span>Max hitpoints</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXHIT]" type="number" v-watch-range min="0" max="32767" /></label>
+                <label><span>Max vitality</span><input v-model="selected_char.stats[CharacterStats.VLS_KONDIC]" type="number" v-watch-range min="0" max="32767" /></label>
+                <label><span>Max mana</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXMANA]" type="number" v-watch-range min="0" max="32767" /></label>
+                <label><span>Attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_L]" v-watch-range min="0" max="32767"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_H]" v-watch-range min="0" max="32767"/></div></label>
+                <label><span>Defese</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_L]" v-watch-range min="0" max="32767"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_H]" v-watch-range min="0" max="32767"/></div></label>
+                <label><span>Magic attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_L]" v-watch-range min="0" max="32767"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_H]" v-watch-range min="0" max="32767"/></div></label>
                 <label><span>Magic attack type</span><div><select v-model="selected_char.stats[CharacterStats.VLS_MGZIVEL]">
                     <option value="-1">--select--</option>
                     <option value="0">fire</option>
@@ -345,7 +428,7 @@ function add_char(xicht: number){
                     <option value="3">air</option>
                     <option value="4">mind</option>
                 </select></div></label>
-                <label><span>Extra damage</span><input v-model="selected_char.stats[CharacterStats.VLS_DAMAGE]" type="number" v-watch-range min="-100" max="100" /></label>
+                <label><span>Extra damage</span><input v-model="selected_char.stats[CharacterStats.VLS_DAMAGE]" type="number" v-watch-range min="-10000" max="10000" /></label>
                 <label><span>Protection fire</span><input v-model="selected_char.stats[CharacterStats.VLS_OHEN]" type="number" v-watch-range min="-100" max="100" /></label>
                 <label><span>Protection water</span><input v-model="selected_char.stats[CharacterStats.VLS_VODA]" type="number" v-watch-range min="-100" max="100" /></label>
                 <label><span>Protection earth</span><input v-model="selected_char.stats[CharacterStats.VLS_ZEME]" type="number" v-watch-range min="-100" max="100" /></label>
@@ -526,34 +609,10 @@ input[type=number] {
 .preview-items {
     position: relative;
     text-align: center;
-    height: 350px;
-}
-
-.preview-items .base {
-    position: absolute;
-    left:0;
-    right: 0;
+    height: 360px;
+    width: 195px;
+    overflow: hidden;
     margin: auto;
-    top:30px;
-    width: fit-content;
-    height: fit-content;
-    z-index: 1;
 }
 
-.preview-items .item {
-    z-index: 5;
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-}
-
-.preview-items .item > * {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-}
 </style>
