@@ -4,7 +4,7 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control';
-import { createTHuman, humanDataFromArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman } from '@/core/character_structs';
+import { createTHuman, humanDataFromArrayBuffer, humanDataToArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman, type THumanData } from '@/core/character_structs';
 import { PCX, PCXProfile } from '@/core/pcx';
 import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } from '@/core/items_struct';
 import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName, SpellEffects } from '@/core/common_defs';
@@ -16,16 +16,19 @@ const missing_files : FileItem[] = [
     {name:"ITEMS.DAT",group:AssetGroup.MAPS,ovr:true},
 ];
 
+let humand_data: THumanData;
 const postavy = ref<THuman[]>([]);
 const selected = ref<number>();
 const items  = ref<ItemDef[]>([]);
 const selected_char = ref<THuman>();
 const list_of_xichts = ref<number[]>();
+const change_appearence_index=ref<number>();
 const portraits = ref<HTMLElement[]>([]);
-const portrait_cache =new  Map<number, HTMLCanvasElement>();
+const portrait_cache =new  Map<number, Promise<PCX> >();
 const preview_items_cache = new Map<number, Promise<PCX> >();
 const char_cache = new Map<number, Promise<PCX> >();
 const preview_box = ref<HTMLElement>();
+const add_char_info_box = ref<boolean>(false);
 let ioblouk :Promise<PCX>|undefined;
 
 
@@ -96,7 +99,20 @@ watch([selected_char,preview_box],()=>{
                 const c = pcx.createCanvas(PCXProfile.transp0);
                 place_human_item(c,0,0);
                 bx.appendChild(c);
-                ch.wearing.forEach((item_ref: number, idx: number)=>{
+                let wr = ch.wearing;
+                if ((ch.npcflags & 0x2)) {
+                    if (ch.npcflags & 0x1) {
+                        wr = [];
+                    } else {
+                        wr = ch.wearing.filter((_,idx)=>idx == HumanWearPlace.BATOH);
+                    }
+                } else if (ch.npcflags & 0x1) {
+                           wr = ch.wearing.filter((_,idx)=>idx != HumanWearPlace.BATOH);                
+                } else {
+                    wr = ch.wearing;
+                }
+                
+                wr.forEach((item_ref: number, idx: number)=>{
                     let itmpcx: Promise<PCX>|undefined;
                     const key = item_ref*2+(ch.female?1:0);
                     const item = items.value[item_ref];
@@ -121,51 +137,6 @@ watch([selected_char,preview_box],()=>{
         }
     }
 },{deep:true})
-/*
-watch([preview_items, selected_char],()=>{
-    if (preview_items.value && selected_char.value && preview_base_canvas.value) {
-
-
-        preview_items.value.forEach((r,idx)=>{
-            const pos = parseInt(r.dataset.pos || "");
-            if (pos == undefined || isNaN(pos)) return;
-            const elem = r as HTMLElement;
-            const item_ref = selected_char.value!.wearing[pos];
-            if (!item_ref) return;
-            const key = item_ref*2+(selected_char.value!.female?1:0);
-            const item = items.value[item_ref];
-            const char = selected_char.value!;
-            let p: Promise<PCX>;
-            if (preview_items_cache.has(key)) {
-                p = preview_items_cache.get(key)!;
-            } else {                                
-                let vzhled_file = char.female?item.vzhled_on_female:item.vzhled_on_male;
-                if (!vzhled_file) vzhled_file = item.vzhled_on_ground;
-                if (!vzhled_file) return;
-                p = server.getDDLFile(vzhled_file).then(x=>PCX.fromArrayBuffer(x));
-                preview_items_cache.set(key,p);
-            }
-            p.then(buff=>{
-                if (!preview_base_canvas.value) return;
-                const parent = preview_base_canvas.value.parentElement;
-                const app_bottom = preview_base_canvas.value.offsetTop + preview_base_canvas.value.offsetHeight;
-                const app_top = preview_base_canvas.value.offsetTop;
-                const app_center = parent?parent.clientWidth / 2.0:0;
-                elem.innerHTML ="";
-                const p = pos == HumanWearPlace.RUKA_R?1:0;
-                const c= buff.createCanvas(PCXProfile.transp0);
-                const x = item.polohy[p][0]+app_center-c.width/2;
-                const y = app_bottom - item.polohy[p][1] - c.height;
-                c.style.left = `${x}px`;
-                c.style.top = `${y}px`;
-
-                elem.appendChild(c);
-            });
-
-        });
-    }
-},{deep:true})
-*/
 
 watch([npcflags], ()=>{if (selected_char.value && npcflags.value !== undefined) selected_char.value.npcflags = npcflags.value;});
 watch([effects], ()=>{if (selected_char.value && effects.value !== undefined) selected_char.value.stats[CharacterStats.VLS_KOUZLA] = effects.value;});
@@ -173,17 +144,21 @@ watch([effects], ()=>{if (selected_char.value && effects.value !== undefined) se
 function init() {
     function reload() {
         server.getDDLFile("POSTAVY.DAT").then(buff=>{
-            postavy.value = humanDataFromArrayBuffer(buff).characters;            
+            humand_data = humanDataFromArrayBuffer(buff);
+            postavy.value = humand_data.characters;
             console.log(postavy.value);
             nextTick(()=>StatusBar.setChangedFlag(false));
         })
     }
     
     StatusBar.registerSaveAndRevert(()=>{
-        console.log("save");
-    }, () => {
-        selected.value = undefined;
-        reload();
+        if (postavy.value) {
+            const buff = humanDataToArrayBuffer(humand_data)
+            server.putDDLFile("POSTAVY.DAT", buff, AssetGroup.MAPS);
+            }
+        }, () => {
+            selected.value = undefined;
+            reload();
     });
     reload();
     server.getDDLFile("ITEMS.DAT").then(buff=>{
@@ -273,27 +248,27 @@ function add_item_to_inv_enter(event: Event) {
 
 function reload_portraits() {
     if (portraits.value) {
-        portraits.value.forEach(async (el:HTMLElement)=>{
+        portraits.value.forEach((el:HTMLElement)=>{
             const sx = el.dataset.xicht;
             if (!sx) return;
             const xicht = parseInt(sx);
             if (xicht ===undefined || isNaN(xicht)) return;
+            let pcx : Promise<PCX>;
             let canvas : HTMLCanvasElement| null= null;
-            if (!portrait_cache.has(xicht)) {
-
-                try {
-                    const img = PCX.fromArrayBuffer(await server.getDDLFile(`XICHT${xicht.toString(16).toUpperCase().padStart(2, '0')}.PCX`));
-                    canvas = img.createCanvas(PCXProfile.default);
-                    portrait_cache.set(xicht, canvas);
-                } catch (e) {
-                    return;
-                }
-
+            if (portrait_cache.has(xicht)) {
+                pcx = portrait_cache.get(xicht)!;
             } else {
-                canvas = portrait_cache.get(xicht) as HTMLCanvasElement;
+                pcx = server.getDDLFile(`XICHT${xicht.toString(16).toUpperCase().padStart(2, '0')}.PCX`)
+                    .then(buff=>PCX.fromArrayBuffer(buff));
+                portrait_cache.set(xicht, pcx);
             }
-            el.innerHTML = '';
-            el.appendChild(canvas)
+            if (pcx) {
+                pcx.then(pcx=>{
+                    const canvas = pcx.createCanvas(PCXProfile.default);
+                    el.innerHTML = '';
+                    el.appendChild(canvas)
+                });
+            }
         })
     }
 }
@@ -316,16 +291,40 @@ async function add_xicht() {
     list_of_xichts.value = 
         (await server.getDDLFiles(AssetGroup.UI,null)).files.filter(x=>x.name.startsWith("XICHT")).map(x=>x.name)
         .map(v =>  parseInt((/XICHT([0-9a-fA-F]+).PCX/.exec(v || '') || ["","0"])[1]))
-        .filter(v=>v && postavy.value && postavy.value.findIndex(w=>w.xicht == v) == -1);
+        .filter(v=>v);
 }
 
 function add_char(xicht: number){
+    if (change_appearence_index.value !== undefined) {
+        if (postavy.value) {
+            postavy.value[change_appearence_index.value].xicht = xicht;
+        }
+        change_appearence_index.value = undefined;
+        list_of_xichts.value = undefined;
+        return;
+    }
     const h = createTHuman();
     h.xicht = xicht;
     selected.value = postavy.value.length;
     postavy.value.push(h)
     list_of_xichts.value = undefined;
-    
+}
+
+function delete_char(index: number) {
+    const p = postavy.value;
+    if (p) {
+        if (confirm("Confirm you want to delete character: " + p[index].jmeno)) {
+            if (p.length-1 == index) p.pop();
+            else {
+                const z = p[p.length-1];
+                p[p.length-1] = p[index];
+                p[index] = z;
+                p.pop();
+            }
+            selected.value = undefined;
+            selected_char.value = undefined;;
+        }
+    }
 }
 
 const HumanPlaceToWearPlace = [
@@ -342,6 +341,13 @@ const HumanPlaceToWearPlace = [
 
 ]
 
+function onImported() {
+    init();
+}
+
+function onNewCreated() {
+    postavy.value = [];
+}
 
 </script>
 
@@ -384,6 +390,10 @@ const HumanPlaceToWearPlace = [
                 <label><input type="checkbox" v-model="chk_npcflags.HIDE_INV"><span>Hide inventory</span></label>
             </x-form>
             <div class="preview-items" ref="preview_box">
+            </div>
+            <div class="buttons">
+                <button @click="change_appearence_index = selected || 0;add_xicht();">Change appearence</button>
+                <button @click="delete_char(selected || 0)">Delete</button>
             </div>
         </x-section>
         <x-section>
@@ -456,27 +466,30 @@ const HumanPlaceToWearPlace = [
                 </div>
             </div>
         </div>
-        <div class="help">
-        <p>To add a new character, choose any two random numbers or letters between A and F, then upload two files using the <RouterLink to="/assets">Assets Manager</RouterLink>:
-            CHAR??.PCX and XICHT??.PCX, where ?? are your chosen characters.            
-        </p>
-        <p class="note">
-            For example, CHAR1D.PCX and XICHT1D.PCX. These files contain the character's body and portrait images.
-        </p>
-        <dl>
-        <dt>CHAR??.PCX</dt>
-        <dd>Whole character's body as shown in inventory (up to 190x300)</dd>
-        <dt>XICHT??.PCX</dt>
-        <dd>Four variants of portraits* image 54x300  (54x75 for each)<br>
-            <br>
-            <span class="note">* The name xicht is a phonetic transcription of the Czech word ksich, which is a dirty word means a face.</span>
-        </dd>
-        </dl>
-        </div>
+        <x-section>
+            <x-section-title @click="add_char_info_box=!add_char_info_box" :class="add_char_info_box?'expanded':''">How to add new characters</x-section-title>
+            <div clas="help" v-if="add_char_info_box">
+            <p>To add a new character, choose any two random numbers or letters between A and F, then upload two files using the <RouterLink to="/assets">Assets Manager</RouterLink>:
+                CHAR??.PCX and XICHT??.PCX, where ?? are your chosen characters.            
+            </p>
+            <p class="note">
+                For example, CHAR1D.PCX and XICHT1D.PCX. These files contain the character's body and portrait images.
+            </p>
+            <dl>
+            <dt>CHAR??.PCX</dt>
+            <dd>Whole character's body as shown in inventory (up to 190x300)</dd>
+            <dt>XICHT??.PCX</dt>
+            <dd>Four variants of portraits* image 54x300  (54x75 for each)<br>
+                <br>
+                <span class="note">* The name xicht is a phonetic transcription of the Czech word ksich, which is a dirty word means a face.</span>
+            </dd>
+            </dl>
+            </div>
+        </x-section>
     </div>
 
 
-<MissingFiles :files="missing_files"></MissingFiles>
+<MissingFiles :files="missing_files" @created_new="onNewCreated" @imported="onImported"></MissingFiles>
 
 </template>
 
@@ -550,6 +563,7 @@ const HumanPlaceToWearPlace = [
 .main-panel {
     display:flex;
     flex-wrap: wrap;
+    justify-content: center;
 }
 .main-panel > *{ 
     width: 20rem;
@@ -613,6 +627,35 @@ input[type=number] {
     width: 195px;
     overflow: hidden;
     margin: auto;
+}
+
+.buttons {
+    text-align: center;
+    margin-top: 1rem;
+}
+.buttons > * {
+    margin: 1rem auto;
+    display: block;
+}
+.list-of-characters x-section {
+    margin-top: 2rem;
+}
+.list-of-characters x-section-title {
+    background-color: #ddd;
+    border: 1px outset;
+    cursor: pointer;
+}
+
+.list-of-characters x-section-title.expanded {
+    border: 1px inset;
+}
+
+.list-of-characters x-section-title::after{
+    content: "▼";
+}
+
+.list-of-characters x-section-title.expanded::after {
+    content: "▲";
 }
 
 </style>

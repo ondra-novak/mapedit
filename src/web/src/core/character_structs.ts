@@ -1,5 +1,5 @@
 import { ItemWearPlace } from "./items_struct";
-import { string_from_keybcs2 } from "./keybcs2";
+import { keybcs2_from_string, string_from_keybcs2 } from "./keybcs2";
 
 export interface THuman {
   jmeno: string;
@@ -97,7 +97,7 @@ class Runes {
 
 
 
-interface THumanData  {
+export interface THumanData  {
     characters: THuman[],
     runes: Runes;
 }
@@ -197,3 +197,58 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
   };
 }
 
+export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
+    const lines :(string | number | null)[] = [];
+    let r = [data.runes.fire,
+             data.runes.water,
+             data.runes.earth,
+             data.runes.air,
+             data.runes.mind].forEach((x,idx)=>{
+        lines.push((64+idx))
+        for (let i = 0; i < 7; ++i) {
+            if (x[i]) {
+                lines.push(i);
+            }
+        }
+        lines.push(-1);
+    })
+
+    data.characters.forEach(h=>{
+        lines.push(128,h.jmeno);
+        lines.push(129,h.female?1:0);
+        lines.push(130,h.xicht);
+        lines.push(131,h.level);
+        lines.push(132,h.exp);
+        lines.push(133,...h.inv,-1);
+
+        if (h.wearing[HumanWearPlace.BATOH] !== undefined)  {
+            lines.push(134, h.wearing[HumanWearPlace.BATOH]);
+        }
+
+        h.wearing.forEach((x, idx)=>{
+            if (idx != HumanWearPlace.BATOH) {
+                lines.push(135);
+                lines.push(idx);
+                lines.push(x);
+            }
+        })
+
+        lines.push(136,h.sipy);
+        lines.push(137,h.sip_druh);
+        lines.push(138,...h.rings, -1);
+        lines.push(139,h.npcflags);
+        h.stats.forEach((v,idx) => {
+            lines.push(idx, v);
+        });
+        lines.push(null);
+    })
+    const whole_str = lines.map(x=>{
+        if (x === null) return "";
+        if (typeof x == "string") return "$"+x;
+        else {
+            return `${x}`;
+        }
+    }).join("\r\n");
+
+    return Uint8Array.from(keybcs2_from_string(whole_str)).buffer;
+}
