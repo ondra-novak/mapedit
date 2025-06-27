@@ -86,7 +86,7 @@ class Iterator {
     }
 }
 
-class Runes {
+export class Runes {
     fire:boolean[] = new Array(7).fill(false);
     water: boolean[] = new Array(7).fill(false);
     earth: boolean[] = new Array(7).fill(false);
@@ -207,7 +207,7 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
         lines.push((64+idx))
         for (let i = 0; i < 7; ++i) {
             if (x[i]) {
-                lines.push(i);
+                lines.push(i+1);
             }
         }
         lines.push(-1);

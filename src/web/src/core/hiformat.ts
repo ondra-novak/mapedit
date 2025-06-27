@@ -47,7 +47,7 @@ class HIFormat {
             const b = imgData.data[4*offset+2];
             const c = ((r & 0xF8)<<7)
                         |((g & 0xF8) << 2)
-                        |((g & 0xF8) >> 3);
+                        |((b & 0xF8) >> 3);
             imageData[offset] = c;
             ++offset;
         }
@@ -86,7 +86,7 @@ class HIFormat {
             const r = ((pixel >> 10) & 0x1F) << 3;
             const g = ((pixel >> 5) & 0x1F) << 3;
             const b = (pixel & 0x1F) << 3;
-            return [r, g, b, 255];
+            return [r + (r>>5), g + (g >> 5), b + (b >> 5), 255];
         } else if (this.flag === 16) {
             // RGB565
             const r = ((pixel >> 11) & 0x1F) << 3;

@@ -13,6 +13,7 @@ import { PCXProfile, PCX } from '@/core/pcx';
 import { SeqFile } from '@/core/seqfile';
 import { computed, onMounted, onUnmounted, reactive, ref, watch, WatchHandle } from 'vue';
 import StatusBar from '@/core/status_bar_control'
+import { messageBoxConfirm } from '@/utils/messageBox';
 
 
 const required_files : FileItem[] =[
@@ -154,9 +155,9 @@ onUnmounted(StatusBar.onFinalSave);
 
 
 
-function deleteEnemy() {
+async function deleteEnemy() {
     if (selected_enemy.value !== undefined && enemies.value) {
-        if (confirm("Do you with to delete enemy:" + enemies.value[selected_enemy.value].name)) {
+        if (await messageBoxConfirm("Do you with to delete enemy:" + enemies.value[selected_enemy.value].name)) {
             enemies.value[selected_enemy.value].mobs_name="";
             while (enemies.value.length > 0 && enemies.value[enemies.value.length-1].mobs_name.length ==0) {
                 enemies.value.pop();

@@ -12,30 +12,27 @@ x-form {
   display:block;
 }
 
-x-form > label {
+x-form > label, x-form > div.label {
   display: flex;
   position:relative;    
   align-items: center;
   align-content: center;
   margin: 0.25em 0em;
 }
-x-form > label > * {
+x-form > label > *,x-form > div.label > * {
   display:block;
+  width: 60%;
+  box-sizing: border-box;
 }
 
-x-form > label > * {
-   width: 60%;
-   box-sizing: border-box;
-}
-
-x-form > label > input[type=checkbox] {
+x-form > label > input[type=checkbox],x-form > div.label > input[type=checkbox] {
   width: 2em;
 }
-x-form > label > div:last-child {
+x-form > label > div:last-child,x-form > div.label > div:last-child {
   text-align: right;
 }
 
-x-form > label > span {
+x-form > label > span,x-form > div.label > span {
   width: unset;
   flex-grow: 1;
 }

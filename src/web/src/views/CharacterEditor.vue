@@ -10,6 +10,7 @@ import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } 
 import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import CanvasView from '@/components/CanvasView.vue';
+import { messageBoxConfirm } from '@/utils/messageBox';
 
 const missing_files : FileItem[] = [
     {name:"POSTAVY.DAT",group:AssetGroup.MAPS,ovr:true},
@@ -310,10 +311,10 @@ function add_char(xicht: number){
     list_of_xichts.value = undefined;
 }
 
-function delete_char(index: number) {
+async function delete_char(index: number) {
     const p = postavy.value;
     if (p) {
-        if (confirm("Confirm you want to delete character: " + p[index].jmeno)) {
+        if (await messageBoxConfirm("Confirm you want to delete character: " + p[index].jmeno)) {
             if (p.length-1 == index) p.pop();
             else {
                 const z = p[p.length-1];

@@ -1,7 +1,7 @@
 export function dosname_sanitize(name: string) {
     return name.split('').map(c => {
-        const code = c.charCodeAt(0);
-        return (code >= 32 && code <= 127) ? c : '~';
+        const code = c.charCodeAt(0);        
+        return (code >= 33 && code <= 127) ? c : code < 33 ? "_" : '~';
     }).join('').toUpperCase();
 }
 

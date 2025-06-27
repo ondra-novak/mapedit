@@ -10,6 +10,7 @@ import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
 import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import StatusBar from '@/core/status_bar_control'
+import { messageBoxConfirm } from '@/utils/messageBox';
 
 
 const required_files: FileItem[] = [
@@ -66,10 +67,10 @@ function init() {
 }
 
 
-function deleteItem() {
+async function deleteItem() {
     if (selected_item.value !== undefined && item_list.value) {
         const lst = item_list.value;
-        if (confirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
+        if (await messageBoxConfirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
             lst[selected_item.value].jmeno = "";
         }
         while (lst.length && !lst[lst.length-1].jmeno) lst.pop();

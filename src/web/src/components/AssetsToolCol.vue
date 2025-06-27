@@ -8,6 +8,7 @@ import { AssetGroup } from '@/core/asset_groups';
 import { PhotoshopPicker } from 'vue-color';
 import { hslToRgb, rgbToHsl, type RGB, type RGBPalette } from '@/core/colors';
 import CanvasView from './CanvasView.vue';
+import { messageBoxConfirm } from '@/utils/messageBox';
 
 const filename = defineModel<string | null>();
 const enemy_image = shallowRef<PCX>();
@@ -213,8 +214,8 @@ function add() {
         change_flag = true;
     }
 }
-function delete_pal(index: number) {
-    if (confirm("Are you sure delete this palette?")) {
+async function delete_pal(index: number) {
+    if (await messageBoxConfirm("Are you sure delete this palette?")) {
         palete_col.value?.palettes.splice(index,1);
         change_flag = true;
     }

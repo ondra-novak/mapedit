@@ -2,6 +2,7 @@
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { FactDB } from '@/core/factdb';
+import { messageBoxConfirm } from '@/utils/messageBox';
 import { onMounted, onUnmounted, ref, toValue } from 'vue';
 
 
@@ -18,7 +19,7 @@ async function init() {
     try {
         const data = await server.getDDLFile(factfilename);
         const dec = new TextDecoder();
-        const str = dec.decode(data.buffer);
+        const str = dec.decode(data);
         facts.value = FactDB.fromJSON(str);
     } catch (e) {
         console.warn("No facts available", e);
@@ -61,8 +62,8 @@ const filteredAndSortedFacts = computed(() => {
     });
 });
 
-function delFactConfirm(pos: number) {
-    if (confirm("Are you sure you want to delete '"+facts.value.getFactById(pos)?.key+"'?")) {
+async function delFactConfirm(pos: number) {
+    if (await messageBoxConfirm("Are you sure you want to delete '"+facts.value.getFactById(pos)?.key+"'?")) {
         facts.value.removeFactById(pos);
         saveFactsDatabase();
     }
@@ -150,6 +151,16 @@ onMounted(init);
             <label><span>Key</span><input v-model="edit_fact_name"></label>
             <label><span>Description</span><textarea rows="4" cols="10" v-model="edit_fact_desc"></textarea></label>            
         </x-form>
+        <p>
+            A "fact" represents a stateful piece of information indicating whether a specific event has occurred in the game adventure. 
+            If the fact is active, it means the event has taken place; if inactive, the event has not happened.
+        </p>
+        <p v-if="edited_fact == -1 || edited_fact >= 8 ">
+            This is GLOBAL fact
+        </p>
+        <p v-if="edited_fact == -2 || (edited_fact >= 0 && edited_fact < 8)">
+            This fact is stored in the state of the monster, meaning each monster has its own value for this fact.
+        </p>
         <div class="buttons">
             <button v-if="edited_fact<0" @click="saveEditedFact" :disabled="!edit_fact_desc || !edit_fact_name">Add</button>
             <button v-if="edited_fact>=0" @click="saveEditedFact" :disabled="!edit_fact_desc || !edit_fact_name">Save</button>
@@ -250,6 +261,10 @@ tr.localstate:hover td {
 
 .search button {
     margin: 0 0.5em;
+}
+
+.fact-window p {
+    margin: 1rem;
 }
 
 </style>

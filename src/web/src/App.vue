@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import StatusBar from './views/StatusBar.vue';
+import MessageBoxComponent from './utils/messageBoxComponent.vue';
 </script>
 
 <template>
@@ -14,6 +15,7 @@ import StatusBar from './views/StatusBar.vue';
   <RouterLink to="/enemies">Enemies</RouterLink>
   <RouterLink to="/characters">Characters</RouterLink>
   <RouterLink to="/dialogs">Dialogs</RouterLink>
+  <RouterLink to="/shops">Shops</RouterLink>
   <RouterLink to="/facts">Facts</RouterLink>
   <RouterLink to="/texts">Book/Texts</RouterLink>    
 </nav>
@@ -26,6 +28,7 @@ import StatusBar from './views/StatusBar.vue';
   <StatusBar />
 </div>
 </div>
+<MessageBoxComponent/>
 </template>
 
 
