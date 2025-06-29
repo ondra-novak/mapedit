@@ -8,6 +8,7 @@ import SpellsEditor from '@/views/SpellsEditor.vue'
 import CharacterEditor from '@/views/CharacterEditor.vue'
 import ShopsEditor from '@/views/ShopsEditor.vue'
 import BasicInfo from '@/views/BasicInfo.vue'
+import MapEditor from '@/views/MapEditor.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -56,6 +57,11 @@ const router = createRouter({
       path: "/basic",
       name: "Basic Info",
       component: BasicInfo
+    },
+    {
+      path: "/maps",
+      name: "Maps",
+      component: MapEditor
     }
 
 

@@ -14,7 +14,7 @@ export async function loadBinaryContent(url:string) {
     }
 }
 
-export type SchemaArray = [Schema|string, number, ...number[]];
+export type SchemaArray = readonly [Schema | string, number, ...number[]];
 
 export interface Schema {
     [key: string]: string | SchemaArray | Schema;
@@ -193,7 +193,7 @@ export class BinaryWriter {
     write_type(type:Schema| string| SchemaArray, value:any)  {
         if (typeof type === 'object') {
             if (!Array.isArray(type)) {
-                this.write(type, value);
+                this.write(type as Schema, value);
             } else {
                 let item_type = type[0];
                 let dimensions = type.slice(1) as number[];
@@ -322,7 +322,7 @@ export function joinUint8Arrays(arrays: ArrayBuffer[], separator : number) {
 
 export interface SectionInfo {
     type: number;
-    data: BinaryIterator;
+    data: ArrayBuffer;
 }
 
 const section_header : Schema= {
@@ -338,7 +338,7 @@ export function parseSection(iter:BinaryIterator ) : SectionInfo {
     const buff = iter.readBytes(hdr.size);
     return {
         type  : hdr.type,
-        data: new BinaryIterator(buff)
+        data: buff
     };
 }
 

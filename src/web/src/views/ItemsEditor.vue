@@ -139,14 +139,6 @@ function itemCanvas( type: PCXProfileType, item?: PCX, shiftup?:number) {
     return null;
 }
 
-function decorateElement<T extends HTMLElement>(htmlElement: T | null, props: Record<string, any>): T | null {
-    if (!htmlElement) return htmlElement;
-    for (let v in props) {
-        htmlElement.setAttribute(v, props[v]);
-    }
-    return htmlElement;
-}
-
 function change_icon() {
     if (selected_item.value!== undefined && item_list.value) {
         change_icon_model.value = -1;
@@ -310,7 +302,7 @@ watch(()=>form.vzhled_on_male,()=>{
         server.getDDLFile(form.vzhled_on_male).then(x=>{
             const pcx = PCX.fromArrayBuffer(x);
             const single = form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR;
-            [left_hand_place, right_hand_place].forEach((h,idx)=>{
+            [right_hand_place, left_hand_place].forEach((h,idx)=>{
                 if (single && idx == 1) {
                     h.value = null;
                 } else {
@@ -521,8 +513,8 @@ onUnmounted(StatusBar.onFinalSave);
                     <template v-if="form.umisteni != ItemWearPlace.PL_NIKAM && form.umisteni != ItemWearPlace.PL_PRSTEN &&  form.umisteni != ItemWearPlace.PL_SIP ">
                     <label v-if="form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR"><span>Avatar pos X,Y</span><input v-watch-range  min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
                     <template v-if="form.umisteni == ItemWearPlace.PL_RUKA || form.umisteni== ItemWearPlace.PL_OBOUR">
-                    <label><span>Left hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
-                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][0]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]"></label>
+                    <label><span>Left hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][0]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]" ></label>
+                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]"></label>
                     </template>
                     </template>
                 </x-form>

@@ -4,7 +4,7 @@ import { StringList1, StringList3 } from "./common_defs";
 import { keybcs2_from_string } from "./keybcs2";
 
 
-const ItemsSchema : Schema =  {
+export const ItemSchema : Schema =  {
 	"jmeno": "char[32]",
 	"popis": "char[32]",
 	"zmeny": ["int16",24],
@@ -35,41 +35,41 @@ const ItemsSchema : Schema =  {
 	"rezerva": ["int16",12],
 	} as const
 
-export interface ItemDef  {
-	jmeno: string;
-	popis: string;
-	zmeny: number[];
-	podminky: number[];
-	hmotnost: number;
-	nosnost:number;
-	druh:number;
-	umisteni:number;
-	flags:number;
-	spell:number;
-	magie:number;
-	sila_spell:number;
-	use_event: number;
-	ikona:number;
-	vzhled:number;
+export class ItemDef  {
+	jmeno: string="";
+	popis: string="";
+	zmeny: number[]=new Array(24).fill(0);
+	podminky: number[]=new Array(4).fill(0);
+	hmotnost: number=0;
+	nosnost:number=0;
+	druh:number=0;
+	umisteni:number=0;
+	flags:number=0;
+	spell:number=0;
+	magie:number=0;
+	sila_spell:number=0;
+	use_event: number=0;
+	ikona:number=0;
+	vzhled:number=0;
 	vzhled_on_ground?: string;
 	vzhled_on_male?:string;
 	vzhled_on_female?:string;
-	user_value:number;
-	keynum:number;
-	polohy: number[][];
-	typ_zbrane: number;
-	druh_sipu: number;
-	sound: number;
-	sound_file?:string;
-	v_letu: number[];
+	user_value:number=0;
+	keynum:number=0;
+	polohy: number[][]=[[0,0],[0,0]];
+	typ_zbrane: number=0;
+	druh_sipu: number=0;
+	sound: number=0;
+	sound_file?:string=""
+	v_letu: number[]=new Array(16).fill(0);
 	v_letu_files? :string[];
-	cena:number;
-	weapon_animation:number;
+	cena:number=0;
+	weapon_animation:number=0;
 	weapon_animation_file?:string;
-	hitpos:number;
-	shiftup:number;
-	byteres:number;
-	rezerva:number;
+	hitpos:number=0;
+	shiftup:number=0;
+	byteres:number=0;
+	rezerva:number=0;
 } ;
 
 const SV_ITLIST =  0x8001;
@@ -85,8 +85,8 @@ function parseItems(iter: BinaryIterator) : ItemDef[] {
 	const def : ItemDef[] = [];
 
 	while (!iter.eof()) {
-		const itm = iter.parse(ItemsSchema);
-		def.push(itm as ItemDef);
+		const itm = iter.parse(ItemSchema);
+		def.push(Object.assign(new ItemDef(),itm));
 	}
 
 	return def;
@@ -107,30 +107,30 @@ export function itemsFromArrayBuffer(buffer: ArrayBuffer) : ItemDef[]{
 	while (sec.type != SV_END) {
 	  switch(sec.type) {
 		case SV_ITLIST:
-			items = parseItems(sec.data);
+			items = parseItems(new BinaryIterator(sec.data));
 		  break;
 		case SV_SNDLIST:
-		  sounds = splitArrayBuffer(sec.data.binaryContent,0)
+		  sounds = splitArrayBuffer(sec.data,0)
 					.map(x=>dec.decode(x));
 		  break;
 		case SV_ON_GROUND:
-		  on_ground = splitArrayBuffer(sec.data.binaryContent,0)
+		  on_ground = splitArrayBuffer(sec.data,0)
 					.map(x=>dec.decode(x));
 		  break;
 		case SV_ON_MALE:
-		  on_male= splitArrayBuffer(sec.data.binaryContent,0)
+		  on_male= splitArrayBuffer(sec.data,0)
 					.map(x=>dec.decode(x));
 		  break;
 		case SV_ON_FEMALE:
-		  on_female = splitArrayBuffer(sec.data.binaryContent,0)
+		  on_female = splitArrayBuffer(sec.data,0)
 					.map(x=>dec.decode(x));
 		  break;
 		case SV_ON_FLY:
-		  in_fly = splitArrayBuffer(sec.data.binaryContent,0)
+		  in_fly = splitArrayBuffer(sec.data,0)
 					.map(x=>dec.decode(x));
 		  break;
 		case SV_WEAPON_ANIM:
-		  animation = splitArrayBuffer(sec.data.binaryContent,0)
+		  animation = splitArrayBuffer(sec.data,0)
 					.map(x=>dec.decode(x));
 
 		  break;
@@ -173,7 +173,7 @@ export function itemsToArrayBuffers(items : ItemDef[]) : ArrayBuffer {
         itm.sound = sound.add(itm.sound_file || "");
     })
     const wr_items = new BinaryWriter();
-    items.forEach(itm=>wr_items.write(ItemsSchema,itm));
+    items.forEach(itm=>wr_items.write(ItemSchema,itm));
     const wr = new BinaryWriter();
     writeSection(wr,SV_ITLIST, wr_items.getBuffer());
 
