@@ -2,7 +2,8 @@
 import { onMounted, onUnmounted } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server } from '@/core/api';
-import { ArcConfigurationPalette, FloorCeilConfigurationPalette, MapFile, RawMapFile, WallConfigurationPalette } from '@/core/map_structs';
+import { MapFile, RawMapFile } from '@/core/map_structs';
+
 
 
 

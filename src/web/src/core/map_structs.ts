@@ -187,6 +187,9 @@ class TNICHE extends WithSchema {
     }};;
 };
 
+type NicheDef = Omit<TNICHE, "sector" | "dir">;
+
+
 class TMAP_LAYOUT extends WithSchema {
 
     x:number=0;
@@ -684,7 +687,7 @@ export class RawMapFile {
     layout: TMAP_LAYOUT[] = [];
     items: MAP_ITEM_PLACES = new MAP_ITEM_PLACES;
     enemies: MapEnemyMap = new MapEnemyMap;
-    niches: NicheMap = new NicheMap([]);
+    niches: NicheDef[] = [];
     actions: MapActionMap = new MapActionMap;
     pixmap_front: string[] = [];
     pixmap_left: string[] = [];
@@ -746,7 +749,12 @@ export class RawMapFile {
                     this.actions.parse(new BinaryIterator(nfo.data));
                     break;
                 case MapSections.MAPVYK:
-                    this.niches = new NicheMap(deserialize_arr(TNICHE, new BinaryIterator(nfo.data)));
+                    this.niches = deserialize_arr(TNICHE, new BinaryIterator(nfo.data))
+                        .reduce((a,b)=>{
+                            const place = b.sector * 4 + b.dir;
+                            a[place] = b;
+                            return a;
+                        },[] as NicheDef[])
                     break;
             }
             nfo = parseSection(iter);
@@ -975,7 +983,8 @@ export class MapSide {
     flags :number = 0;
     action: number = 0;
     target_side: number = 0;
-    target_sector: number = 0; 
+    target_sector: number = 0;
+    niche: NicheDef | null = null; 
 }
 
 export class MapSector {
@@ -1014,6 +1023,7 @@ export class MapFile {
             nw.ceil = c.add(FloorCeilConfiguration.from(s,m.layout[idx],m.pixmap_ceil,true));
             nw.floor = f.add(FloorCeilConfiguration.from(s,m.layout[idx],m.pixmap_ceil,false));
             for (let i = 0; i < 4; ++i) {
+                const place = idx * 4 +i;
                 const side = m.sides[idx*4+i];
                 const n = new MapSide();
                 n.primary = w.add(WallConfiguration.from(side, m.pixmap_front,m.pixmap_left,m.pixmap_right, false));
@@ -1023,7 +1033,9 @@ export class MapFile {
                 n.flags = side.flags;
                 n.target_sector = side.target_sector;
                 n.target_side = side.target_side;                
+                n.niche = m.niches[place] || null;
                 nw.side[i] = n;
+                
             }
             const ml = m.layout[idx];
             nw.flags = ml.flags;
