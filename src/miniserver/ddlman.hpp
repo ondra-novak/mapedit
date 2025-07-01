@@ -107,4 +107,5 @@ protected:
     static std::vector<char> get_file(std::istream &f, const DirItem &item);
     static std::optional<std::pair<DirItem, unsigned int> > find_file(std::istream &f, std::string_view name);
     static bool check_empty(std::iostream &f);
+    static uint32_t find_free_space(std::iostream &f, std::size_t sz);
 };

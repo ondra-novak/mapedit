@@ -14,6 +14,11 @@ async function reload() {
     rm.parseMap(buff);
     const m = MapFile.from(rm);
     console.log(m);
+    const bf = m.saveToArrayBuffer();
+    const rm2 = new RawMapFile();
+    rm2.parseMap(bf);
+    const m2 = MapFile.from(rm);
+    console.log(m2);
 }
 
 

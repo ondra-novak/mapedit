@@ -1,4 +1,5 @@
-import { BinaryIterator, BinaryWriter, loadBinaryContent, parseSection, splitArrayBuffer, type Schema } from "./binary"
+import { parse } from "vue/compiler-sfc";
+import { BinaryIterator, BinaryWriter, joinUint8Arrays, loadBinaryContent, parseSection, splitArrayBuffer, writeSection, type Schema } from "./binary"
 import { ItemDef, ItemSchema } from "./items_struct";
 import { string_from_keybcs2 } from "./keybcs2";
 
@@ -23,6 +24,7 @@ const MapSections = {
     MOBSND: 0x8012, // Potvory zvuky
     PASSW: 0x8013, // Heslo 1
     PASSW2: 0x8014, // Heslo 2
+    USERPAL: 0x8100, // user palette settings
     MAPEND: 0x8000
 } as const;
 
@@ -114,7 +116,7 @@ class TSECTOR extends WithSchema {
     flags: number = 0;
     type: number = 0;
     action: number = 0;
-    target_size :number = 0;
+    target_side :number = 0;
     target_sector: number = 0;
     exit: number[] = new Array(4).fill(0);
 
@@ -138,8 +140,8 @@ class TSIDE extends WithSchema {
     oblouk:number=0;
     target_side:number=0;
     target_sector:number=0;
-    xsec:number=0;
-    ysec:number=0;
+    xsec:number=500>>2;
+    ysec:number=320>>2;
     flags:number=0;
     prim_anim:number=0;
     sec_anim:number=0;
@@ -187,7 +189,7 @@ class TNICHE extends WithSchema {
     }};;
 };
 
-type NicheDef = Omit<TNICHE, "sector" | "dir">;
+type NicheDef = Omit<TNICHE, "sector" | "dir" | "reserved" | "getSchema">;
 
 
 class TMAP_LAYOUT extends WithSchema {
@@ -232,6 +234,64 @@ class MAPGLOBAL extends WithSchema {
     }};;
 };
 
+class EnemyPlace extends WithSchema {
+
+    sector: number = 0;
+    enemy_dir: number = 0;
+    getSchema(): Schema {
+        return {
+            sector: "uint16",
+            enemy_dir: "uint16"
+        }
+    }
+};
+
+class EnemyOnSector {
+    enemy_index: number = 0;
+    direction: number = 0;
+
+    static from(enemy_dir: number) : EnemyOnSector {
+        const r = new EnemyOnSector();
+        r.direction = enemy_dir >> 14;
+        r.enemy_index = enemy_dir & 0x3FFF;
+        return r;
+    }
+
+    to() : number {
+        return this.direction << 14 | this.enemy_index;
+    }
+
+}
+
+function parseItems(iter: BinaryIterator) : number [][] {
+    const out : number[][] = [];
+    while (!iter.eof()) {
+        let place = iter.parse_type("int32");
+        let n = iter.parse_type("uint16");
+        let items = [];
+        while (n != 0) {
+            items.push(n-1);
+            n = iter.parse_type("uint16");
+        }
+        out[place] = items;        
+    }
+    return out;
+}
+
+function serializeItems(items: number[][]): ArrayBuffer {
+    const wr = new BinaryWriter();
+    items.forEach((x,idx)=>{
+        if (x.length) {
+            wr.write_type("int32", idx);                
+            x.forEach(itm=>{
+                wr.write_type("int16", itm+1);
+            })
+                wr.write_type("int16", 0);
+        }
+    })
+    return wr.getBuffer();
+}
+
 class MAP_ITEM_PLACES  {
     
     item_map:Map<number, number[]> = new Map<number, number[]>();
@@ -268,63 +328,6 @@ class MAP_ITEM_PLACES  {
     get(sector:number, side:number): number[] {
         const k = sector * 4 + side ;
         return this.item_map.get(k) || [];
-    }
-
-}
-
-type MapEnemyPlacement = {
-    enemy_id: number;
-    direction: number;
-}
-
-
-class MapEnemyMap extends Map<number, MapEnemyPlacement> {
-    
-
-    static Schema:Schema = {
-        "sector":"int16",
-        "def":"uint16"            
-    }
-
-    parse(iter: BinaryIterator) {
-        while (!iter.eof()) {
-            const def = iter.parse(MapEnemyMap.Schema);
-            this.set(def.sector, {enemy_id: def.def & 0x3fff, direction: def.def >> 14});
-        }
-    }
-
-    serialize(iter: BinaryWriter) {
-        this.forEach((v,k)=> {
-            const def = {
-                sector: k,
-                def : (v.direction << 14 | v.enemy_id)
-            }
-            iter.write(MapEnemyMap.Schema, def);
-        });
-    }
-}
-
-
-class NicheMap {
-
-    map: Map<number, TNICHE> = new Map<number, TNICHE>;
-
-    constructor(v: TNICHE[]) {
-        v.forEach(w=>{
-            this.set(w);
-        })
-    }
-
-    set(def: TNICHE) {
-        this.map.set(def.sector * 4 + def.dir, def);
-    }
-
-    get(sector: number, dir: number) : TNICHE | undefined{
-        return this.map.get(sector * 4 + dir);
-    }
-
-    erase(sector: number, dir: number) {
-         this.map.delete(sector * 4 + dir);;
     }
 
 }
@@ -623,60 +626,51 @@ const action_to_schema = [
 ]
 
 
-class MapActionMap {
-    map: Map<number, TMA_GEN[]> = new Map<number, TMA_GEN[]>;
-
-    set(sector:number, side:number, def: TMA_GEN[]) {
-        const k = sector * 4+side;
-        if (def.length) {
-            this.map.set(k, def);
-        } else {
-            this.map.delete(k);
-        }
-    }
-    get(sector:number, side:number) : TMA_GEN[] {
-        return this.map.get(sector * 4 + side) || [];
-    }   
-
-
-    parse(iter : BinaryIterator ) {
-        while (!iter.eof()) {
-            const sectorside = iter.parse_type("uint32");
-            if (sectorside == 0) break;
-            const sector = sectorside >> 2;
-            const side = sectorside & 0x3;
-            let size = iter.parse_type("uint32");
-            const lst = [];
-            while (size) {
-                const action = iter.readBytes(size);
-                let iter2 = new BinaryIterator(action);
-                const a = iter2.parse_type("uint8");
-                const atype = a & 0x3F;
-                if (action_to_schema[atype]) {
-                    iter2 = new BinaryIterator(action);
-                    const action_def = deserialize(action_to_schema[atype], iter2);
-                    lst.push(action_def);
-                }
-                size = iter.parse_type("uint32");
-            }        
-            this.set(sector, side,lst);
-        }        
-    }
-
-    serialize(iter: BinaryWriter) {
-        this.map.forEach((v,k)=>{
-            iter.write_type("uint32",k);
-            v.forEach(action=>{
-                const wr = new BinaryWriter;
-                serialize(wr,action);
-                const buff = wr.getBuffer();
-                iter.write_type("uint32", buff.byteLength);
-                iter.write_buffer(buff);
-            })
-            iter.write_type("uint32", 0);
-        });
-    }
+function parseActions(iter:BinaryIterator) : TMA_GEN[][] {
+    const ret:TMA_GEN[][] = [];
+    
+    while (!iter.eof()) {
+        const sectorside = iter.parse_type("uint32");
+        if (sectorside == 0) break;
+        const sector = sectorside >> 2;
+        const side = sectorside & 0x3;
+        let size = iter.parse_type("uint32");
+        const lst = [];
+        while (size) {
+            const action = iter.readBytes(size);
+            let iter2 = new BinaryIterator(action);
+            const a = iter2.parse_type("uint8");
+            const atype = a & 0x3F;
+            if (action_to_schema[atype]) {
+                iter2 = new BinaryIterator(action);
+                const action_def = deserialize(action_to_schema[atype], iter2);
+                lst.push(action_def);
+            }
+            size = iter.parse_type("uint32");
+        }      
+        ret[sector * 4 + side] = lst;
+    }        
+    return ret;
 }
+
+function serializeActions(a:  TMA_GEN[][]) : ArrayBuffer{
+    const wr = new BinaryWriter;
+    a.forEach((alist,idx)=>{
+        if (alist.length) {
+            wr.write_type("uint32", idx);
+            alist.forEach(a=>{
+                const wr2 = new BinaryWriter();
+                serialize(wr2,a);
+                const buff = wr2.getBuffer()
+                wr.write_type("uint32", buff.byteLength);
+                wr.write_buffer(buff);
+            })
+            wr.write_type("uint32", 0);
+        }
+    })
+    return wr.getBuffer();
+}
+
 
 
 export class RawMapFile {
@@ -685,10 +679,10 @@ export class RawMapFile {
     sides: TSIDE[] = [];
     info: MAPGLOBAL = new MAPGLOBAL;
     layout: TMAP_LAYOUT[] = [];
-    items: MAP_ITEM_PLACES = new MAP_ITEM_PLACES;
-    enemies: MapEnemyMap = new MapEnemyMap;
+    items: number[][] = [];
+    enemies: EnemyOnSector[] = [];
     niches: NicheDef[] = [];
-    actions: MapActionMap = new MapActionMap;
+    actions: TMA_GEN[][] = [];
     pixmap_front: string[] = [];
     pixmap_left: string[] = [];
     pixmap_right: string[] = [];
@@ -696,6 +690,7 @@ export class RawMapFile {
     pixmap_ceil: string[] = [];
     pixmap_arc_left: string[] = [];
     pixmap_arc_right: string[] = [];
+    user_palette  = "";
 
     
 
@@ -740,22 +735,32 @@ export class RawMapFile {
                     this.info = deserialize(MAPGLOBAL, new BinaryIterator(nfo.data))
                     break;
                 case MapSections.MAPITEM:
-                    this.items.parse(new BinaryIterator(nfo.data));
+                    this.items = parseItems(new BinaryIterator(nfo.data));
                     break;
-                case MapSections.MAPMOBS:
-                    this.enemies.parse(new BinaryIterator(nfo.data));
+                case MapSections.MAPMOBS: {
+                    this.enemies = deserialize_arr(EnemyPlace, new BinaryIterator(nfo.data))
+                        .reduce((a,b)=>{
+                            a[b.sector] = EnemyOnSector.from(b.enemy_dir);
+                            return a;
+                        },[] as EnemyOnSector[])
                     break;
+                }
                 case MapSections.MAPMACR:
-                    this.actions.parse(new BinaryIterator(nfo.data));
-                    break;
+                    this.actions = parseActions(new BinaryIterator(nfo.data));
+                    break;                
                 case MapSections.MAPVYK:
                     this.niches = deserialize_arr(TNICHE, new BinaryIterator(nfo.data))
-                        .reduce((a,b)=>{
+                        .reduce((a,b:TNICHE)=>{
                             const place = b.sector * 4 + b.dir;
-                            a[place] = b;
+                            a[place] = {items: b.items.filter(x=>x).map(x=>x-1),xpos: b.xpos,ypos: b.ypos,xs: b.xs,ys: b.ys};
                             return a;
                         },[] as NicheDef[])
                     break;
+                case MapSections.USERPAL: {
+                    const dec = new TextDecoder();
+                    this.user_palette = dec.decode(nfo.data);
+                }
+
             }
             nfo = parseSection(iter);
         }
@@ -770,25 +775,19 @@ export class RawMapFile {
     }
 }
 
-class WallGraphics {
-    front: string = "";
-    left: string = ""
-    right: string = "";
 
-    constructor(front?:string, left?:string, right?:string) {
-        this.front = front || "";
-        this.left = left || "";
-        this.right= right || this.left;
+abstract class AssetConfiguration {
+    name : string | null = null;
+    abstract get_key() : string 
+    get_name() : string {
+        return this.name || this.get_key();
     }
-
-    get_key() : string {
-        return `${this.front}|${this.left}|${this.right}`;
-    }
-
+    abstract get_pixmaps():string[][];
 }
 
-class WallConfiguration {
-    graphics: WallGraphics[] = [];
+
+class WallConfiguration extends AssetConfiguration{
+    graphics: string[][] = [];
     anim_frames: number = 0;
     alternate: boolean = false;
     reverse_dir: boolean = false;
@@ -814,7 +813,7 @@ class WallConfiguration {
 
         for (let l = 0; l < count_graphics; ++l) {
             const idx = l+side_id-1;
-            r.graphics.push(new WallGraphics(fronts[idx],lefts[idx],rights[idx]));
+            r.graphics.push([fronts[idx],lefts[idx],rights[idx]]);
         }
         if ((side.flags & SideFlag.SPEC) == 0 && sec) {
             r.offset_x = side.xsec*2;
@@ -828,7 +827,9 @@ class WallConfiguration {
     get_key(): string {
         if (this.graphics.length == 0) return "";
         const ln = [
-            this.graphics[0].get_key(),
+            this.graphics[0][0],
+            this.graphics[0][1],
+            this.graphics[0][2],
             this.anim_frames.toString(36),
             this.alternate?"X":"S",
             this.repeat_anim?"R":"N",
@@ -842,73 +843,59 @@ class WallConfiguration {
         return ln.join("");
     }
 
+    get_pixmaps(): string[][] {
+        return this.graphics;
+    }
+
+    adjust_flags_prim(flags: number) : number{
+        flags &= ~(SideFlag.PRIM_ANIM|SideFlag.PRIM_FORV|SideFlag.PRIM_GAB|SideFlag.DOUBLE_SIDE);
+        if (this.alternate) flags |=SideFlag.DOUBLE_SIDE;
+        if (this.repeat_anim) flags |=SideFlag.PRIM_ANIM;
+        if (!this.reverse_dir) flags |= SideFlag.PRIM_FORV;
+        if (this.ping_pong) flags |= SideFlag.PRIM_GAB;
+        return flags;
+    }
+    adjust_flags_sec(flags: number) : number{
+        flags &= ~(SideFlag.SEC_ANIM|SideFlag.SEC_FORV|SideFlag.SEC_GAB|SideFlag.SPEC);
+        if (!this.allow_offset) flags |=SideFlag.SPEC;
+        if (this.repeat_anim) flags |=SideFlag.SEC_ANIM;
+        if (!this.reverse_dir) flags |= SideFlag.SEC_FORV;
+        if (this.ping_pong) flags |= SideFlag.SEC_GAB;
+        return flags;
+    }
+    get_anim() : number {
+        if (this.anim_frames > 1 && this.anim_frames <= 16) {
+            const r = this.repeat_anim?Math.round(Math.random()*(this.anim_frames-1)):0;
+            return (r << 4) | (this.anim_frames-1);
+        } else {
+            return 0;
+        }
+
+    }
+
 }
 
-export class ArcConfiguration {
+export class ArcConfiguration extends AssetConfiguration {
     left:string = "";
     right:string = "";
     constructor(left?:string,right?:string) {
+        super();
         this.left =  left || "";
         this.right = right || this.left;
     }
-    get_key() {
+    get_key() : string{
         return this.left+this.right;
     }
     static from(sd:TSIDE, lefts: string[], rights: string[]) : ArcConfiguration | null{
         if (sd.oblouk == 0) return null;
         else return new ArcConfiguration(lefts[sd.oblouk-1], rights[sd.oblouk-1]);
     }
-}
-
-export class WallConfigurationPalette {
-    map: Map<string, WallConfiguration> = new Map<string, WallConfiguration>();
-
-    add(conf: WallConfiguration |null) : WallConfiguration|null{
-        if (!conf) return conf;
-        const k = conf.get_key();
-        if (!this.map.has(k)) {
-            this.map.set(k, conf);
-            return conf;
-        } else {
-            return this.map.get(k)!;
-        }
-    }
-
-    static from(sides: TSIDE[], fronts: string[], lefts: string[], rights: string[]): WallConfigurationPalette {
-        const p = new WallConfigurationPalette;
-        sides.forEach(x=>{
-            const c1 = WallConfiguration.from(x,fronts,lefts,rights, false);
-            if (c1) p.add( c1 );
-            const c2 =  WallConfiguration.from(x,fronts,lefts,rights, true);
-            if (c2) p.add( c2 );
-        });
-        return p;
+    get_pixmaps(): string[][] {
+        return [[this.left,this.right]];
     }
 }
 
-export class ArcConfigurationPalette {
-    map: Map<string, ArcConfiguration> = new Map<string, ArcConfiguration>();
 
-    add(conf: ArcConfiguration | null) : ArcConfiguration|null{
-        if (!conf) return conf;
-        const k = conf.get_key();
-        if (!this.map.has(k)) {
-            this.map.set(k, conf);
-            return conf;
-        } else {
-            return this.map.get(k)!; 
-        }
-    }
-
-    static from(sides: TSIDE[], lefts: string[], rights: string[]): ArcConfigurationPalette {
-        const p = new ArcConfigurationPalette;
-        sides.forEach(x=>{
-            const c1 =  ArcConfiguration.from(x,lefts,rights);
-            if (c1) p.add( c1 );
-        });
-        return p;
-    }
-}
 
 const FloorCeilMode = {
     SINGLE: 0,
@@ -919,7 +906,7 @@ const FloorCeilMode = {
     FOUR_DIRECTIONS_ALTERNATE: 5,
 }
 
-export class FloorCeilConfiguration {
+export class FloorCeilConfiguration extends AssetConfiguration {
     pixmaps:string[] = [];
     animation: boolean = false;
     frames: number = 0;
@@ -945,34 +932,42 @@ export class FloorCeilConfiguration {
         return ret;
     }
 
-    get_key() {
-        return this.pixmaps.concat([this.animation?"!":"#",this.frames.toString(36),this.mode.toString(36)]).join("");
+    get_key() {        
+        return [this.pixmaps[0],this.animation?"!":"#",this.frames.toString(36),this.mode.toString(36)].join("");
+    }
+
+    get_pixmaps(): string[][] {
+        return this.pixmaps.map(x=>[x]);
+    }
+    get_flags() {
+        if (this.animation) return 0x8 | (this.frames-1);
+        else return this.mode;
     }
 
 }
 
-export class FloorCeilConfigurationPalette {
-    map: Map<string, FloorCeilConfiguration> = new Map<string, FloorCeilConfiguration>();
+class ConfigurationPalette<T extends AssetConfiguration> {
+    map: Record<string, T> = {};
 
-    add(conf: FloorCeilConfiguration|null) : FloorCeilConfiguration|null{
-        if (!conf) return conf;
+    add(conf: T|null) : T|null{
+        if (conf === null) return conf;
         const k = conf.get_key();
-        if (!this.map.has(k)) {
-            this.map.set(k, conf);
+        if (this.map[k] === undefined) {
+            this.map[k] =  conf;
             return conf;
         } else {
-            return this.map.get(k)!
+            return this.map[k]
         }
     }
 
-    static from(sectors: TSECTOR[], layout: TMAP_LAYOUT[], lists: string[], is_ceil:boolean): FloorCeilConfigurationPalette {
-        const p = new FloorCeilConfigurationPalette;
-        sectors.forEach((x,idx)=>{
-            const c1 = FloorCeilConfiguration.from(x, layout[idx], lists, is_ceil);
-            if (c1) p.add( c1 );
+    merge_user_palette(user: T[]) {
+        user.forEach(p=>{
+            const key = p.get_key();
+            if (this.map[key]) this.map[key].name = p.name;
+            else this.map[key] = p;
         });
-        return p;
     }
+
 }
 
 export class MapSide {
@@ -985,6 +980,8 @@ export class MapSide {
     target_side: number = 0;
     target_sector: number = 0;
     niche: NicheDef | null = null; 
+    actions: TMA_GEN[] = [];
+    items: number[] = [];      //items always lying in front of side on left 
 }
 
 export class MapSector {
@@ -994,34 +991,70 @@ export class MapSector {
     type: number = 0;
     flags: number = 0;
     action: number = 0;
-    target_size :number = 0;
+    target_side :number = 0;
     target_sector: number = 0;
     exit: number[] = new Array(4).fill(0);
     side: MapSide[] = new Array(4).fill(0).map((_)=>new MapSide());
     x: number = 0;
     y: number = 0;
     level : number = 0;
+    enemy: EnemyOnSector | null = null;
+}
+
+class ConfigurationSaveMap {
+
+    map : Record<string, [ string[][], number ]> = {};
+    next_id = 1;
+
+    to_id(conf: AssetConfiguration | null) : number {
+        if (conf === null) return 0;
+        const key = conf.get_key();
+        const def = this.map[key]
+        if (def) return def[1];
+        const pxms = conf.get_pixmaps();
+        if (!pxms) return 0;
+        const def2 = [pxms, this.next_id] as [ string[][], number ];
+        this.map[key] = def2;
+        this.next_id = def2[1]+ pxms.length;
+        return def2[1];
+    }
+
+    create_pixmap_list(type: number) :  string[] {
+        const lst: [string, number][] = [];
+        for (const k in this.map) {
+            const v = this.map[k];
+            const id = v[1];
+            const pxms = v[0];
+            pxms.forEach((x,idx)=>{
+                lst.push([x[type], idx+id]);
+            });
+        }
+        lst.sort((a,b)=>a[1] - b[1]);
+        return lst.map(x=>x[0]);
+    }
+
 }
 
 
 export class MapFile {
     
     sectors: MapSector[] = [];
-    wall_palette = new WallConfigurationPalette;
-    arc_palette = new ArcConfigurationPalette;
-    floor_pallete = new FloorCeilConfigurationPalette;
-    ceil_palette = new FloorCeilConfigurationPalette
+    wall_palette = new ConfigurationPalette<WallConfiguration>;
+    arc_palette = new ConfigurationPalette<ArcConfiguration>;
+    floor_pallete = new ConfigurationPalette<FloorCeilConfiguration>;
+    ceil_palette = new ConfigurationPalette<FloorCeilConfiguration>
+    info = new MAPGLOBAL;
 
     static from(m: RawMapFile) {
-        const w = new WallConfigurationPalette;
-        const a = new ArcConfigurationPalette;
-        const f = new FloorCeilConfigurationPalette;
-        const c = new FloorCeilConfigurationPalette;
+        const w = new ConfigurationPalette<WallConfiguration>;
+        const a = new ConfigurationPalette<ArcConfiguration>;
+        const f = new ConfigurationPalette<FloorCeilConfiguration>;
+        const c = new ConfigurationPalette<FloorCeilConfiguration>;
         const r = m.sectors.map((s,idx)=>{
             const nw = new MapSector;
             nw.action = s.action;
             nw.ceil = c.add(FloorCeilConfiguration.from(s,m.layout[idx],m.pixmap_ceil,true));
-            nw.floor = f.add(FloorCeilConfiguration.from(s,m.layout[idx],m.pixmap_ceil,false));
+            nw.floor = f.add(FloorCeilConfiguration.from(s,m.layout[idx],m.pixmap_floor,false));
             for (let i = 0; i < 4; ++i) {
                 const place = idx * 4 +i;
                 const side = m.sides[idx*4+i];
@@ -1034,28 +1067,194 @@ export class MapFile {
                 n.target_sector = side.target_sector;
                 n.target_side = side.target_side;                
                 n.niche = m.niches[place] || null;
+                n.actions = m.actions[place] || [];
+                n.items = m.items[place] || [];
                 nw.side[i] = n;
                 
             }
             const ml = m.layout[idx];
             nw.flags = ml.flags;
             nw.target_sector = s.target_sector;
-            nw.target_size = s.target_size;
+            nw.target_side = s.target_side;
             nw.x = ml.x;
             nw.y = ml.y;
             nw.level = ml.layer;
             nw.exit = s.exit.slice();            
+            nw.enemy = m.enemies[idx] || null;
             return nw;
         });
+
+        if (m.user_palette.length) {
+            const def = JSON.parse(m.user_palette);
+            w.merge_user_palette(def.walls);
+            a.merge_user_palette(def.arcs);
+            f.merge_user_palette(def.floors);
+            c.merge_user_palette(def.ceils);
+        }
 
         const q = new MapFile;
         q.wall_palette = w;
         q.arc_palette = a;
         q.floor_pallete = f;
         q.ceil_palette = c;
-        q.sectors = r;
+        q.sectors = r;        
+        q.info = m.info;
         return q;
     }
+
+    saveToArrayBuffer() : ArrayBuffer {
+        const wr = new BinaryWriter();
+        const walls = new ConfigurationSaveMap;
+        const arc = new ConfigurationSaveMap;
+        const floors = new ConfigurationSaveMap;
+        const ceils = new ConfigurationSaveMap;
+        
+        const sectors : TSECTOR[] =  this.sectors.map(s=>{
+
+            while (s.side.length < 4) s.side.push(new MapSide);
+            while (s.side.length > 4) s.side.pop();
+
+            const out = new TSECTOR;
+            out.action = s.action;
+            out.exit = s.exit.slice();
+            out.flags = (s.floor?s.floor.get_flags():0) | ((s.ceil?s.ceil.get_flags():0) << 4);
+            out.ceil = ceils.to_id(s.ceil);
+            out.floor = floors.to_id(s.floor);
+            out.target_sector = s.target_sector;
+            out.target_side = s.target_side
+            out.type = s.type;
+            return out;
+        })
+        
+        const sides: TSIDE[] = this.sectors.map((sect)=>{
+            return sect.side.map((s,side)=>{
+                const out = new TSIDE;
+                out.action = s.action;
+                let f = s.flags;
+                out.prim = walls.to_id(s.primary);
+                out.sec = walls.to_id(s.secondary);
+                if (s.primary) {
+                    f = s.primary.adjust_flags_prim(f);
+                    out.prim_anim = s.primary.get_anim();
+                    out.lclip = s.primary.lclip;                    
+                    if (f & SideFlag.DOUBLE_SIDE) {
+                        const alt = ((sect.x + sect.y + side) & 1) != 0;
+                        if (alt) out.prim+=(s.primary.anim_frames);
+                    }
+                } 
+                if (s.secondary) {
+                    f = s.secondary.adjust_flags_sec(f);
+                    out.sec_anim = s.secondary.get_anim();
+                    if (s.secondary.allow_offset) {
+                        out.xsec = s.secondary.offset_x>>1;
+                        out.ysec = s.secondary.offset_y>>1;                        
+                    }                    
+                }
+                out.flags = f;
+                out.oblouk = arc.to_id(s.arc);
+                out.target_sector = s.target_sector;
+                out.target_side = s.target_side;                
+                return out;
+
+            });
+        }).flat(1);
+        const layout: TMAP_LAYOUT[] = this.sectors.map(s=>{
+            const out = new TMAP_LAYOUT;
+            out.x = s.x;
+            out.y = s.y;
+            out.layer = s.level;
+            out.flags = s.flags;
+            return out;
+        })
+
+        const enemies: EnemyPlace[] = this.sectors.map((s,idx)=>{
+            if (s.enemy) {
+                const out = new EnemyPlace;
+                out.sector = idx;
+                out.enemy_dir = s.enemy.to();
+                return out;
+            } else {
+                return null;
+            }
+        }).filter(x=>x) as EnemyPlace[];
+
+        const niches : TNICHE[] = this.sectors.map((s, idx)=>{
+            return s.side.map((s, idx2)=>{
+                if (s.niche) {
+                    const out = new TNICHE;
+                    out.sector = idx;
+                    out.dir = idx2;
+                    out.xpos = s.niche.xpos;
+                    out.ypos = s.niche.ypos;
+                    out.xs = s.niche.xs;
+                    out.ys = s.niche.ys;
+                    out.items = s.niche.items.map(x=>x+1);
+                    out.reserved = 0;
+                    return out;
+                } else {
+                    return null;
+                }
+            });
+        }).flat(1).filter(x=>x) as TNICHE[];
+
+        const actions : TMA_GEN[][] = this.sectors.map((s)=>{
+            return s.side.map((s)=>{
+                return s.actions || [];
+            });
+        }).flat(1);
+
+
+        const items : number[][] = this.sectors.map((s)=>{
+            return s.side.map((s) => {
+                return s.items || [];
+            });
+        }).flat(1);
+
+        function toArrayBuffer(s: WithSchema[]) {
+            const wr = new BinaryWriter();
+            s.forEach(x=>wr.write(x.getSchema(),x));
+            return wr.getBuffer();
+        }
+        
+        function stringsToArrayBuffer(s: string[]) {
+            const enc = new TextEncoder();
+            const data = s.map(x=>enc.encode(x).buffer);
+            data.push(new ArrayBuffer(0));
+            return joinUint8Arrays(data,0);
+        }
+
+
+        const userpal = {
+            walls: Object.values(this.wall_palette.map).filter(x=>x.name),
+            arcs: Object.values(this.arc_palette.map).filter(x=>x.name),
+            floors: Object.values(this.floor_pallete.map).filter(x=>x.name),
+            ceils: Object.values(this.ceil_palette.map).filter(x=>x.name),
+        }
+
+        const enc = new TextEncoder();
+
+        writeSection(wr, MapSections.MAPGLOB, toArrayBuffer([this.info]));
+        writeSection(wr, MapSections.SIDEMAP, toArrayBuffer(sides));
+        writeSection(wr, MapSections.SECTMAP, toArrayBuffer(sectors));
+        writeSection(wr, MapSections.MAPINFO, toArrayBuffer(layout));
+        writeSection(wr, MapSections.MAPMOBS, toArrayBuffer(enemies));
+        writeSection(wr, MapSections.MAPVYK, toArrayBuffer(niches));
+        writeSection(wr, MapSections.STRTAB1, stringsToArrayBuffer(walls.create_pixmap_list(0)));
+        writeSection(wr, MapSections.STRTAB2, stringsToArrayBuffer(walls.create_pixmap_list(1)));
+        writeSection(wr, MapSections.STRTAB3, stringsToArrayBuffer(walls.create_pixmap_list(2)));
+        writeSection(wr, MapSections.STRTAB4, stringsToArrayBuffer(ceils.create_pixmap_list(0)));
+        writeSection(wr, MapSections.STRTAB5, stringsToArrayBuffer(floors.create_pixmap_list(0)));
+        writeSection(wr, MapSections.STRTAB6, stringsToArrayBuffer(arc.create_pixmap_list(0)));
+        writeSection(wr, MapSections.STRTAB7, stringsToArrayBuffer(arc.create_pixmap_list(1)));
+        writeSection(wr, MapSections.MAPMACR, serializeActions(actions));
+        writeSection(wr, MapSections.MAPITEM, serializeItems(items));
+        writeSection(wr, MapSections.USERPAL, enc.encode(JSON.stringify(userpal)));
+        writeSection(wr, MapSections.MAPEND, new ArrayBuffer);
+        
+        return wr.getBuffer();
+    }
+
 }
+
 
 

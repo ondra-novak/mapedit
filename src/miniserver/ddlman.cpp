@@ -329,12 +329,42 @@ void DDLManager::append_file(std::ostream &f, std::string_view payload)
     f.write(payload.data(), payload.size());
 }
 
+
+
+uint32_t DDLManager::find_free_space(std::iostream &f, std::size_t sz) {
+
+    std::vector<uint32_t> blocks;
+
+    auto dirpos = parse_ddl(f, [&](const DirItem &itm) {    
+        blocks.push_back(itm.offset);
+        return true;
+    });
+    blocks.erase(std::remove_if(blocks.begin(), blocks.end(), [&](uint32_t pos){return pos <= dirpos;}), blocks.end());
+    std::sort(blocks.begin(), blocks.end());        
+    for (size_t i = 1; i < blocks.size(); ++i) {
+        auto beg = blocks[i-1];
+        auto space = blocks[i]- beg - 4; //4 bytes for size        
+        if (space > sz) {
+            f.seekg(beg);
+            uint32_t bsz = 0;
+            f.read(reinterpret_cast<char *>(&bsz),4);
+            space -= bsz;
+            if (space >= sz) {
+                return beg+4+bsz;
+            }
+        }
+    }
+    f.seekg(0, std::ios::end);
+    return static_cast<uint32_t>(f.tellg());
+
+
+}
+
 void DDLManager::replace_entry(std::iostream &f, unsigned int index, std::string_view name, std::string_view payload, uint32_t group) 
 {
     DirItem entry;
-    f.seekg(0, std::ios::end);
+    entry.offset = payload.empty()?static_cast<uint32_t>(0):find_free_space(f,payload.size()+4);   
     entry.set_name(name);
-    entry.offset = payload.empty()?static_cast<uint32_t>(0):static_cast<uint32_t>(f.tellg());
 
     // Skip first 4 bytes
     f.seekg(4);
