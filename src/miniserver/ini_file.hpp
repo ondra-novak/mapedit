@@ -68,7 +68,7 @@ public:
         if (val.empty()) return def;
         std::string lower;
         lower.reserve(val.size());
-        std::transform(val.begin(), val.end(), std::back_inserter(lower), [](unsigned char c) { return std::tolower(c); });
+        std::transform(val.begin(), val.end(), std::back_inserter(lower), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (lower == "false" || lower == "no" || lower == "off" || lower == "0")
             return false;
         if (lower == "true" || lower == "yes" || lower == "on" || lower == "1")

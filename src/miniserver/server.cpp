@@ -3,24 +3,93 @@
 #include "utils/http_utils.hpp"
 
 #include <json/serializer.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <sys/socket.h>
-#include <sys/timerfd.h>
-#include <unistd.h>
-#include <netdb.h>
 #include <string>
 #include <format>
 #include <stdexcept>
 #include <system_error>
 #include <thread>
 #include <format>
+#include <fcntl.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+constexpr int SOCK_CLOEXEC = 0;
+constexpr int MSG_NOSIGNAL = 0;
+#pragma comment(lib, "ws2_32.lib")
+
+#else 
+#include <poll.h>
+#include <sys/socket.h>
+#include <sys/timerfd.h>
+#include <unistd.h>
+#include <netdb.h>
+using SOCKET = int;
+constexpr SOCKET INVALID_SOCKET = -1;
+inline void closesocket(SOCKET s) {::close(s);}
+#endif
 
 namespace server
 {
 
-    int create_listening_socket(const std::string &address_port)
+    #ifdef _WIN32
+    class network_category_t : public std::error_category {
+    public:
+        const char* name() const noexcept override {
+            return "winsock";
+        }
+        std::string message(int ev) const override {
+            char *msg = nullptr;
+            FormatMessageA(
+                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                nullptr, ev, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                (LPSTR)&msg, 0, nullptr);
+            std::string result = msg ? msg : "Unknown Winsock error";
+            if (msg) LocalFree(msg);
+            return result;
+        }
+    };
+
+    inline const std::error_category& network_category() {
+        static network_category_t cat;
+        return cat;
+    }
+
+    inline int getLastNetError() {
+        return static_cast<int>(WSAGetLastError());
+    }
+
+    inline void ensure_winsock_initialized() {
+        static bool initialized = [] {
+            WSADATA wsaData;
+            int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
+            if (res != 0) {
+                throw std::system_error(res, network_category(), "WSAStartup failed");
+            }
+            return true;
+        }();
+        (void)initialized;
+    }
+
+    #else 
+    
+        inline const std::error_category& network_category() {
+            return network_category();
+        }
+        inline int getLastNetError() {
+            return getLastNetError();
+        }
+
+
+    #endif
+
+    
+
+    SOCKET create_listening_socket(const std::string &address_port)
     {
+        ensure_winsock_initialized();
         std::string host;
         std::string port;
 
@@ -44,11 +113,11 @@ namespace server
                               &hints, &result);
         if (ret != 0)
         {
-            throw std::system_error(0, std::generic_category(),
+            throw std::system_error(0, network_category(),
                                     std::string("getaddrinfo: ") + gai_strerror(ret));
         }
 
-        int sockfd = -1;
+        SOCKET sockfd = INVALID_SOCKET;
         for (addrinfo *rp = result; rp != nullptr; rp = rp->ai_next)
         {
             sockfd = socket(rp->ai_family,
@@ -57,10 +126,12 @@ namespace server
             if (sockfd == -1)
                 continue;
 
+#ifndef _WIN32
             int opt = 1;
             setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+#endif
 
-            if (bind(sockfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            if (bind(sockfd, rp->ai_addr, static_cast<int>(rp->ai_addrlen)) == 0)
             {
                 if (listen(sockfd, SOMAXCONN) == 0)
                 {
@@ -70,20 +141,20 @@ namespace server
             }
 
             // jinak zavřít a zkusit další
-            ::close(sockfd);
-            sockfd = -1;
+            closesocket(sockfd);
+            sockfd = INVALID_SOCKET;
         }
 
         freeaddrinfo(result);
-        throw std::system_error(errno, std::generic_category(),
+        throw std::system_error(getLastNetError(), network_category(),
                                 "Failed to bind and listen on any address");
     }
 
-    static bool send_block(int socket, std::string_view data)
+    static bool send_block(SOCKET socket, std::string_view data)
     {
         while (!data.empty())
         {
-            int r = send(socket, data.data(), data.size(), MSG_NOSIGNAL);
+            int r = send(socket, data.data(), static_cast<int>(data.size()), MSG_NOSIGNAL);
             if (r <= 0)
                 return false;
             data = data.substr(r);
@@ -100,7 +171,7 @@ namespace server
         sockaddr_storage addr;
         socklen_t len = sizeof(addr);
         if (getsockname(_mother.get(), reinterpret_cast<sockaddr *>(&addr), &len) == -1) {
-            throw std::system_error(errno, std::system_category(), "getsockname failed");
+            throw std::system_error(getLastNetError(), network_category(), "getsockname failed");
         }
 
         char host[NI_MAXHOST], service[NI_MAXSERV];
@@ -108,7 +179,7 @@ namespace server
                               host, sizeof(host), service, sizeof(service),
                               NI_NUMERICHOST | NI_NUMERICSERV);
         if (res != 0) {
-            throw std::system_error(0, std::generic_category(),
+            throw std::system_error(0, network_category(),
                                     std::string("getnameinfo: ") + gai_strerror(res));
         }
 
@@ -183,10 +254,10 @@ namespace server
         {
             auto sz = read_buffer.size();
             read_buffer.resize(sz + 4096);
-            int r = recv(socket.get(), read_buffer.data() + sz, read_buffer.size() - sz, MSG_NOSIGNAL);
+            int r = recv(socket.get(), read_buffer.data() + sz, static_cast<int>(read_buffer.size() - sz), MSG_NOSIGNAL);
             if (r < 0)
             {
-                int e = errno;
+                int e = getLastNetError();
                 if (e != EINTR)
                     return false;
             }
@@ -200,20 +271,20 @@ namespace server
                 auto n = read_buffer.find("\r\n\r\n");
                 if (n != std::string::npos)
                 {
-                    int sck = socket.get();
+                    SOCKET sck = socket.get();
                     return parse_header(std::string_view(read_buffer).substr(0, n + 2), std::move(socket), [&](BasicRequest &req)
                                         {
                     if (req.body_size) {
                         return utils::stack_alloc<char>(req.body_size,[&](char *buffer){                            
                             char *iter = buffer;
                             char *end = iter+req.body_size;
-                            int s = n+4;
+                            auto s = n+4;
                             std::size_t remain_size = std::min(read_buffer.size() - s, req.body_size);
                             iter = std::copy(read_buffer.data()+s, read_buffer.data()+s+remain_size, buffer);
                             while (iter != end) {
-                                int r = recv(sck, iter, end - iter, MSG_NOSIGNAL);
+                                int r = recv(sck, iter, static_cast<int>(end - iter), MSG_NOSIGNAL);
                                 if (r < 0) {
-                                    int e = errno;
+                                    int e = getLastNetError();
                                     if (e != EINTR) return false;
                                 } else if (r == 0) {
                                     return false;
@@ -240,13 +311,17 @@ namespace server
     {
         while (true)
         {
-            int sock = accept4(_mother.get(), 0, 0, SOCK_CLOEXEC);
+            #ifdef _WIN32
+            SOCKET sock = accept(_mother.get(),0,0);
+            #else
+            SOCKET sock = accept4(_mother.get(), 0, 0, SOCK_CLOEXEC);
+            #endif
             if (sock == -1)
             {
-                int e = errno;
+                int e = getLastNetError();
                 if (e != EINTR)
                 {
-                    throw std::system_error(e, std::system_category(), "accept failed");
+                    throw std::system_error(e, network_category(), "accept failed");
                 }
             }
             std::thread thr([this, callback, sock]
@@ -257,9 +332,9 @@ namespace server
         }
     }
 
-    void Server::HandleDeleter::operator()(int fd)
+    void Server::HandleDeleter::operator()(SocketType fd)
     {
-        ::close(fd);
+        closesocket(fd);
     }
 
     constexpr std::string_view content_type("Content-Type");

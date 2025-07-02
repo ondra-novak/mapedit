@@ -11,7 +11,10 @@
 #include <span>
 
 
+
+
 namespace server {
+
 
     class IReader {
     public:
@@ -91,9 +94,16 @@ namespace server {
 
     protected:
 
+        #ifdef _WIN32
+        using SocketType = std::uintptr_t;
+        #else
+        using SocketType = int;
+        #endif
 
-        struct HandleDeleter {void operator()(int);};
-        using Socket =  unique_handle<int, HandleDeleter>;
+        struct HandleDeleter {            
+            void operator()(SocketType);
+        };
+        using Socket =  unique_handle<SocketType , HandleDeleter>;
         Socket _mother;
 
         struct SendCallback {

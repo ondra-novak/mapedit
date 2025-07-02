@@ -5,14 +5,6 @@
 #include "interface.hpp"
 
 
-server::Config cfg {
-    ":8088",
-    "/home/ondra/vscode/mapedit/public",
-    "/home/ondra/vscode/mapedit/public/assets",
-    "/home/ondra/skeldal_game/SKELDAL.DDL",
-    "/home/ondra/vscode/mapedit/files/user.DDL",
-    "/home/ondra/vscode/mapedit/files/maps"
-};
 
 std::filesystem::path find_config(const char *argv0) {
     namespace fs = std::filesystem;
@@ -60,7 +52,7 @@ int entry_point(std::filesystem::path root_config) {
     IniFile ini = load_config(root_config);
     std::string addrport = ini.get("server","listen","localhost:0");
     bool  open_browser = ini.get_bool("server","open_browser", true);
-    std::string ddl = ini.get("path", "game_assets", "./SKELDAL.DDL");
+    std::string ddl = ini.get("paths", "game_assets", "./SKELDAL.DDL");
 
     server::Config cfg;
     auto parent = root_config.parent_path();

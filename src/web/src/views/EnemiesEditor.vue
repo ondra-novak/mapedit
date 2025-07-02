@@ -11,7 +11,7 @@ import { useBitmaskCheckbox2 } from '@/core/flags';
 import { itemsFromArrayBuffer, type ItemDef } from '@/core/items_struct';
 import { PCXProfile, PCX } from '@/core/pcx';
 import { SeqFile } from '@/core/seqfile';
-import { computed, onMounted, onUnmounted, reactive, ref, watch, WatchHandle } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch, type WatchHandle } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { messageBoxConfirm } from '@/utils/messageBox';
 

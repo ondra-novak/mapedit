@@ -300,7 +300,7 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
         if (r.creator->getNeed() != MGIFCreator::nothing) {
             return req.response({204}, {}, "");
         }
-         std::lock_guard _(_mx);
+         std::lock_guard __(_mx);
          const auto &data = r.creator->get_data();
          _user.put(r.name, {reinterpret_cast<const char *>(data.data()),data.size()},r.group);
         return req.response({201},{{"Location","/api/ddl/"+r.name}},r.name);

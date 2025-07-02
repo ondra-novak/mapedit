@@ -111,6 +111,7 @@ function init() {
              shop_list.value.forEach(v=>{
                 const new_plist = v.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) == 0);
                 const types : TProduct[] = [];
+                const add_plist : TProduct[] = []
                 v.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) != 0)
                     .forEach(t=>{
                         const type = t.item 
@@ -123,7 +124,7 @@ function init() {
                                 p.max_pocet = 10;
                                 p.pocet = 0;
                                 p.trade_flags = (t.trade_flags | ProductFlags.SHP_POPULATED) & ~ProductFlags.SHP_TYPE;
-                                itms.push(p);
+                                add_plist.push(p);
                             })
                         }
                         types.push(t);
@@ -131,7 +132,7 @@ function init() {
                 const nw = new TShop();
                 Object.assign(nw, v);
                 nw.list_size = new_plist.length;
-                new_plist.push(...types);
+                new_plist.push(...types,...add_plist);
                 nw.products = new_plist.length;
                 nw.product_list = new_plist;
                 shp.push(nw);

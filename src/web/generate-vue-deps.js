@@ -3,6 +3,7 @@
 import { promises } from 'fs';
 import { dirname } from 'path';
 import glob from 'fast-glob';
+import {resolve } from 'path';
 
 // Získání argumentu z CLI
 const outFile = process.argv[2];
@@ -13,12 +14,13 @@ if (!outFile) {
 }
 
 async function run() {
-  const sources = await glob([
+  const sources = (await glob([
     './src/**/*',
     './public/**/*',
     './index.html'
-  ], { onlyFiles: true });
+  ], { onlyFiles: true })).map(file => resolve(file));
 
+  
   const target = 'dist/index.html'; // Tento řetězec musí odpovídat tomu, co CMake očekává v OUTPUT
   const depLine = `${target}: ${sources.join(' ')}`;
 
