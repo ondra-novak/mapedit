@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import StatusBar from '@/core/status_bar_control'
-import { server } from '@/core/api';
+import { server, type FileItem } from '@/core/api';
 import { MapFile, RawMapFile } from '@/core/map_structs';
+import { AssetGroup } from '@/core/asset_groups';
+import MissingFiles from '@/components/MissingFiles.vue';
 
+const required_files: FileItem[] = [
+    {group:AssetGroup.MAPS,name:"ITEMS.DAT",ovr:true},
+    {group:AssetGroup.MAPS,name:"SOUND.DAT",ovr:true},
+    {group:AssetGroup.MAPS,name:"ENEMY.DAT",ovr:true}
+];
 
 
 
@@ -32,10 +39,16 @@ async function init() {
     reload();
 }
 
+function onCreateNew() {
+
+}
+
+function onImported() {
+    reload();
+}
 
 onMounted(init);
 onUnmounted(StatusBar.onFinalSave)
-
 
 </script>
 
@@ -43,6 +56,9 @@ onUnmounted(StatusBar.onFinalSave)
 <x-workspace>
 
 </x-workspace>
+
+<MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
+
 </template>
 
 

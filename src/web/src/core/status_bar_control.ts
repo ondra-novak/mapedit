@@ -1,80 +1,125 @@
 
 import { computed, nextTick, ref } from 'vue'
+import { MapFile } from './map_structs'
+import { server } from './api'
+import { AssetGroup } from './asset_groups'
 
 type SaveFn = () => void|Promise<void>
 type RevertFn = () => void|Promise<void>
 
-const fnSave = ref<SaveFn | null>(null)
-const fnRevert = ref<RevertFn | null>(null)
-const changed = ref(false);
-const inprogress = ref(false);
+class StatusBar {
+    fnSave = ref<SaveFn | null>(null)
+    fnRevert = ref<RevertFn | null>(null)
+    changed = ref(false);
+    inprogress = ref(false);
 
-const stack: [SaveFn|null, RevertFn|null, boolean][] =  [];
+    cur_map_name = ref<string>();
+    cur_map = ref<MapFile>();
 
-export default {
+    stack: [SaveFn|null, RevertFn|null, boolean][] =  [];
 
-    registerSaveAndRevert: (saveFn: SaveFn, revertFn: RevertFn): void => {
-        fnSave.value = saveFn
-        fnRevert.value = revertFn
-        changed.value = false
-    },
-    setChangedFlag: (flag: boolean): void => {
-        changed.value = flag
-    },
-    onFinalSave: (): void => {
-        if (fnSave.value && changed.value) {
-            fnSave.value();
+
+    registerSaveAndRevert (saveFn: SaveFn, revertFn: RevertFn): void  {
+        this.fnSave.value = saveFn
+        this.fnRevert.value = revertFn
+        this.changed.value = false
+    }
+    setChangedFlag(flag: boolean): void {
+        this.changed.value = flag
+    }
+    onFinalSave (): void {
+        if (this.fnSave.value && this.changed.value) {
+            this.fnSave.value();
         }
-        fnSave.value = null
-        fnRevert.value = null
-        changed.value = false
-    },
+        this.fnSave.value = null
+        this.fnRevert.value = null
+        this.changed.value = false
+    };
     
-    triggerSave: async (): Promise<void> => {
-        if (fnSave.value && changed.value){
-            const n = fnSave.value();
-            inprogress.value = true;
+    async triggerSave(): Promise<void> {
+        if (this.fnSave.value && this.changed.value){
+            const n = this.fnSave.value();
+            this.inprogress.value = true;
             try {
                 if (n) await n;
-                changed.value = false;
+                this.changed.value = false;
             } catch (e) {
                 alert("Failed to save page:" + e);                
             }
-            inprogress.value = false;
+            this.inprogress.value = false;
         } 
-    },
+    };
 
-    triggerRevert: async (): Promise<void> => {
-        if (fnRevert.value) {
-            const n = fnRevert.value()
-            inprogress.value = true;
+    async triggerRevert (): Promise<void>  {
+        if (this.fnRevert.value) {
+            const n = this.fnRevert.value()
+            this.inprogress.value = true;
             try {
                 if (n) await n;                
             } catch (e) {
                 //....                
             }
-            inprogress.value = false;
-            changed.value = false;
-        }
-    },
-    visible: computed(()=>!!(fnSave.value && fnRevert.value) ),
-    enabled: computed(()=>changed.value && !inprogress.value),
-
-
-    push: () => {
-        stack.push([fnSave.value,fnRevert.value,changed.value])
-        fnSave.value=null;
-        fnRevert.value=null;
-        changed.value = false;
-    },
-    pop: () => {
-        const x = stack.pop();
-        if (x) {
-            nextTick(()=>{
-                fnSave.value = x[0];
-                fnRevert.value = x[1];
-                changed.value = x[2];
-            })
+            this.inprogress.value = false;
+            this.changed.value = false;
         }
     }
+    visible = computed(()=>!!(this.fnSave.value && this.fnRevert.value));
+    enabled = computed(()=>this.changed.value && !this.inprogress.value);
+
+    push() {
+        this.stack.push([this.fnSave.value,this.fnRevert.value,this.changed.value])
+        this.fnSave.value=null;
+        this.fnRevert.value=null;
+        this.changed.value = false;
+    }
+
+    pop() {
+        const x = this.stack.pop();
+        if (x) {
+            nextTick(()=>{
+                this.fnSave.value = x[0];
+                this.fnRevert.value = x[1];
+                this.changed.value = x[2];
+            })
+        }
+    };
+
+    async loadMap (mapname: string) : Promise<MapFile>   {
+        if (this.cur_map_name.value === mapname) return this.cur_map.value!;
+        const buff = await server.getDDLFile(mapname);
+        this.cur_map.value = MapFile.from(buff);
+        this.cur_map_name.value = mapname;
+        return this.cur_map.value;
+    };
+
+    async reloadMap() :Promise<MapFile | null> {
+        const name = this.cur_map_name.value;
+        if (name) {
+            this.cur_map_name.value = undefined;
+            return await this.loadMap(name);
+        } else {
+            return null;
+        }
+    }
+
+    async saveMap() : Promise<boolean> {
+        const name = this.cur_map_name.value;
+        if (name) {
+            await server.putDDLFile(name, this.cur_map.value!.saveToArrayBuffer(), AssetGroup.MAPS);
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    getMapNameReactive() {
+        return this.cur_map_name;
+    }
+
+    getMapReactive() {
+        return this.cur_map;
+    }
 }
+
+
+export default new StatusBar();

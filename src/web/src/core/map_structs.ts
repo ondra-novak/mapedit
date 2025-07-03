@@ -1045,11 +1045,18 @@ export class MapFile {
     ceil_palette = new ConfigurationPalette<FloorCeilConfiguration>
     info = new MAPGLOBAL;
 
-    static from(m: RawMapFile) {
+    static from(map_or_buff: RawMapFile | ArrayBuffer) {
         const w = new ConfigurationPalette<WallConfiguration>;
         const a = new ConfigurationPalette<ArcConfiguration>;
         const f = new ConfigurationPalette<FloorCeilConfiguration>;
         const c = new ConfigurationPalette<FloorCeilConfiguration>;
+        let m: RawMapFile;
+        if (map_or_buff instanceof RawMapFile) {
+            m = map_or_buff;
+        } else {
+            m = new RawMapFile();
+            m.parseMap(map_or_buff);
+        }
         const r = m.sectors.map((s,idx)=>{
             const nw = new MapSector;
             nw.action = s.action;
