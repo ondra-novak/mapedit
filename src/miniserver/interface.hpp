@@ -5,6 +5,7 @@
 #include "server.hpp"
 #include "mgifcomp.hpp"
 #include <shared_mutex>
+#include <thread>
 
 
 namespace server {
@@ -49,6 +50,20 @@ protected:
     bool ddl_mpg_get(Request &req);
     bool ddl_mpg_create(Request &req);
     bool ddl_mpg_session_put(Request &req);
+
+    bool command(Request &req);
+    bool control(Request &req);
+
+    void basic_timer_worker(std::stop_token stp);
+    void on_timer_tick();
+
+    std::mutex _stream_mx;
+    std::vector<Stream> _streams;
+
+    void broadcast(std::string_view data);
+ 
+    std::jthread _basic_timer;
+    
 
 };
 

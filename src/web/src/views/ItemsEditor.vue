@@ -10,7 +10,6 @@ import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
 import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import StatusBar from '@/core/status_bar_control'
-import { messageBoxConfirm } from '@/utils/messageBox';
 
 
 const required_files: FileItem[] = [
@@ -67,10 +66,10 @@ function init() {
 }
 
 
-async function deleteItem() {
+function deleteItem() {
     if (selected_item.value !== undefined && item_list.value) {
         const lst = item_list.value;
-        if (await messageBoxConfirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
+        if (confirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
             lst[selected_item.value].jmeno = "";
         }
         while (lst.length && !lst[lst.length-1].jmeno) lst.pop();
@@ -137,6 +136,14 @@ function itemCanvas( type: PCXProfileType, item?: PCX, shiftup?:number) {
         return c;
     }
     return null;
+}
+
+function decorateElement<T extends HTMLElement>(htmlElement: T | null, props: Record<string, any>): T | null {
+    if (!htmlElement) return htmlElement;
+    for (let v in props) {
+        htmlElement.setAttribute(v, props[v]);
+    }
+    return htmlElement;
 }
 
 function change_icon() {
@@ -302,7 +309,7 @@ watch(()=>form.vzhled_on_male,()=>{
         server.getDDLFile(form.vzhled_on_male).then(x=>{
             const pcx = PCX.fromArrayBuffer(x);
             const single = form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR;
-            [right_hand_place, left_hand_place].forEach((h,idx)=>{
+            [left_hand_place, right_hand_place].forEach((h,idx)=>{
                 if (single && idx == 1) {
                     h.value = null;
                 } else {
@@ -513,8 +520,8 @@ onUnmounted(StatusBar.onFinalSave);
                     <template v-if="form.umisteni != ItemWearPlace.PL_NIKAM && form.umisteni != ItemWearPlace.PL_PRSTEN &&  form.umisteni != ItemWearPlace.PL_SIP ">
                     <label v-if="form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR"><span>Avatar pos X,Y</span><input v-watch-range  min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
                     <template v-if="form.umisteni == ItemWearPlace.PL_RUKA || form.umisteni== ItemWearPlace.PL_OBOUR">
-                    <label><span>Left hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][0]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]" ></label>
-                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]"></label>
+                    <label><span>Left hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
+                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][0]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]"></label>
                     </template>
                     </template>
                 </x-form>

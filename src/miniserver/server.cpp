@@ -18,6 +18,7 @@
 #include <WS2tcpip.h>
 constexpr int SOCK_CLOEXEC = 0;
 constexpr int MSG_NOSIGNAL = 0;
+constexpr int MSG_DONTWAIT = 0;
 #pragma comment(lib, "ws2_32.lib")
 
 #else 
@@ -76,10 +77,13 @@ namespace server
     #else 
     
         inline const std::error_category& network_category() {
-            return network_category();
+            return std::system_category();
         }
         inline int getLastNetError() {
-            return getLastNetError();
+            return errno;
+        }
+        inline void ensure_winsock_initialized() {
+                //empty
         }
 
 
@@ -227,22 +231,26 @@ namespace server
                 req.body_size = std::strtoul(lwiter->value.data(), nullptr,10);
             }
         }
+
+        Response::Context ctx {std::move(socket), false};
+
         req.headers = {list,iter};
         req.method = method;
         req.path = path;
         req.protocol = protocol;    
-        req.response = SendCallback{std::move(socket)};        
+        req.response = Response{ctx};        
         
         return fn(req); });
     }
 
     bool Server::post_handler(BasicRequest &req, Socket &s)
     {
-        SendCallback *resp = req.response.get_clousure<SendCallback>();
-        if (resp->socket.has_value() && resp->complete)
-        {
-            s = std::move(resp->socket);
-            return true;
+        if (req.response.is_complete()) {
+            Socket q = req.response.release_socket();
+            if (q) {
+                s = std::move(q);
+                return true;
+            }
         }
         return false;
     }
@@ -332,73 +340,170 @@ namespace server
         }
     }
 
-    void Server::HandleDeleter::operator()(SocketType fd)
+    void HandleDeleter::operator()(SocketType fd)
     {
         closesocket(fd);
     }
 
-    constexpr std::string_view content_type("Content-Type");
-    constexpr std::string_view application_json("application/json");
 
-    bool Server::SendCallback::operator()(StatusCode status, std::initializer_list<HeaderRow> headers, ResponseBody body)
+    bool Response::operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, std::string_view body)
     {
-        std::size_t req_size = 64 + status.message.size() + (std::holds_alternative<json::value>(body) ? (content_type.size() + application_json.size() + 4) : std::size_t(0));
-
-        for (const auto &[key, value] : headers)
-        {
-            req_size += key.size() + value.size() + 4;
-        };
-
-        req_size += 2;
-        return utils::stack_alloc<char>(req_size, [&](char *buffer)
-                                        {
-        char *iter = buffer;
-        iter = std::format_to(iter, "HTTP/1.1 {} {}\r\n", status.code, status.message);
-        for (const auto &[key, value]: headers) {
-            iter = std::format_to(iter, "{}: {}\r\n", static_cast<std::string_view>(key), value);                                    
-        }
-        std::string json_data;        
-        std::size_t content_length = 0;
-        if (std::holds_alternative<std::string_view>(body)) {
-            content_length = std::get<std::string_view>(body).size();
-        } else if (std::holds_alternative<json::value>(body)) {
-            const auto &js = std::get<json::value>(body);
-            json_data = js.to_json();
-            content_length = json_data.size();
-            iter = std::format_to(iter, "{}: {}\r\n", content_type, application_json);                                
-        } else {
-            content_length = std::get<std::unique_ptr<IReader> >(body)->size();
-        }  
-        
-        bool nobody = status.code == 204 || status.code == 304;
-
-        if (!nobody) {
-            iter = std::format_to(iter, "Content-Length: {}\r\n", content_length);                                
-        }
-        iter = std::format_to(iter, "\r\n");
-
-
-        if (!send_block(socket.get(), {buffer, iter})) return false;
-
-        if (nobody) {
-            complete = true;
-            return true;
-        }
-
-        if (std::holds_alternative<std::string_view>(body)) {
-            return complete =  send_block(socket.get(), std::get<std::string_view>(body));
-        } else if (std::holds_alternative<json::value>(body)) {        
-            return complete =  send_block(socket.get(), json_data);
-        } else {
-            auto &rd = std::get<std::unique_ptr<IReader> >(body);
-            while (content_length) {
-                auto s = rd->read().substr(0, content_length);
-                if (!send_block(socket.get(), s)) return false;
-                content_length -= s.size();
-            }   
-            complete = true;
-            return true;
-        } });
+        return send_response(code, {hdr}, body.size(), [body](){return body;});
     }
 
+    bool Response::operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, std::size_t sz, function_view<std::string_view()> body_gen)
+    {
+        return send_response(code, {hdr}, sz, body_gen);        
+    }
+
+    bool Response::operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const json::value &json)
+    {
+        std::string jstr = json.to_json();
+        return send_response(code, {hdr, {{"Content-Type", "application/json"}}},jstr.size(), [&](){return std::string_view(jstr);});        
+    }
+
+    bool Response::operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, Stream &stream)
+    {
+        if (send_response(code, {hdr}, std::nullopt, []{return std::string_view();})) {
+            stream = Stream(std::move(_ctx->socket));
+            return true;
+        }
+        return false;
+    }
+
+    bool Response::send_response(StatusCode st, std::initializer_list<std::initializer_list<HeaderRow>> hdrs, std::optional<std::size_t> body_size, function_view<std::string_view()> body_gen)
+    {
+        std::size_t hdr_sz = 64 + st.message.size();
+        for (const auto &h: hdrs) {
+            for (const auto &[k,v]: h) {
+                hdr_sz += k.size() + v.size()+4;
+            }
+        }
+        return utils::stack_reserve(hdr_sz, [&](void *bvoid){
+            char *buffer = static_cast<char *>(bvoid);
+
+            char *iter = buffer;
+            iter = std::format_to(iter, "HTTP/1.1 {} {}\r\n", st.code, st.message);
+            for (const auto &h: hdrs) {
+                for (const auto &[key, value]: h) {
+                    iter = std::format_to(iter, "{}: {}\r\n", static_cast<std::string_view>(key), value);    
+                }
+            }
+            bool nobody = st.code == 204 || st.code == 304;
+
+            if (!nobody) {
+                if  (body_size) {
+                    iter = std::format_to(iter, "Content-Length: {}\r\n", *body_size);
+                } else {
+                    iter = std::format_to(iter, "Connection: close\r\n");
+                }
+            } 
+            iter = std::format_to(iter, "\r\n");
+        
+            if (!send_block(_ctx->socket.get(), {buffer, iter})) return false;
+
+            if (!body_size) {
+                auto data = body_gen();
+                while (!data.empty()) {
+                    if (!send_block(_ctx->socket.get(), data)) return false;
+                    data = body_gen();
+                }
+                return true;
+            } else {
+                std::size_t remain = *body_size;;
+                while (remain) {
+                    auto data = body_gen().substr(0,remain);
+                    if (data.empty()) return false;
+                    if (!send_block(_ctx->socket.get(), data)) return false;
+                    remain -= data.size();
+                }
+                _ctx->complete = true;
+                return true;
+            }
+        });
+    }
+
+
+
+    bool Stream::operator()(std::string_view data)
+    {
+        while (data.size()) {
+            int r = ::send(_socket.get(), data.data(), data.size(), MSG_DONTWAIT|MSG_NOSIGNAL);
+            if (r < 1) return false;
+            data = data.substr(r);
+        }        
+        return true;
+    }
+
+    void Stream::prepare_socket()
+    {
+        #ifdef _WIN32
+            SOCKET s = _socket.get();
+            u_long mode = 1;
+            ioctlsocket(s, FIONBIO, &mode);
+        #endif
+    }
+
+    /*
+        bool Server::SendCallback::operator()(StatusCode status, std::initializer_list<HeaderRow> headers, ResponseBody body)
+        {
+            std::size_t req_size = 64 + status.message.size() + (std::holds_alternative<json::value>(body) ? (content_type.size() + application_json.size() + 4) : std::size_t(0));
+
+            for (const auto &[key, value] : headers)
+            {
+                req_size += key.size() + value.size() + 4;
+            };
+
+            req_size += 2;
+            return utils::stack_alloc<char>(req_size, [&](char *buffer)
+                                            {
+            char *iter = buffer;
+            iter = std::format_to(iter, "HTTP/1.1 {} {}\r\n", status.code, status.message);
+            for (const auto &[key, value]: headers) {
+                iter = std::format_to(iter, "{}: {}\r\n", static_cast<std::string_view>(key), value);
+            }
+            std::string json_data;
+            std::size_t content_length = 0;
+            if (std::holds_alternative<std::string_view>(body)) {
+                content_length = std::get<std::string_view>(body).size();
+            } else if (std::holds_alternative<json::value>(body)) {
+                const auto &js = std::get<json::value>(body);
+                json_data = js.to_json();
+                content_length = json_data.size();
+                iter = std::format_to(iter, "{}: {}\r\n", content_type, application_json);
+            } else {
+                content_length = std::get<std::unique_ptr<IReader> >(body)->size();
+            }
+
+            bool nobody = status.code == 204 || status.code == 304;
+
+            if (!nobody) {
+                iter = std::format_to(iter, "Content-Length: {}\r\n", content_length);
+            }
+            iter = std::format_to(iter, "\r\n");
+
+
+            if (!send_block(socket.get(), {buffer, iter})) return false;
+
+            if (nobody) {
+                complete = true;
+                return true;
+            }
+
+            if (std::holds_alternative<std::string_view>(body)) {
+                return complete =  send_block(socket.get(), std::get<std::string_view>(body));
+            } else if (std::holds_alternative<json::value>(body)) {
+                return complete =  send_block(socket.get(), json_data);
+            } else {
+                auto &rd = std::get<std::unique_ptr<IReader> >(body);
+                while (content_length) {
+                    auto s = rd->read().substr(0, content_length);
+                    if (!send_block(socket.get(), s)) return false;
+                    content_length -= s.size();
+                }
+                complete = true;
+                return true;
+            } });
+        }
+    */
 }

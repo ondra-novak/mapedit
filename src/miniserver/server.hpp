@@ -1,7 +1,7 @@
 #pragma once
 
 #include "utils/http_utils.hpp"
-#include "utils/inline_function.hpp"
+#include "utils/function_view.hpp"
 #include "utils/unique_handle.hpp"
 #include <json/value.h>
 #include <vector>
@@ -15,6 +15,16 @@
 
 namespace server {
 
+    #ifdef _WIN32
+    using SocketType = std::uintptr_t;
+    #else
+    using SocketType = int;
+    #endif
+
+    struct HandleDeleter {            
+        void operator()(SocketType);
+    };
+    using Socket =  unique_handle<SocketType , HandleDeleter>;
 
     class IReader {
     public:
@@ -46,7 +56,7 @@ namespace server {
         bool operator==(const HeaderRow &) const = default;
     };
 
-
+/*
     class ResponseBody : public std::variant<std::string_view, std::unique_ptr<IReader>, json::value > {
     public:
 
@@ -61,18 +71,65 @@ namespace server {
         requires(std::is_constructible_v<json::value, T> && !std::is_constructible_v<std::string_view, T>)
         ResponseBody(T &&body):super(std::in_place_type<json::value>,std::forward<T>(body)) {}
     };
-
+*/
     struct StatusCode {
         int code = {};
         std::string_view message = {};
     };
 
-    
+
+
+    class Stream {
+    public:
+        Stream() = default;
+        Stream(Socket sock):_socket(std::move(sock)) {prepare_socket();}
+        bool operator()(std::string_view data);
+    protected:
+        Socket _socket;
+        void prepare_socket();
+
+    };
+
+    class Response {
+    public:
+
+        struct Context {
+            Socket socket;
+            bool complete = false;
+        };
+
+        Response() = default;
+        Response(Context &context):_ctx(&context) {}
+
+        bool is_complete() const {return _ctx?_ctx->complete:false;}
+
+        bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const char *body) {return this->operator()(code, hdr, std::string_view(body));}
+        bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const std::string &body) {return this->operator()(code, hdr, std::string_view(body));}
+        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::string_view body);
+        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::size_t sz, function_view<std::string_view()> body_gen);
+        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, const json::value &json);
+        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, Stream &stream);        
+
+        Socket release_socket() {
+            if (_ctx) {
+                return std::move(_ctx->socket);
+            } else {
+                return {};
+            }
+                
+        }
+    protected:
+        Context *_ctx;
+        
+        bool send_response(StatusCode code, std::initializer_list<std::initializer_list<HeaderRow> > hdrs, std::optional<std::size_t> body_size, function_view<std::string_view()> body_gen);
+
+    };
+    /*
 
     using Response = Function<bool(StatusCode,
                         std::initializer_list<HeaderRow>,
                         ResponseBody), 4*sizeof(void *)>;
-
+*/
     struct BasicRequest {
         utils::HeaderKey method;
         std::string_view path;
@@ -94,23 +151,8 @@ namespace server {
 
     protected:
 
-        #ifdef _WIN32
-        using SocketType = std::uintptr_t;
-        #else
-        using SocketType = int;
-        #endif
 
-        struct HandleDeleter {            
-            void operator()(SocketType);
-        };
-        using Socket =  unique_handle<SocketType , HandleDeleter>;
         Socket _mother;
-
-        struct SendCallback {
-            Socket socket;
-            bool complete = false;
-            bool operator()(StatusCode st,std::initializer_list<HeaderRow> hdr,ResponseBody body)            ;
-        };
 
         bool process_request(Socket & socket,const Handler &handler);
         template<typename Fn>

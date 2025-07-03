@@ -5,6 +5,7 @@
 #include <mutex>
 #include <json/serializer.h>
 #include <json/parser.h>
+#include <condition_variable>
 
 namespace server {
 
@@ -22,8 +23,10 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::PUT, "/api/ddl/{}", &WebInterface::ddl_put},
     {Method::DELETE, "/api/ddl/{}", &WebInterface::ddl_delete},
     {Method::POST, "/api/ddl/compact", &WebInterface::ddl_compact},
+    {Method::POST, "/api/control", &WebInterface::control},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
+    {Method::GET, "/command", &WebInterface::command},
     {Method::GET, "/{}", &WebInterface::webserver},
     {Method::GET, "/", &WebInterface::webserver_index}
 };
@@ -106,12 +109,12 @@ bool WebInterface::serve_file(const std::filesystem::path &path, std::string_vie
         std::ifstream f(p, std::ios::in|std::ios::binary);
         if (!f) return false;
         char buff[8192];
-        return req.response({200,"OK"},{{"Content-Type",mime}}, {sz,[&]{
+        return req.response({200,"OK"},{{"Content-Type",mime}}, sz,[&]{
             f.read(buff,sizeof(buff));
             auto cnt =  f.gcount();
             if (cnt == 0) return std::string_view(" ");
             else return std::string_view(buff,cnt);
-        }});
+        });
 
 }
 
@@ -241,6 +244,7 @@ WebInterface::WebInterface(Config cfg)
     ,_maps(cfg.maps)
     ,_app_dir(cfg.app_dir)
     ,_assets_dir(cfg.asset_dir)
+    ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
 {
 
 }
@@ -312,6 +316,67 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
 }
 
 
+bool WebInterface::command(Request &req)
+{
+    if (req.method == Method::GET) {
+        Stream s;
+        if (req.response({200,"OK"},{{"Content-Type","text/event-stream"}}, s)) {
+            std::lock_guard _(_stream_mx);
+            _streams.push_back(std::move(s));
+        }
 
 
+
+
+    } else {
+        req.response({405,"Method not allowed"},{{"Allow","GET"}},"");
+    }
+
+    return true;
+}
+
+void  WebInterface::broadcast(std::string_view data) {
+    std::lock_guard _(_stream_mx);
+    auto new_end = std::remove_if(_streams.begin(), _streams.end(), [&](Stream &s){
+        return !s(data);
+    });
+    _streams.erase(new_end, _streams.end());    
+}
+
+bool WebInterface::control(Request &req)
+{
+ 
+    if (req.method == Method::POST) {
+        auto b = req.body;
+        std::string buff;
+        while (!b.empty()) {
+            auto ln = utils::trim(utils::split_at(b,"\n"));
+            buff = std::format("data: {} \r\n", ln);
+            broadcast(buff);
+        }
+        broadcast("\r\n");
+        req.response({202,"Accepted"},{},"");
+        return true;
+    } else {
+        req.response({405,"Method not allowed"},{{"Allow","POST"}},"");
+    }
+    return true;
+}
+void WebInterface::basic_timer_worker(std::stop_token stp)
+{
+    std::mutex mx;
+    std::unique_lock lk(mx);
+    std::condition_variable cv;
+    std::stop_callback stpcb(stp, [&]{
+        cv.notify_all();        
+    });
+    while (!stp.stop_requested()) {
+        cv.wait_for(lk, std::chrono::seconds(5));
+        on_timer_tick();
+    }
+}
+void WebInterface::on_timer_tick()
+{
+    broadcast(":ping\r\n\r\n");
+}
 }
