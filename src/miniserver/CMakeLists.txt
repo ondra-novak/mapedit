@@ -9,5 +9,6 @@ add_executable(mapedit_server
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c
+    utils/profile_path.cpp
     )
 add_dependencies(mapedit_server frontend)

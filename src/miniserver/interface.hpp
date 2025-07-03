@@ -22,11 +22,12 @@ public:
 
 protected:
     DDLManager _game;
-    DDLManager _user;
     std::shared_mutex _mx;
     std::filesystem::path _maps;
     std::filesystem::path _app_dir;
     std::filesystem::path _assets_dir;
+    std::filesystem::path _user_dir;
+    bool _check_active = false;
 
     MGifComp _mgfcomp;
     std::mutex _mgfcomp_mx;
@@ -34,13 +35,12 @@ protected:
     bool webserver(Request &req);
     bool webserver_index(Request &req);
     bool webserver_assets(Request &req);
-    bool serve_maps(Request &req);
-    bool serve_map_list(Request &req);
     
 
     bool serve_file(const std::filesystem::path &path, std::string_view name, Request &req);
  
     
+    bool all_ddl_list(Request &req);
     bool ddl_list(Request &req);
     bool ddl_get(Request &req);
     bool ddl_put(Request &req);
@@ -63,7 +63,8 @@ protected:
     void broadcast(std::string_view data);
  
     std::jthread _basic_timer;
-    
+ 
+    DDLManager getUserDDL(const std::string &name) const;
 
 };
 

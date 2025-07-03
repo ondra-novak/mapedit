@@ -16,6 +16,12 @@ export interface Stats {
     used_space: number;
 }
 
+export interface DDLEntry {
+    name: string;
+    size: number;
+    last_write: Date;
+}
+
 export interface DDLFiles {
     files: FileItem[];
     stats: Stats;
@@ -33,11 +39,24 @@ interface ArrayBufferWithBuffer extends ArrayBuffer {
 
 export class ApiClient {
 
+    current_ddl: string = "";
+
+    constructor() {
+        const v = localStorage.getItem("current_ddl");
+        if (v) this.set_current_ddl(v);
+    }
+
+    set_current_ddl(s:string) {
+        localStorage.setItem("current_ddl", s);
+        this.current_ddl = encodeURIComponent(s);
+    }
+    get_current_ddl() :string {return decodeURIComponent(this.current_ddl);}
+
     // DDL
     async getDDLFiles(group: number|null, source: string|null): Promise<DDLFiles> {
         const arg1=group?`group=${group}`:"";
         const arg2=source?`type=${source}`:"";
-        const query = ["api/ddl", [arg1,arg2].join('&')].join('?');
+        const query = [`api/ddl/${this.current_ddl}`, [arg1,arg2].join('&')].join('?');
         const response = await fetch(query);
         const json = await response.json();
         json.files = json.files.map((x:[string, string, boolean][])=>{
@@ -51,7 +70,7 @@ export class ApiClient {
     }
 
     async getDDLFile(id: string): Promise<ArrayBuffer> {
-        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`);
+        const response = await fetch(`api/ddl/${this.current_ddl}/{$this.${encodeURIComponent(id)}`);
         if (response.ok) {
             const n = ((await response.bytes()).buffer);
             return n
@@ -61,7 +80,7 @@ export class ApiClient {
     }
 
     async getDDLMGFFile(id: string): Promise<ArrayBuffer> {
-        const response = await fetch(`api/ddl/mgf/${encodeURIComponent(id)}`);
+        const response = await fetch(`api/ddl/${this.current_ddl}/mgf/${encodeURIComponent(id)}`);
         if (response.ok) {
             const n = ((await response.bytes()).buffer);
             return n
@@ -71,7 +90,7 @@ export class ApiClient {
     }
 
     async putDDLFile(id: string, data: ArrayBuffer, group: number): Promise<void> {
-        const response = await fetch(`api/ddl/${encodeURIComponent(id)}?group=${group}`, {
+        const response = await fetch(`api/ddl/${this.current_ddl}/${encodeURIComponent(id)}?group=${group}`, {
             method: "PUT",
             headers: { "Content-Type": "application/octet-stream" },
             body: data
@@ -83,7 +102,7 @@ export class ApiClient {
     }    
 
     async deleteDDLFile(id: string): Promise<void> {
-        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`, {
+        const response = await fetch(`api/ddl/${this.current_ddl}/${encodeURIComponent(id)}`, {
             method: "DELETE"
         });
        if (response.status !== 202) {
@@ -93,7 +112,7 @@ export class ApiClient {
     }
 
     async compactDDL(): Promise<any> {
-        const response = await fetch(`api/ddl/compact`, {
+        const response = await fetch(`api/ddl/${this.current_ddl}/compact`, {
             method: "POST"
         });
         if (response.status !== 202) {
@@ -103,7 +122,7 @@ export class ApiClient {
     }
 
     async mgfCreate(name: string, group: number, frames:number, transparent: boolean): Promise<string> {
-        const response = await fetch(`api/ddl/mgf`, {
+        const response = await fetch(`api/ddl/${this.current_ddl}/mgf`, {
             method: "POST",
             body: JSON.stringify({
                 filename: name,
@@ -149,7 +168,20 @@ export class ApiClient {
     } 
 
     getDownloadLink(id:string):string {
-        return `api/ddl/${encodeURIComponent(id)}`;
+        return `api/ddl/${this.current_ddl}/${encodeURIComponent(id)}`;
+    }
+
+    async listAllDDLs() : Promise<DDLEntry[]> {
+        const response   = await fetch("api/ddl") ;
+        if (response.status != 200) {
+            const text = await response.text();
+            throw new Error(`listAllDDLs failed. Status: ${response.status}. Message: ${text}`);
+        }
+        return ((await response.json()) as Record<string, any>[]).map(x=>({
+            name: x.name,
+            size: x.size,
+            last_write: new Date(x.last_write*1000)
+        }));
     }
 
 }

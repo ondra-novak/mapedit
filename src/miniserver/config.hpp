@@ -8,9 +8,9 @@ struct Config {
     std::string addr_port;
     std::filesystem::path app_dir;
     std::filesystem::path asset_dir;
-    std::filesystem::path game_ddl;
-    std::filesystem::path user_ddl;
-    std::filesystem::path maps;
+    std::filesystem::path game_folder;
+    std::filesystem::path user_folder;
+    bool check_active;
 };
 
 }

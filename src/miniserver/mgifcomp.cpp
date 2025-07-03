@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <random>
 
-std::string MGifComp::create_mgif(std::string name,int group, int frames,bool transp_color)
+std::string MGifComp::create_mgif(std::string ddl, std::string name,int group, int frames,bool transp_color)
 {
     auto now =  std::chrono::system_clock::now();
     
@@ -14,7 +14,7 @@ std::string MGifComp::create_mgif(std::string name,int group, int frames,bool tr
     creator->init(frames);
 
     std::string uuid = gen_uuid();
-    _sessions.push_back(Session{uuid, name,group,std::move(creator), now, transp_color});
+    _sessions.push_back(Session{uuid, name,ddl, group,std::move(creator), now, transp_color});
     
     return uuid;
 }

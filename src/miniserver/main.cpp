@@ -3,6 +3,7 @@
 #include "handler_map.hpp"
 #include "config.hpp"
 #include "interface.hpp"
+#include "utils/profile_path.hpp"
 
 
 
@@ -47,21 +48,28 @@ void open_url(std::string url) {
     #endif
 }
 
+
+
+
+
 int entry_point(std::filesystem::path root_config) {
 
     IniFile ini = load_config(root_config);
     std::string addrport = ini.get("server","listen","localhost:0");
     bool  open_browser = ini.get_bool("server","open_browser", true);
-    std::string ddl = ini.get("paths", "game_assets", "./SKELDAL.DDL");
+    std::basic_string<char8_t> game_folder = ini.get("paths", "game_folder", u8"");
+    std::basic_string<char8_t> user_folder = ini.get("paths", "adventure_folder", u8"");
 
     server::Config cfg;
     auto parent = root_config.parent_path();
     cfg.app_dir = parent/"web";
     cfg.asset_dir = parent/"web"/"assets";
-    cfg.maps = parent/"files"/"maps";
-    cfg.game_ddl = parent/ddl;
-    cfg.user_ddl = parent/"files"/"assets.ddl";
+    cfg.game_folder = game_folder.empty()?parent.parent_path():parent/game_folder;
+    cfg.user_folder = user_folder.empty()
+            ?getUserDocumentsPath() / u8"Skeldal_Adventure":std::filesystem::current_path()/user_folder;
+    cfg.check_active = ini.get_bool("server","exit_on_close",true);
 
+    std::filesystem::create_directories(cfg.user_folder);
 
     server::Server srv(addrport);
 

@@ -62,6 +62,15 @@ public:
         }
         return def;
     }
+    std::basic_string<char8_t> get(const std::string& section, const std::string& key, const std::basic_string<char8_t> & def = std::basic_string<char8_t>()) const {
+        auto sit = data.find(section);
+        if (sit != data.end()) {
+            auto kit = sit->second.find(key);
+            if (kit != sit->second.end())
+                return std::basic_string<char8_t>(reinterpret_cast<const char8_t *>(kit->second.data()), kit->second.size());
+        }
+        return def;
+    }
     // Read a boolean value from the INI file
     bool get_bool(const std::string& section, const std::string& key, bool def = false) const {
         std::string val = get(section, key, "");

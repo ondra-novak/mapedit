@@ -14,15 +14,14 @@ Server::Handler WebInterface::get_handler() {
 
 
 constexpr Endpoint<WebInterface> endpoints[] = {
-    {Method::GET, "/api/maps", &WebInterface::serve_map_list},
-    {Method::GET, "/api/maps/{}", &WebInterface::serve_maps},
-    {Method::GET, "/api/ddl", &WebInterface::ddl_list},
-    {Method::GET, "/api/ddl/mgf/{}", &WebInterface::ddl_mpg_get},
-    {Method::POST, "/api/ddl/mgf", &WebInterface::ddl_mpg_create},
-    {Method::GET, "/api/ddl/{}", &WebInterface::ddl_get},
-    {Method::PUT, "/api/ddl/{}", &WebInterface::ddl_put},
-    {Method::DELETE, "/api/ddl/{}", &WebInterface::ddl_delete},
-    {Method::POST, "/api/ddl/compact", &WebInterface::ddl_compact},
+    {Method::GET, "/api/ddl", &WebInterface::all_ddl_list},
+    {Method::GET, "/api/ddl/{}", &WebInterface::ddl_list},
+    {Method::GET, "/api/ddl/{}/mgf/{}", &WebInterface::ddl_mpg_get},
+    {Method::POST, "/api/ddl/{}/mgf", &WebInterface::ddl_mpg_create},
+    {Method::GET, "/api/ddl/{}/{}", &WebInterface::ddl_get},
+    {Method::PUT, "/api/ddl/{}/{}", &WebInterface::ddl_put},
+    {Method::DELETE, "/api/ddl/{}/{}", &WebInterface::ddl_delete},
+    {Method::POST, "/api/ddl/{}/compact", &WebInterface::ddl_compact},
     {Method::POST, "/api/control", &WebInterface::control},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
@@ -79,23 +78,6 @@ bool WebInterface::webserver_assets(Request &req)
         return serve_file(_assets_dir, req.path_vars[0], req);
 }
 
-bool WebInterface::serve_maps(Request &req)
-{
-    return serve_file(_maps, req.path_vars[0],req);
-}
-
-bool WebInterface::serve_map_list(Request &req)
-{
-    std::shared_lock _(_mx);    
-    std::vector<std::string> files;
-    for (auto iter = std::filesystem::directory_iterator(_maps);iter != std::filesystem::directory_iterator();++iter) {
-        if (iter->is_regular_file()) {
-            files.push_back(iter->path().filename().string());
-        }
-    }
-    return req.response({200},{},json::value{{"files",json::value(files.begin(), files.end())}});
-}
-
 bool WebInterface::serve_file(const std::filesystem::path &path, std::string_view name, Request &req)
 {
         std::shared_lock _(_mx);    
@@ -118,6 +100,39 @@ bool WebInterface::serve_file(const std::filesystem::path &path, std::string_vie
 
 }
 
+bool WebInterface::all_ddl_list(Request &req)
+{
+    constexpr utils::HeaderKey extension = ".DDL";
+
+    auto to_timestamp=[](std::filesystem::file_time_type ftime){
+        auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            ftime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now()
+        );
+        return std::chrono::system_clock::to_time_t(sctp);
+    };
+
+    if (req.method == Method::GET) {
+        std::vector<json::value> result;
+        auto iter = std::filesystem::directory_iterator(_user_dir);
+        auto iter_end = std::filesystem::directory_iterator();
+        while (iter != iter_end) {
+            const auto &entry = *iter;
+            if (entry.is_regular_file() && extension == utils::HeaderKey(entry.path().extension().string())) {
+                result.push_back({
+                    {"name", entry.path().filename().string()},
+                    {"size", entry.file_size()},
+                    {"last_write", to_timestamp(entry.last_write_time())}
+                });
+            }
+            ++iter;
+        }
+        req.response({200,{}},{},json::value(result.begin(), result.end()));
+    } else {
+        req.response({405,{}},{{"Allow","GET"}},"");
+    }
+    return true;
+}
+
 bool WebInterface::ddl_list(Request &req)
 {
     std::shared_lock _(_mx);    
@@ -132,9 +147,10 @@ bool WebInterface::ddl_list(Request &req)
         };
     }
 
+    auto user = getUserDDL(req.path_vars[0]);
 
     std::vector<DDLManager::Item> game_files = _game.list();
-    std::vector<DDLManager::Item> user_files = _user.list();
+    std::vector<DDLManager::Item> user_files = user.list();
     std::vector<DDLManager::Item> out_files;
 
     auto cmp =[](const auto &a, const auto &b) {
@@ -158,7 +174,7 @@ bool WebInterface::ddl_list(Request &req)
             return false;
     }), out_files.end());
 
-    auto stats = _user.get_stats();
+    auto stats = user.get_stats();
     return req.response({200},{},json::value({
         {"files", json::value(out_files.begin(), out_files.end(), [&](const DDLManager::Item &val){
             auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
@@ -180,9 +196,10 @@ bool WebInterface::ddl_list(Request &req)
 bool WebInterface::ddl_get(Request &req)
 {
     std::shared_lock _(_mx);    
-    auto f = _user.get(req.path_vars[0]);
+    auto user = getUserDDL(req.path_vars[0]);
+    auto f = user.get(req.path_vars[1]);
     if (!f) {
-        f = _game.get(req.path_vars[0]);
+        f = _game.get(req.path_vars[1]);
         if (!f) return false;
     }    
     return req.response({200},{
@@ -193,22 +210,24 @@ bool WebInterface::ddl_get(Request &req)
 bool WebInterface::ddl_put(Request &req)
 {
     std::lock_guard _(_mx);
-    if (req.path_vars[0].empty()) return false;
+    auto user = getUserDDL(req.path_vars[0]);
+    if (req.path_vars[1].empty()) return false;
     if (req.body.size() > 0x7FFFFFFF) {
         return req.response({413,"Content Too Large"},{},"");
     }
     uint32_t group =0;
     auto iter = std::find_if(req.query.begin(), req.query.end(), [](const auto &kv){return kv.first == "group";});
     if (iter != req.query.end()) group = static_cast<uint32_t>(std::stoul(iter->second));
-    _user.put(req.path_vars[0], req.body,group);
+    user.put(req.path_vars[0], req.body,group);
     return req.response({202,"Accepted"},{},"");
 }
 
 bool WebInterface::ddl_delete(Request &req)
 {
     std::lock_guard _(_mx);
-    if (req.path_vars[0].empty()) return false;
-    _user.erase(req.path_vars[0]);
+    auto user = getUserDDL(req.path_vars[0]);
+    if (req.path_vars[1].empty()) return false;
+    user.erase(req.path_vars[0]);
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -216,16 +235,18 @@ bool WebInterface::ddl_delete(Request &req)
 bool WebInterface::ddl_compact(Request &req)
 {   
     std::lock_guard _(_mx);
-    _user.compact();
+    auto user = getUserDDL(req.path_vars[0]);
+    user.compact();
     return req.response({202,"Accepted"},{},"");
 }
 
 bool WebInterface::ddl_mpg_get(Request &req)
 {
     std::shared_lock _(_mx);       
-    auto f = _user.get(req.path_vars[0]);
+    auto user = getUserDDL(req.path_vars[0]);
+    auto f = user.get(req.path_vars[1]);
     if (!f) {
-        f = _game.get(req.path_vars[0]);
+        f = _game.get(req.path_vars[1]);
         if (!f) return false;
     }    
     auto stream = decompress_mgf(f->data());
@@ -239,11 +260,11 @@ bool WebInterface::ddl_mpg_get(Request &req)
 }
 
 WebInterface::WebInterface(Config cfg)
-    :_game(cfg.game_ddl)
-    ,_user(cfg.user_ddl)
-    ,_maps(cfg.maps)
+    :_game(cfg.game_folder/u8"SKELDAL.DDL")
     ,_app_dir(cfg.app_dir)
     ,_assets_dir(cfg.asset_dir)
+    ,_user_dir(cfg.user_folder)
+    ,_check_active(cfg.check_active)
     ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
 {
 
@@ -272,7 +293,7 @@ bool WebInterface::ddl_mpg_create(Request &req)
         return req.response({400,"Bad Request"},{{"Content-Type","text/plain"}}, err);        
     }
 
-    auto uuid = _mgfcomp.create_mgif(fname.as<std::string>(), group.as<int>(), frames.as<unsigned int>(), transp.as<bool>());
+    auto uuid = _mgfcomp.create_mgif(req.path_vars[0],fname.as<std::string>(), group.as<int>(), frames.as<unsigned int>(), transp.as<bool>());
 
     return req.response({201, "Created"},{{"Location","/api/mgf_session/"+uuid}},uuid);
 }
@@ -298,6 +319,7 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
     }
     if (action == "close") {
         auto r = _mgfcomp.close(uuid);
+        auto user = getUserDDL(r.ddl);
         if (!r.creator ) {
             return req.response({410}, {}, "");        
         }
@@ -306,7 +328,7 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
         }
          std::lock_guard __(_mx);
          const auto &data = r.creator->get_data();
-         _user.put(r.name, {reinterpret_cast<const char *>(data.data()),data.size()},r.group);
+         user.put(r.name, {reinterpret_cast<const char *>(data.data()),data.size()},r.group);
         return req.response({201},{{"Location","/api/ddl/"+r.name}},r.name);
 
     }
@@ -341,6 +363,17 @@ void  WebInterface::broadcast(std::string_view data) {
         return !s(data);
     });
     _streams.erase(new_end, _streams.end());    
+}
+
+DDLManager WebInterface::getUserDDL(const std::string &name) const
+{
+    for (char c: name) {
+        if (!((c >= '0' && c <= '9')
+              || (c >= 'A' && c <='Z')
+              || (c >= 'a' && c <='z')
+              || (c == '_' || c == '-'))) throw std::runtime_error("DDL Archive name validation failed (unsupported characters)");
+    }
+    return DDLManager(_user_dir/name);
 }
 
 bool WebInterface::control(Request &req)

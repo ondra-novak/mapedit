@@ -21,7 +21,7 @@ async function run() {
   ], { onlyFiles: true })).map(file => resolve(file));
 
   
-  const target = 'dist/index.html'; // Tento řetězec musí odpovídat tomu, co CMake očekává v OUTPUT
+  const target = 'web/index.html'; // Tento řetězec musí odpovídat tomu, co CMake očekává v OUTPUT
   const depLine = `${target}: ${sources.join(' ')}`;
 
   const outDir = dirname(outFile);

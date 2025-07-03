@@ -19,13 +19,14 @@ public:
     struct Session {
         std::string uuid = {};
         std::string name = {};
+        std::string ddl = {};
         int group = 0;
         std::unique_ptr<MGIFCreator> creator = {};
         std::chrono::system_clock::time_point last_activity = {};
         bool transp_color =false;
     };
 
-    std::string create_mgif(std::string name,int group, int frames, bool transp_color);
+    std::string create_mgif(std::string ddl, std::string name,int group, int frames, bool transp_color);
     Status put_image_pcx(std::string session, std::string_view pcx_image);
     Session close(std::string session);
 
