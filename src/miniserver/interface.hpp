@@ -16,6 +16,8 @@ struct Request;
 class WebInterface {
 public:
 
+    static constexpr auto keepalive_interval = std::chrono::seconds(5);
+
     WebInterface(Config cfg);
     
     Server::Handler get_handler();
@@ -50,6 +52,7 @@ protected:
     bool ddl_mpg_get(Request &req);
     bool ddl_mpg_create(Request &req);
     bool ddl_mpg_session_put(Request &req);
+    bool keep_alive(Request &req);
 
     bool command(Request &req);
     bool control(Request &req);

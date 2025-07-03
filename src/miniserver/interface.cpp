@@ -23,6 +23,7 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::DELETE, "/api/ddl/{}/{}", &WebInterface::ddl_delete},
     {Method::POST, "/api/ddl/{}/compact", &WebInterface::ddl_compact},
     {Method::POST, "/api/control", &WebInterface::control},
+    {Method::GET, "/api/keepalive", &WebInterface::keep_alive},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
     {Method::GET, "/command", &WebInterface::command},
@@ -111,25 +112,21 @@ bool WebInterface::all_ddl_list(Request &req)
         return std::chrono::system_clock::to_time_t(sctp);
     };
 
-    if (req.method == Method::GET) {
-        std::vector<json::value> result;
-        auto iter = std::filesystem::directory_iterator(_user_dir);
-        auto iter_end = std::filesystem::directory_iterator();
-        while (iter != iter_end) {
-            const auto &entry = *iter;
-            if (entry.is_regular_file() && extension == utils::HeaderKey(entry.path().extension().string())) {
-                result.push_back({
-                    {"name", entry.path().filename().string()},
-                    {"size", entry.file_size()},
-                    {"last_write", to_timestamp(entry.last_write_time())}
-                });
-            }
-            ++iter;
+    std::vector<json::value> result;
+    auto iter = std::filesystem::directory_iterator(_user_dir);
+    auto iter_end = std::filesystem::directory_iterator();
+    while (iter != iter_end) {
+        const auto &entry = *iter;
+        if (entry.is_regular_file() && extension == utils::HeaderKey(entry.path().extension().string())) {
+            result.push_back({
+                {"name", entry.path().filename().string()},
+                {"size", entry.file_size()},
+                {"last_write", to_timestamp(entry.last_write_time())}
+            });
         }
-        req.response({200,{}},{},json::value(result.begin(), result.end()));
-    } else {
-        req.response({405,{}},{{"Allow","GET"}},"");
+        ++iter;
     }
+    req.response({200,{}},{},json::value(result.begin(), result.end()));
     return true;
 }
 
@@ -337,21 +334,27 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
     return false;
 }
 
+bool WebInterface::keep_alive(Request &req)
+{
+    std::size_t stream_count;
+    {
+        std::lock_guard _(_stream_mx);
+        stream_count = _streams.size();
+    }
+    req.response({200,{}},{},json::value({
+        {"keepalive_interval",std::chrono::duration_cast<std::chrono::milliseconds>(keepalive_interval).count()},
+        {"game_instances",stream_count},
+        {"exit_on_close", _check_active}
+    }));
+    return true;
+}
 
 bool WebInterface::command(Request &req)
 {
-    if (req.method == Method::GET) {
-        Stream s;
-        if (req.response({200,"OK"},{{"Content-Type","text/event-stream"}}, s)) {
-            std::lock_guard _(_stream_mx);
-            _streams.push_back(std::move(s));
-        }
-
-
-
-
-    } else {
-        req.response({405,"Method not allowed"},{{"Allow","GET"}},"");
+    Stream s;
+    if (req.response({200,"OK"},{{"Content-Type","text/event-stream"}}, s)) {
+        std::lock_guard _(_stream_mx);
+        _streams.push_back(std::move(s));
     }
 
     return true;
@@ -378,21 +381,15 @@ DDLManager WebInterface::getUserDDL(const std::string &name) const
 
 bool WebInterface::control(Request &req)
 {
- 
-    if (req.method == Method::POST) {
-        auto b = req.body;
-        std::string buff;
-        while (!b.empty()) {
-            auto ln = utils::trim(utils::split_at(b,"\n"));
-            buff = std::format("data: {} \r\n", ln);
-            broadcast(buff);
-        }
-        broadcast("\r\n");
-        req.response({202,"Accepted"},{},"");
-        return true;
-    } else {
-        req.response({405,"Method not allowed"},{{"Allow","POST"}},"");
+    auto b = req.body;
+    std::string buff;
+    while (!b.empty()) {
+        auto ln = utils::trim(utils::split_at(b,"\n"));
+        buff = std::format("data: {} \r\n", ln);
+        broadcast(buff);
     }
+    broadcast("\r\n");
+    req.response({202,"Accepted"},{},"");
     return true;
 }
 void WebInterface::basic_timer_worker(std::stop_token stp)
@@ -404,12 +401,13 @@ void WebInterface::basic_timer_worker(std::stop_token stp)
         cv.notify_all();        
     });
     while (!stp.stop_requested()) {
-        cv.wait_for(lk, std::chrono::seconds(5));
+        cv.wait_for(lk, keepalive_interval);
         on_timer_tick();
     }
 }
 void WebInterface::on_timer_tick()
 {
-    broadcast(":ping\r\n\r\n");
+    broadcast(":ping");
+    broadcast("\r\n\r\n");
 }
 }

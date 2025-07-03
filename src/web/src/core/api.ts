@@ -1,4 +1,5 @@
 import type { AssetGroupType } from "./asset_groups";
+import Distributor from "./distributor";
 
 
 export interface FileItem {
@@ -27,6 +28,12 @@ export interface DDLFiles {
     stats: Stats;
 }
 
+export interface KeepAliveStatus {
+    exit_on_close:boolean;
+    keepalive_interval: number;
+    game_instances: number;
+}
+
 export interface PutImageStatus {
     need: string;
     processed: boolean;
@@ -40,16 +47,28 @@ interface ArrayBufferWithBuffer extends ArrayBuffer {
 export class ApiClient {
 
     current_ddl: string = "";
+    disconnect_event = new Distributor<unknown>();
+    ddlchange_event = new Distributor<string>();
+    gameconnect_event = new Distributor<number>();
+    status: KeepAliveStatus = {exit_on_close:true, game_instances:0,keepalive_interval:5000};
+
 
     constructor() {
         const v = localStorage.getItem("current_ddl");
         if (v) this.set_current_ddl(v);
+        this.start_keepalive();
     }
 
     set_current_ddl(s:string) {
         localStorage.setItem("current_ddl", s);
-        this.current_ddl = encodeURIComponent(s);
+        const n = encodeURIComponent(s);
+        if (n != this.current_ddl) {
+            this.current_ddl = n;
+            this.ddlchange_event.trigger(s);
+        }
     }
+
+
     get_current_ddl() :string {return decodeURIComponent(this.current_ddl);}
 
     // DDL
@@ -182,6 +201,30 @@ export class ApiClient {
             size: x.size,
             last_write: new Date(x.last_write*1000)
         }));
+    }
+
+    async keepalive() : Promise<KeepAliveStatus> {
+        const response = await fetch("api/keepalive");
+        if (response.status != 200) {
+            const text = await response.text();
+            throw new Error(`Keepalive failed. Status ${response.status}. Message: ${text}`);
+        }
+        return await response.json();
+    }
+
+    async start_keepalive() {
+        try {
+            const st = await this.keepalive();
+            if (st.game_instances != this.status.game_instances) {
+                this.gameconnect_event.trigger(st.game_instances);
+            }
+            this.status = st;
+        } catch (e) {
+            if (this.status.exit_on_close) {
+                this.disconnect_event.trigger(e);
+            }
+        }
+        setTimeout(()=>this.start_keepalive(), this.status.keepalive_interval);
     }
 
 }
