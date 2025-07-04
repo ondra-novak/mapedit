@@ -24,10 +24,14 @@ std::filesystem::path getUserDocumentsPath()
     } else {
         if (pathTmp) CoTaskMemFree(pathTmp);
         // Fallback na USERPROFILE\Documents
-        const char* userProfile = std::getenv("USERPROFILE");
-        if (userProfile) {
-            return fs::path(userProfile) / "Documents";
+        char* userProfile = nullptr;
+        size_t len = 0;
+        if (_dupenv_s(&userProfile, &len, "USERPROFILE") == 0 && userProfile) {
+            fs::path result = fs::path(userProfile) / "Documents";
+            free(userProfile);
+            return result;
         } else {
+            if (userProfile) free(userProfile);
             return fs::current_path();
         }
     }

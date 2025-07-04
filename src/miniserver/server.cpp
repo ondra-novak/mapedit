@@ -19,6 +19,7 @@
 constexpr int SOCK_CLOEXEC = 0;
 constexpr int MSG_NOSIGNAL = 0;
 constexpr int MSG_DONTWAIT = 0;
+constexpr int SHUT_RD = SD_RECEIVE;
 #pragma comment(lib, "ws2_32.lib")
 
 #else 
@@ -458,7 +459,7 @@ namespace server
     bool Stream::operator()(std::string_view data)
     {
         while (data.size()) {
-            int r = ::send(_socket.get(), data.data(), data.size(), MSG_DONTWAIT|MSG_NOSIGNAL);
+            int r = ::send(_socket.get(), data.data(), static_cast<int>(data.size()), MSG_DONTWAIT|MSG_NOSIGNAL);
             if (r < 1) return false;
             data = data.substr(r);
         }        
