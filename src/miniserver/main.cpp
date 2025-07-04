@@ -48,10 +48,6 @@ void open_url(std::string url) {
     #endif
 }
 
-
-
-
-
 int entry_point(std::filesystem::path root_config) {
 
     IniFile ini = load_config(root_config);
@@ -72,8 +68,10 @@ int entry_point(std::filesystem::path root_config) {
     std::filesystem::create_directories(cfg.user_folder);
 
     server::Server srv(addrport);
+    std::stop_source stp;
+    std::stop_token tkn = stp.get_token();
 
-    server::WebInterface ifc(cfg);
+    server::WebInterface ifc(cfg, stp);
     std::string url = "http://" + srv.get_listen_addr();
 
     std::cout <<  "Server running at: " << url << std::endl;
@@ -82,7 +80,7 @@ int entry_point(std::filesystem::path root_config) {
         open_url(url);
     }
 
-    srv.listen(ifc.get_handler());
+    srv.serve(ifc.get_handler(), tkn);
     return 0;
 }
 

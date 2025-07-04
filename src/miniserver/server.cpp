@@ -255,69 +255,78 @@ namespace server
         return false;
     }
 
-    bool Server::process_request(Socket &socket, const Handler &handler)
+    bool Server::process_request(Socket &socket, const Handler &handler) noexcept
     {
         std::string read_buffer;
-        while (true)
-        {
-            auto sz = read_buffer.size();
-            read_buffer.resize(sz + 4096);
-            int r = recv(socket.get(), read_buffer.data() + sz, static_cast<int>(read_buffer.size() - sz), MSG_NOSIGNAL);
-            if (r < 0)
+        try {
+            while (true)
             {
-                int e = getLastNetError();
-                if (e != EINTR)
-                    return false;
-            }
-            else if (r == 0)
-            {
-                return false;
-            }
-            else
-            {
-                read_buffer.resize(sz + r);
-                auto n = read_buffer.find("\r\n\r\n");
-                if (n != std::string::npos)
+                auto sz = read_buffer.size();
+                read_buffer.resize(sz + 4096);
+                int r = recv(socket.get(), read_buffer.data() + sz, static_cast<int>(read_buffer.size() - sz), MSG_NOSIGNAL);
+                if (r < 0)
                 {
-                    SOCKET sck = socket.get();
-                    return parse_header(std::string_view(read_buffer).substr(0, n + 2), std::move(socket), [&](BasicRequest &req)
-                                        {
-                    if (req.body_size) {
-                        return utils::stack_alloc<char>(req.body_size,[&](char *buffer){                            
-                            char *iter = buffer;
-                            char *end = iter+req.body_size;
-                            auto s = n+4;
-                            std::size_t remain_size = std::min(read_buffer.size() - s, req.body_size);
-                            iter = std::copy(read_buffer.data()+s, read_buffer.data()+s+remain_size, buffer);
-                            while (iter != end) {
-                                int r = recv(sck, iter, static_cast<int>(end - iter), MSG_NOSIGNAL);
-                                if (r < 0) {
-                                    int e = getLastNetError();
-                                    if (e != EINTR) return false;
-                                } else if (r == 0) {
-                                    return false;
-                                } else {
-                                    iter+=r;
+                    int e = getLastNetError();
+                    if (e != EINTR)
+                        return false;
+                }
+                else if (r == 0)
+                {
+                    return false;
+                }
+                else
+                {
+                    read_buffer.resize(sz + r);
+                    auto n = read_buffer.find("\r\n\r\n");
+                    if (n != std::string::npos)
+                    {
+                        SOCKET sck = socket.get();
+                        return parse_header(std::string_view(read_buffer).substr(0, n + 2), std::move(socket), [&](BasicRequest &req)
+                                            {
+                        if (req.body_size) {
+                            return utils::stack_alloc<char>(req.body_size,[&](char *buffer){                            
+                                char *iter = buffer;
+                                char *end = iter+req.body_size;
+                                auto s = n+4;
+                                std::size_t remain_size = std::min(read_buffer.size() - s, req.body_size);
+                                iter = std::copy(read_buffer.data()+s, read_buffer.data()+s+remain_size, buffer);
+                                while (iter != end) {
+                                    int r = recv(sck, iter, static_cast<int>(end - iter), MSG_NOSIGNAL);
+                                    if (r < 0) {
+                                        int e = getLastNetError();
+                                        if (e != EINTR) return false;
+                                    } else if (r == 0) {
+                                        return false;
+                                    } else {
+                                        iter+=r;
+                                    }
                                 }
-                            }
-                            req.body = {buffer, req.body_size};
+                                req.body = {buffer, req.body_size};
+                                handler(req);
+                                return post_handler(req,socket);
+                            });
+                        } else {
                             handler(req);
                             return post_handler(req,socket);
-                        });
-                    } else {
-                        handler(req);
-                        return post_handler(req,socket);
-                    } });
+                        } });
+                    }
                 }
             }
+        } catch (...) {
+            return false;
         }
 
         return false;
     }
 
-    void Server::listen(std::function<void(BasicRequest &)> callback)
+    void Server::serve(Handler callback, std::stop_token tkn)
     {
-        while (true)
+        std::stop_callback stpcb(tkn,[&]{
+            shutdown(_mother.get(), SHUT_RD);
+        });
+
+
+        while (!tkn.stop_requested())
         {
             #ifdef _WIN32
             SOCKET sock = accept(_mother.get(),0,0);
@@ -329,15 +338,36 @@ namespace server
                 int e = getLastNetError();
                 if (e != EINTR)
                 {
-                    throw std::system_error(e, network_category(), "accept failed");
+                    if (!tkn.stop_requested()) {
+                        std::system_error(e, network_category(), "accept failed");
+                    }
                 }
             }
-            std::thread thr([this, callback, sock]
-                            {
-            Socket socket(sock, {});
-            while (process_request(socket, callback)); });
-            thr.detach();
+
+            std::thread thr([this, callback, sock, tkn] {
+
+                std::stop_callback stpcb(tkn,[sock]{
+                    shutdown(sock, SHUT_RD);
+                });
+
+                Socket socket(sock, {});
+                _threads.fetch_add(1,std::memory_order_relaxed);
+                
+                while (!tkn.stop_requested() && process_request(socket, callback)); 
+
+                if (_threads.fetch_sub(1,std::memory_order_relaxed) == 1) {
+                    _threads.notify_all();
+                }
+            });
+            thr.detach();            
         }
+
+        unsigned int tcount = _threads.load(std::memory_order_relaxed);
+        while (tcount) {
+            _threads.wait(tcount);
+            tcount = _threads.load(std::memory_order_relaxed);
+        }
+
     }
 
     void HandleDeleter::operator()(SocketType fd)
@@ -506,4 +536,5 @@ namespace server
             } });
         }
     */
+
 }

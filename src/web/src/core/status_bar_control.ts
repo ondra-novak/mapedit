@@ -17,6 +17,7 @@ class StatusBar {
     cur_map = ref<MapFile>();
 
     stack: [SaveFn|null, RevertFn|null, boolean][] =  [];
+    onFinalSave = ()=>{this.onFinalSaveImpl()};
 
 
     registerSaveAndRevert (saveFn: SaveFn, revertFn: RevertFn): void  {
@@ -27,7 +28,7 @@ class StatusBar {
     setChangedFlag(flag: boolean): void {
         this.changed.value = flag
     }
-    onFinalSave (): void {
+    protected onFinalSaveImpl (): void {
         if (this.fnSave.value && this.changed.value) {
             this.fnSave.value();
         }

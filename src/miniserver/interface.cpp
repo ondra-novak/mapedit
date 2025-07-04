@@ -9,21 +9,37 @@
 
 namespace server {
 
-Server::Handler WebInterface::get_handler() {
+WebInterface::WebInterface(Config cfg, std::stop_source stp)
+    :_game(cfg.game_folder/u8"SKELDAL.DDL")
+    ,_app_dir(cfg.app_dir)
+    ,_assets_dir(cfg.asset_dir)
+    ,_user_dir(cfg.user_folder)
+    ,_stop(std::move(stp))
+    ,_check_active(cfg.check_active)    
+    ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
+{
+
+}
+
+
+
+std::function<bool( BasicRequest &)> WebInterface::get_handler() {
 
 
 
 constexpr Endpoint<WebInterface> endpoints[] = {
-    {Method::GET, "/api/ddl", &WebInterface::all_ddl_list},
-    {Method::GET, "/api/ddl/{}", &WebInterface::ddl_list},
     {Method::GET, "/api/ddl/{}/mgf/{}", &WebInterface::ddl_mpg_get},
     {Method::POST, "/api/ddl/{}/mgf", &WebInterface::ddl_mpg_create},
     {Method::GET, "/api/ddl/{}/{}", &WebInterface::ddl_get},
     {Method::PUT, "/api/ddl/{}/{}", &WebInterface::ddl_put},
     {Method::DELETE, "/api/ddl/{}/{}", &WebInterface::ddl_delete},
     {Method::POST, "/api/ddl/{}/compact", &WebInterface::ddl_compact},
+    {Method::GET, "/api/ddl/{}", &WebInterface::ddl_list},
+    {Method::GET, "/api/ddl", &WebInterface::all_ddl_list},
     {Method::POST, "/api/control", &WebInterface::control},
     {Method::GET, "/api/keepalive", &WebInterface::keep_alive},
+    {Method::GET, "/api/config", &WebInterface::config_get},
+    {Method::PUT, "/api/config", &WebInterface::config_put},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
     {Method::GET, "/command", &WebInterface::command},
@@ -126,9 +142,9 @@ bool WebInterface::all_ddl_list(Request &req)
         }
         ++iter;
     }
-    req.response({200,{}},{},json::value(result.begin(), result.end()));
-    return true;
+    return req.response({200,{}},{},json::value(result.begin(), result.end()));
 }
+    
 
 bool WebInterface::ddl_list(Request &req)
 {
@@ -215,7 +231,7 @@ bool WebInterface::ddl_put(Request &req)
     uint32_t group =0;
     auto iter = std::find_if(req.query.begin(), req.query.end(), [](const auto &kv){return kv.first == "group";});
     if (iter != req.query.end()) group = static_cast<uint32_t>(std::stoul(iter->second));
-    user.put(req.path_vars[0], req.body,group);
+    user.put(req.path_vars[1], req.body,group);
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -224,7 +240,7 @@ bool WebInterface::ddl_delete(Request &req)
     std::lock_guard _(_mx);
     auto user = getUserDDL(req.path_vars[0]);
     if (req.path_vars[1].empty()) return false;
-    user.erase(req.path_vars[0]);
+    user.erase(req.path_vars[1]);
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -254,17 +270,6 @@ bool WebInterface::ddl_mpg_get(Request &req)
         {"Content-Type","application/octet-stream"}
             },std::string_view(reinterpret_cast<const char *>(stream.data()), stream.size()));
    
-}
-
-WebInterface::WebInterface(Config cfg)
-    :_game(cfg.game_folder/u8"SKELDAL.DDL")
-    ,_app_dir(cfg.app_dir)
-    ,_assets_dir(cfg.asset_dir)
-    ,_user_dir(cfg.user_folder)
-    ,_check_active(cfg.check_active)
-    ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
-{
-
 }
 
 
@@ -334,6 +339,35 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
     return false;
 }
 
+bool WebInterface::config_get(Request &req)
+{
+    std::ifstream cfgdata(_user_dir/".config", std::ios::in);
+    json::value cfgjson;
+    if (!cfgdata) {
+        cfgjson = json::type::null;
+    } else {
+        std::string content((std::istreambuf_iterator<char>(cfgdata)), std::istreambuf_iterator<char>());
+        cfgjson = json::value::from_json(content);
+    }
+    return req.response({200,{}},{},cfgjson);    
+}
+
+bool WebInterface::config_put(Request &req)
+{
+    try {
+        auto json = json::value::from_json(req.body);
+        std::ofstream cfgdata(_user_dir/".config", std::ios::out|std::ios::trunc);
+        if (!cfgdata) {
+            return req.response({500,"Internal error: Can't write config"},{},"");
+        }
+        std::string jsonstr = json.to_json();
+        cfgdata.write(jsonstr.data(), jsonstr.size());
+        return req.response({202,"Accepted"},{},"");
+    } catch (std::exception &e) {
+        return req.response({400,{}},{{"Content-Type","text/plain;charset=utf-8"}}, e.what());
+    }
+}
+
 bool WebInterface::keep_alive(Request &req)
 {
     std::size_t stream_count;
@@ -341,11 +375,12 @@ bool WebInterface::keep_alive(Request &req)
         std::lock_guard _(_stream_mx);
         stream_count = _streams.size();
     }
-    req.response({200,{}},{},json::value({
-        {"keepalive_interval",std::chrono::duration_cast<std::chrono::milliseconds>(keepalive_interval).count()},
+    if (!req.response({200,{}},{},json::value({
+        {"keepalive_interval",std::chrono::duration_cast<std::chrono::milliseconds>(keepalive_interval).count()*9/10},
         {"game_instances",stream_count},
         {"exit_on_close", _check_active}
-    }));
+    }))) return false;
+    _last_seen = true;
     return true;
 }
 
@@ -355,9 +390,10 @@ bool WebInterface::command(Request &req)
     if (req.response({200,"OK"},{{"Content-Type","text/event-stream"}}, s)) {
         std::lock_guard _(_stream_mx);
         _streams.push_back(std::move(s));
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 void  WebInterface::broadcast(std::string_view data) {
@@ -374,7 +410,7 @@ DDLManager WebInterface::getUserDDL(const std::string &name) const
         if (!((c >= '0' && c <= '9')
               || (c >= 'A' && c <='Z')
               || (c >= 'a' && c <='z')
-              || (c == '_' || c == '-'))) throw std::runtime_error("DDL Archive name validation failed (unsupported characters)");
+              || (c == '_' || c == '-' || c =='.'))) throw std::runtime_error("DDL Archive name validation failed (unsupported characters)");
     }
     return DDLManager(_user_dir/name);
 }
@@ -389,8 +425,7 @@ bool WebInterface::control(Request &req)
         broadcast(buff);
     }
     broadcast("\r\n");
-    req.response({202,"Accepted"},{},"");
-    return true;
+    return req.response({202,"Accepted"},{},"");
 }
 void WebInterface::basic_timer_worker(std::stop_token stp)
 {
@@ -408,6 +443,10 @@ void WebInterface::basic_timer_worker(std::stop_token stp)
 void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
-    broadcast("\r\n\r\n");
-}
+    broadcast("\r\n\r\n");    
+    if (_last_seen) {
+        _last_seen = false;
+    } else if (_check_active)
+        _stop.request_stop();       
+    }
 }

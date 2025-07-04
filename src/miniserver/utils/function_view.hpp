@@ -20,7 +20,7 @@ public:
     }
 
     template<typename Fn>
-    requires(std::is_invocable_r_v<RetVal, Fn, Args...>)
+    requires(std::is_invocable_r_v<RetVal, Fn, Args...> )
     FunctionViewImpl(Fn &&fn) {
         _context = &fn;
         _callptr = [](const void *ctx, Args && ...  args) {

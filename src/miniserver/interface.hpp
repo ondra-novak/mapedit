@@ -18,9 +18,9 @@ public:
 
     static constexpr auto keepalive_interval = std::chrono::seconds(5);
 
-    WebInterface(Config cfg);
+    WebInterface(Config cfg, std::stop_source stop);
     
-    Server::Handler get_handler();
+    std::function<bool( BasicRequest &)> get_handler();
 
 protected:
     DDLManager _game;
@@ -29,7 +29,9 @@ protected:
     std::filesystem::path _app_dir;
     std::filesystem::path _assets_dir;
     std::filesystem::path _user_dir;
+    std::stop_source _stop;
     bool _check_active = false;
+    bool _last_seen = true;
 
     MGifComp _mgfcomp;
     std::mutex _mgfcomp_mx;
@@ -52,6 +54,8 @@ protected:
     bool ddl_mpg_get(Request &req);
     bool ddl_mpg_create(Request &req);
     bool ddl_mpg_session_put(Request &req);
+    bool config_get(Request &req);
+    bool config_put(Request &req);
     bool keep_alive(Request &req);
 
     bool command(Request &req);

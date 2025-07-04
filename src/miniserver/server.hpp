@@ -3,11 +3,11 @@
 #include "utils/http_utils.hpp"
 #include "utils/function_view.hpp"
 #include "utils/unique_handle.hpp"
+#include <queue>
+#include <future>
 #include <json/value.h>
 #include <vector>
-#include <variant>
 #include <utility>
-#include <functional>
 #include <span>
 
 
@@ -103,12 +103,12 @@ namespace server {
 
         bool is_complete() const {return _ctx?_ctx->complete:false;}
 
-        bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const char *body) {return this->operator()(code, hdr, std::string_view(body));}
-        bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const std::string &body) {return this->operator()(code, hdr, std::string_view(body));}
-        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::string_view body);
-        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::size_t sz, function_view<std::string_view()> body_gen);
-        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, const json::value &json);
-        bool operator()(StatusCode code, std::initializer_list<HeaderRow>, Stream &stream);        
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const char *body) {return this->operator()(code, hdr, std::string_view(body));}
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const std::string &body) {return this->operator()(code, hdr, std::string_view(body));}
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::string_view body);
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::size_t sz, function_view<std::string_view()> body_gen);
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, const json::value &json);
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, Stream &stream);        
 
         Socket release_socket() {
             if (_ctx) {
@@ -143,18 +143,18 @@ namespace server {
     class Server {
     public:
 
-        using Handler =  std::function<void(BasicRequest &)>;
+        using Handler = function_view<bool(BasicRequest &)>;
 
         Server(std::string address_port);
-        void listen(Handler callback);
+        void serve( Handler callback, std::stop_token tkn);        
         std::string get_listen_addr() const;
 
     protected:
 
-
         Socket _mother;
+        std::atomic<unsigned int> _threads;
 
-        bool process_request(Socket & socket,const Handler &handler);
+        bool process_request(Socket & socket,const Handler &handler) noexcept;
         template<typename Fn>
         bool parse_header(std::string_view data,Socket socket, Fn &&fn)  ;
         bool post_handler(BasicRequest &req, Socket &s);

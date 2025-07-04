@@ -1,16 +1,25 @@
 <script setup lang="ts">
 
-import { type DDLEntry, server } from "@/core/api";
+import { Config, type DDLEntry, server } from "@/core/api";
 import StatusBar from "@/core/status_bar_control";
-import { nextTick, onMounted, ref, watch } from "vue";
+import { messageBoxAlert } from "@/utils/messageBox";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 
 const vis = StatusBar.visible;
 const en = StatusBar.enabled;
 const conf = ref<boolean>(false);
 const current_ddl = ref(server.get_current_ddl());
+const connected = ref(true);
+const cur_map = StatusBar.cur_map_name;
+const game_connected = ref(0);
 
 const list_of_projects = ref<DDLEntry[]>();
 const new_project_name = ref<string>("");
+const focused_element = ref<HTMLInputElement>();
+const router = useRouter();
+const config = ref<Config>(new Config());
+
 
 
 
@@ -41,19 +50,101 @@ function selectProject() {
     });
 }
 
-function init() {
-    if (!current_ddl.value) {
-        selectProject();
+
+function check_connection() {
+    if (connected.value) {
+        messageBoxAlert("Connection to backend, everything is ok");
+    } else {
+        messageBoxAlert("Connection is lost, backend has been closed or crashed");
     }
 }
 
+
+async function watch_server_status() {
+    while (true) {
+        connected.value = await server.connect_change_event.listen();
+    }
+}
+
+
+async function watch_game_status() {
+    while (true) {
+        game_connected.value = await server.gameconnect_event.listen();
+
+    }
+}
+
+function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (vis.value && en.value) {
+        event.preventDefault()
+        // Některé prohlížeče vyžadují nastavit returnValue
+        event.returnValue = ''
+      }
+}
+
+
+async function init() {
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    watch_server_status();
+    watch_game_status();
+    config.value = await server.get_config();
+    if (!config.value.project) {
+        selectProject();
+    } else {
+        server.set_current_ddl(config.value.project);
+        current_ddl.value = config.value.project;
+    }
+    
+}
+
 onMounted(init);
+onBeforeUnmount(()=>{
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+});
+
+watch(focused_element,()=>{
+    nextTick(()=>{
+        if (focused_element.value) {focused_element.value.focus();}
+    });
+})
+
+async function open_project(name:string) {
+    if (!name.endsWith(".ddl")) name = name+".ddl";
+    console.log(name);
+    new_project_name.value = "";
+    server.set_current_ddl(name);
+    config.value.project = name;
+    current_ddl.value = name;
+    await server.put_config(config.value);
+    list_of_projects.value = undefined;    
+    router.push("/");
+}
+
+function open_project_enter(event:Event) {
+    var e = event as KeyboardEvent;
+    if (e.key === "Enter" && new_project_name.value) {
+        // Only process if not already handled by default
+        if (!e.defaultPrevented) {
+            e.preventDefault();
+            open_project(new_project_name.value);
+        }
+    }
+}
+
+
 
 </script>
 <template>
     <div class="bar">
         <div class="left">
-
+            <div class="indicator" :class="{connected: connected}" @click="check_connection"></div>
+            <div @click="selectProject"> {{ current_ddl }}</div>
+            <div> {{ cur_map }}</div>
+            <div><button v-if="game_connected == 0">Start game client</button>
+                 <span v-if="game_connected > 0"> Game client running: {{ game_connected }}</span>        
+            </div>            
+            <div v-if="game_connected > 0"><button>Restart</button></div>
+            <div v-if="game_connected > 0"><button>Teleport to sector</button></div>
         </div>
         <div class="right">
             <button v-if="vis" :disabled="!en" @click="show_confirm">Revert</button>
@@ -64,12 +155,15 @@ onMounted(init);
         </div>
     </div>
     <div v-if="list_of_projects !== undefined" class="select-project-popup">
+        <datalist id="statusBar216840"><option v-for="v of list_of_projects" :key="v.name" :value="v.name"></option></datalist>
         <div>
+            <div class="title">Open or create new project</div>
+            <button v-if="current_ddl" class="close" @click="list_of_projects = undefined"></button>
             <div class="srl">
                 <div class="row hdr">
                     <div>Name</div><div>Size</div><div>Last edited</div>                
                 </div>
-                <div class="row dta" v-for="v of list_of_projects!" :key="v.name">
+                <div class="row dta" v-for="v of list_of_projects!" :key="v.name" @click="open_project(v.name)">
                     <div>{{ v.name }}</div>
                     <div>{{ v.size }}</div>
                     <div>{{ v.last_write.toLocaleString() }}</div>
@@ -77,8 +171,17 @@ onMounted(init);
             </div>
             <div class="nw">
                 <span>Create new adventure</span>
-                <input type="text" v-model="new_project_name">
-                <button>Create</button>
+                <input type="text" v-model="new_project_name" ref="focused_element" list="statusBar216840" @keydown="$event=>open_project_enter($event)">
+                <button @click="open_project(new_project_name)">Open / Create</button> 
+            </div>
+        </div>
+    </div>
+    <div v-if="!connected" class="select-project-popup">
+        <div>
+            <div>
+            <p>Lost connection to backend! It probably exited or crashed</p>            
+            <p>Your changes cannot be saved</p>
+            <p>You can close this page</p>
             </div>
         </div>
     </div>
@@ -124,8 +227,12 @@ onMounted(init);
     background-color: #ddd;
     width: 60%;
     min-width: 30rem;
-    padding: 1rem;
+    padding: 1rem ;
     margin: auto;
+    box-shadow: 3px 3px 5px black;
+}
+.select-project-popup .title {
+    margin-bottom: 0.5rem;    
 }
 
 .select-project-popup .srl {
@@ -180,6 +287,52 @@ onMounted(init);
 }
 .select-project-popup .nw input {
     flex-grow: 1;
+}
+.left {
+    display:flex;
+    gap: 0.5rem;
+    align-items: stretch;
+    height: 2rem;
+    
+}
+
+.left > .indicator {
+    border-right: none;
+}
+.left > .indicator::before {
+    content: "";
+    display: inline-block;
+    width: 1.5rem;
+    height: 1.5rem;    
+    background-color: red;
+    border-radius: 1.5rem;
+    vertical-align: middle;
+}
+
+.left > .indicator.connected::before {
+    background-color: green;
+}
+
+.left > * {
+    border-right: 1px solid;
+    background-color: #ccc;
+    line-height: 2rem;
+    padding: 0 0.5rem;
+}
+
+.left > *:nth-child(1),.left > *:nth-child(2),.left > *:nth-child(3) {
+    cursor: pointer;
+}
+.left > *:nth-child(2):hover,.left > *:nth-child(3):hover {
+    cursor: pointer;;
+    background-color: white;
+}
+
+.left > *:nth-child(2)::before {
+    content: "Project: ";
+}
+.left > *:nth-child(3)::before {
+    content: "Map: ";
 }
 
 

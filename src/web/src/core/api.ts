@@ -44,23 +44,24 @@ interface ArrayBufferWithBuffer extends ArrayBuffer {
     buffer: ArrayBuffer;
 }
 
+export class Config {
+    project = "";    
+}
+
 export class ApiClient {
 
     current_ddl: string = "";
-    disconnect_event = new Distributor<unknown>();
+    connect_change_event = new Distributor<boolean>();
     ddlchange_event = new Distributor<string>();
     gameconnect_event = new Distributor<number>();
     status: KeepAliveStatus = {exit_on_close:true, game_instances:0,keepalive_interval:5000};
-
+    connected: boolean = false;
 
     constructor() {
-        const v = localStorage.getItem("current_ddl");
-        if (v) this.set_current_ddl(v);
         this.start_keepalive();
     }
 
     set_current_ddl(s:string) {
-        localStorage.setItem("current_ddl", s);
         const n = encodeURIComponent(s);
         if (n != this.current_ddl) {
             this.current_ddl = n;
@@ -68,8 +69,14 @@ export class ApiClient {
         }
     }
 
+    get_last_status() {return this.status;}
 
     get_current_ddl() :string {return decodeURIComponent(this.current_ddl);}
+
+    protected async handle_error(response:Response, message: string) {
+            const text = await response.text(); // Může obsahovat chybovou hlášku
+            throw new Error(`${message}. Status: ${response.status}. Message: ${text}`);
+    }
 
     // DDL
     async getDDLFiles(group: number|null, source: string|null): Promise<DDLFiles> {
@@ -89,7 +96,7 @@ export class ApiClient {
     }
 
     async getDDLFile(id: string): Promise<ArrayBuffer> {
-        const response = await fetch(`api/ddl/${this.current_ddl}/{$this.${encodeURIComponent(id)}`);
+        const response = await fetch(`api/ddl/${this.current_ddl}/${encodeURIComponent(id)}`);
         if (response.ok) {
             const n = ((await response.bytes()).buffer);
             return n
@@ -115,8 +122,6 @@ export class ApiClient {
             body: data
         });
        if (response.status !== 202) {
-            const text = await response.text(); // Může obsahovat chybovou hlášku
-            throw new Error(`Failed to upload file. Status: ${response.status}. Message: ${text}`);
        }
     }    
 
@@ -125,8 +130,7 @@ export class ApiClient {
             method: "DELETE"
         });
        if (response.status !== 202) {
-            const text = await response.text(); // Může obsahovat chybovou hlášku
-            throw new Error(`Failed to upload file. Status: ${response.status}. Message: ${text}`);
+            await this.handle_error(response, "Failed to upload file.")
        }
     }
 
@@ -135,9 +139,8 @@ export class ApiClient {
             method: "POST"
         });
         if (response.status !== 202) {
-            const text = await response.text(); // Může obsahovat chybovou hlášku
-            throw new Error(`Compact failed. Status: ${response.status}. Message: ${text}`);
-       }
+            await this.handle_error(response, "Compact failed.")
+        }
     }
 
     async mgfCreate(name: string, group: number, frames:number, transparent: boolean): Promise<string> {
@@ -154,8 +157,7 @@ export class ApiClient {
             }
         });
         if (response.status !== 201) {
-            const text = await response.text();
-            throw new Error(`mgfCreate failed. Status: ${response.status}. Message: ${text}`);
+            await this.handle_error(response, "mfgCreate failed.")
         }
         return await response.text()
     }
@@ -169,8 +171,7 @@ export class ApiClient {
             }
         });
         if (response.status !== 202) {
-            const text = await response.text();
-            throw new Error(`mgfPutImage failed. Status: ${response.status}. Message: ${text}`);
+            await this.handle_error(response, "mfgPutImage failed.")
         }
         return await response.json();
     }
@@ -180,8 +181,7 @@ export class ApiClient {
             method: "PUT",
         });
         if (response.status !== 201) {
-            const text = await response.text();
-            throw new Error(`mgfPutImage failed. Status: ${response.status}. Message: ${text}`);
+            await this.handle_error(response, "mfgClose failed.")
         }
         return await response.text();
     } 
@@ -193,8 +193,7 @@ export class ApiClient {
     async listAllDDLs() : Promise<DDLEntry[]> {
         const response   = await fetch("api/ddl") ;
         if (response.status != 200) {
-            const text = await response.text();
-            throw new Error(`listAllDDLs failed. Status: ${response.status}. Message: ${text}`);
+            await this.handle_error(response, "List ddl failed.")
         }
         return ((await response.json()) as Record<string, any>[]).map(x=>({
             name: x.name,
@@ -206,8 +205,7 @@ export class ApiClient {
     async keepalive() : Promise<KeepAliveStatus> {
         const response = await fetch("api/keepalive");
         if (response.status != 200) {
-            const text = await response.text();
-            throw new Error(`Keepalive failed. Status ${response.status}. Message: ${text}`);
+            await this.handle_error(response, "Keep alive failed.")
         }
         return await response.json();
     }
@@ -219,12 +217,40 @@ export class ApiClient {
                 this.gameconnect_event.trigger(st.game_instances);
             }
             this.status = st;
+            if (!this.connected) {
+                this.connect_change_event.trigger(true)
+                this.connected = true;
+            }
         } catch (e) {
-            if (this.status.exit_on_close) {
-                this.disconnect_event.trigger(e);
+            if (this.connected) {
+                this.connect_change_event.trigger(false);
+                this.connected = false;
             }
         }
         setTimeout(()=>this.start_keepalive(), this.status.keepalive_interval);
+    }
+
+    async get_config() : Promise<Config>{
+        const response = await fetch("api/config");
+        if (response.status != 200) {
+            await this.handle_error(response, "get_config failed")
+        }
+        const r =await response.json();
+        if (!r) return new Config();
+        else return r;
+    }
+
+    async put_config(conf: Config): Promise<void> {
+        const response = await fetch("api/config",{
+            "method":"PUT",
+            "headers": {
+                "Content-Type":"application/json"
+            },
+            "body":JSON.stringify(conf)
+        });
+        if (response.status != 202) {
+               await this.handle_error(response, "put_config failed")
+        }
     }
 
 }

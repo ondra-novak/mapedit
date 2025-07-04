@@ -74,7 +74,7 @@ namespace server {
 
     template<typename Interface, unsigned int N>
     auto create_basic_handler(Interface *ptr, const Endpoint<Interface> (&list)[N]) {
-        return [list,ptr](BasicRequest &breq) {
+        return [list,ptr](BasicRequest &breq) -> bool {
             auto fmethod = std::find_if(std::begin(method_map),std::end(method_map),[&](const auto &x){return breq.method == utils::HeaderKey(x.first);});
             Request req{std::move(breq),{},{},{}};
             if (fmethod == std::end(method_map)) req.method = Method::unknown; else req.method = fmethod->second;
