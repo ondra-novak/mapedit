@@ -342,6 +342,12 @@ class TMA_GEN extends WithSchema {
         action: "uint8",
         flags: "uint16",    
     }};;
+
+    getAction() {return this.action & 0x3F;}
+    getCancel() {return this.action & 0x40;}
+    getOnce() {return this.action & 0x80;}
+    
+
 };
 
 class TMA_SOUND extends TMA_GEN {
@@ -383,7 +389,7 @@ class TMA_TEXT extends TMA_GEN{
     }};
 }
 
-class TMA_SEND_ACTION extends TMA_GEN {
+export class TMA_SEND_ACTION extends TMA_GEN {
 
     change_bits:number= 0;
     sector:number= 0;
@@ -625,6 +631,48 @@ const action_to_schema = [
    TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_IFSEC,TMA_TWOP
 ]
 
+export const ActionType = {
+    GEN: 0,
+    SOUND: 1,
+    TEXTG: 2,
+    TEXTL: 3,
+    SENDA: 4,
+    FIREB: 5,
+    DESTI: 6,
+    LOADL: 7,
+    DROPI: 8,
+    DIALG: 9,
+    SSHOP: 10,
+    CLOCK: 11,
+    CACTN: 12,
+    LOCK:  13,
+    SWAPS: 14,
+    WOUND: 15,
+    IFJMP: 16,
+    CALLS: 17,
+    HAVIT: 18,
+    STORY: 19,
+    IFACT: 20,
+    SNDEX: 21,
+    MOVEG: 22,
+    PLAYA: 23,
+    CREAT: 24,
+    ISFLG: 25,
+    CHFLG: 26,
+    CUNIQ: 27,
+    MONEY: 28,
+    GUNIQ: 29,
+    PICKI: 30,
+    WBOOK: 31,
+    RANDJ: 32,
+    ENDGM: 33,
+    GOMOB: 34,
+    SHRMA: 35,
+    MUSIC: 36,
+    GLOBE: 37,  //global events
+    IFSEC: 38,	 //if sector num
+    IFSTP: 39,  //if sector type
+}
 
 function parseActions(iter:BinaryIterator) : TMA_GEN[][] {
     const ret:TMA_GEN[][] = [];
@@ -1084,6 +1132,7 @@ export class MapFile {
             nw.target_sector = s.target_sector;
             nw.target_side = s.target_side;
             nw.x = ml.x;
+            nw.type = s.type;
             nw.y = ml.y;
             nw.level = ml.layer;
             nw.exit = s.exit.slice();            

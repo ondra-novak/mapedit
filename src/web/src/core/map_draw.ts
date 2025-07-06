@@ -1,0 +1,745 @@
+import { SVGDrawing, SVGPath, SvgTextGroupBuilder, Transform2D } from "@/utils/svg";
+import { ActionType, SectorType, SideFlag, TMA_SEND_ACTION, type MapFile } from "./map_structs";
+import type { ParsedBuildCommand } from "typescript";
+import Distributor from "./distributor";
+
+
+
+
+
+
+export class MapDraw {
+
+    svg ?: SVGSVGElement;
+    selection: SVGElement | null = null;
+    rect_selction: SVGElement | null = null;
+    focus: SVGElement | null = null;
+    scale = 24;
+    dim?: {width:number,height:number};
+    layout: Record<string, number> = {};
+
+
+    draw(m: MapFile, level: number) : SVGElement{
+
+        const c = new SVGDrawing(this.svg);
+        c.clear();
+        this.layout = {};
+
+        const set = {
+            sector:{
+                normal: new SVGPath("sector normal"),
+                lava: new SVGPath("sector lava"),
+                acid: new SVGPath("sector normal"),
+                water: new SVGPath("sector water"),                
+                stairs: new SVGPath("sectorfeat stairs"),
+            },
+            sectorfeats :{
+                flute_arrow: new SVGPath("sectorfeat flute"),
+                pit: new SVGPath("sectorfeat pit"),
+                column: new SVGPath("sectorfeat column"),
+                button: new SVGPath("sectorfeat button"),
+                buttonPressed: new SVGPath("sectorfeat button pressed "),
+                death: new SVGPath("sectorfeat death"),
+                ship: new SVGPath("sectorfeat ship"),
+                lvplace: new SVGPath("sectorfeat lvplace"),
+                teleport: new SVGPath("sectorfeat teleport"),
+            },
+            walls :{
+                sound_impassable: new SVGPath("wall sound_impassable"), //sound can't pass (other can)
+                sound_alarm: new SVGPath("wall alarm"),
+                solid:  new SVGPath("wall solid"), //solid wall, but sector connected
+                passable: new SVGPath("wall passable"), //solid wall, but passable for player
+                pc_impassable: new SVGPath("wall impassable"),  //hidden wall, impassable for player
+                enemy_only_passable: new SVGPath("wall enemy_only_passable"), //player cannot pass, but enemy can
+                edge:  new SVGPath("wall edge"),  //edge wall - no sector behind
+                secret: new SVGPath("wall secret"), //solid wall, but passable for player, market as secret
+                niche: new SVGPath("wall niche")
+            },
+            arcs: {
+                arc: new SVGPath("arc"),
+            },
+            action :{
+                wall: new SVGPath("action wall"),
+                script: new SVGPath("action script"),                
+                button: new SVGPath("action button"),                
+            },
+            arrow :{
+                same: new SVGPath("arrow same"),
+                to_other:  new SVGPath("arrow out"),
+                from_other: new SVGPath("arrow in"),
+            },
+            enemies: {
+                placed: new SVGPath("enemy placed"),
+                areas: new SVGPath("enemy impassable"), //enemy can't pass
+                directions: new SVGPath("enemy direction"),
+            },
+            items: {
+                placed: new SVGPath("items placed")
+            }
+        }
+        
+
+        const bbox = {left:0,top:0,right:0,bottom: 0};
+
+        const scl = this.scale;
+        const sclp = scl>>1;
+
+
+        m.sectors.forEach((s,sector)=>{
+            if (sector == 0 || s.type == SectorType.Empty) return;
+            const x = s.x*scl;
+            const y = s.y*scl;
+
+            if (s.level != level) {
+                if (s.action && s.target_sector && m.sectors[s.target_sector].level == level) {
+                    const ts = m.sectors[s.target_sector];
+                    const mx = this.transformByDir(ts.x, ts.y, s.target_side);
+                    if (mx) this.drawActionFromSector(set.arrow.from_other, x,y, mx);
+                }
+                s.side.forEach((sd,dir)=>{
+                    const mx = this.transformByDir(x,y, dir);
+                    if (!mx) return;
+                    if (sd.target_sector) {
+                        if (m.sectors[sd.target_sector].level == level) {
+                            const ts = m.sectors[sd.target_sector];
+                            const smx = this.transformByDir(ts.x, ts.y, s.target_side);
+                            if (smx) {
+                                this.drawActionFromWall(set.arrow.from_other,smx,mx);
+                            }
+                        }
+                    }
+                    if (sd.actions) {
+                        sd.actions.forEach(ma=>{
+                            if (ma.getAction() == ActionType.SENDA) {
+                                const senda = ma as TMA_SEND_ACTION;
+                                if (senda.sector && m.sectors[senda.sector].level == level) {
+                                    const ts = m.sectors[senda.sector];
+                                    const smx = this.transformByDir(ts.x, ts.y, s.target_side);
+                                    if (smx) {
+                                        this.drawActionFromWall(set.arrow.from_other,smx,mx);
+                                    }                                    
+                                }
+                            }
+                        })
+                    }
+
+                });
+                return;
+            }
+
+            if (x < bbox.left) bbox.left = x;
+            if (x > bbox.right) bbox.right = x;
+            if (y < bbox.top) bbox.top = y;
+            if (y > bbox.bottom) bbox.bottom = y;
+
+            this.layout[`${s.x},${s.y}`] = sector;
+
+            let bgr = null;
+            switch (s.type) {
+                case SectorType.Empty: return;
+                case SectorType.Acid: bgr = set.sector.acid;break;
+                case SectorType.Button: bgr = set.sector.normal;
+                                        set.sectorfeats.button.rctc(x,y,sclp, sclp);
+                                        break;
+                case SectorType.ButtonPressed:bgr = set.sector.normal;
+                                        set.sectorfeats.buttonPressed.rctc(x,y,sclp, sclp);
+                                        break;
+                case SectorType.Column:bgr = set.sector.normal;
+                                        set.sectorfeats.column.mt(x,y).circle(sclp>>1);
+                                        break;
+                case SectorType.DeathColumn:bgr = set.sector.normal;
+                                        set.sectorfeats.death.rctc(x,y,sclp, sclp,45);
+                                        break;
+                case SectorType.DirectEnemyEast:
+                                        bgr = set.sector.normal;this.drawArrow(set.enemies.directions,s.x,s.y,1);
+                                        break;
+                case SectorType.DirectEnemyNorth:
+                                        bgr = set.sector.normal;this.drawArrow(set.enemies.directions,s.x,s.y,0);
+                                        break;
+                case SectorType.DirectEnemySouth:
+                                        bgr = set.sector.normal;this.drawArrow(set.enemies.directions,s.x,s.y,2);
+                                        break;
+                case SectorType.DirectEnemyWest:
+                                        bgr = set.sector.normal;this.drawArrow(set.enemies.directions,s.x,s.y,3);
+                                        break;
+                case SectorType.FluteEast:
+                                        bgr = set.sector.normal;this.drawArrow(set.sectorfeats.flute_arrow,s.x,s.y,1);
+                                        break;
+                case SectorType.FluteNorth:
+                                        bgr = set.sector.normal;this.drawArrow(set.sectorfeats.flute_arrow,s.x,s.y,0);
+                                        break;
+                case SectorType.FluteSouth:
+                                        bgr = set.sector.normal;this.drawArrow(set.sectorfeats.flute_arrow,s.x,s.y,2);
+                                        break;
+                case SectorType.FluteWest:
+                                        bgr = set.sector.normal;this.drawArrow(set.sectorfeats.flute_arrow,s.x,s.y,3);
+                                        break;
+                case SectorType.Lava:   bgr = set.sector.lava;break;
+                case SectorType.LeavePlace: bgr=set.sector.normal;
+                                        set.sectorfeats.lvplace.mt(x,y).circle(scl/3);
+                                        break;
+                case SectorType.Normal: bgr = set.sector.normal;break;
+                case SectorType.Pit:    bgr=set.sector.normal;
+                                        set.sectorfeats.pit.mt(x,y).circle(scl/3);
+                case SectorType.Ship:   bgr = set.sector.water; 
+                                        this.drawShip(set.sectorfeats.ship, x,y);
+                                        break;
+                case SectorType.Stairs: bgr = set.sector.normal;
+                                        this.drawStairs(set.sector.stairs, x, y);
+                                        break;
+                case SectorType.Teleport: bgr = set.sector.normal;
+                                        this.drawTeleport(set.sectorfeats.teleport, x, y);
+                                        break;
+                case SectorType.Water: bgr = set.sector.water;break;
+                case SectorType.Whirpool: bgr = set.sector.water;break;
+                                        set.sectorfeats.death.rctc(x,y,scl*0.5, scl*0.5,45);
+                                        break;
+                default: bgr = set.sector.normal;                
+            }
+            bgr.rctc(x,y,scl,scl);
+            if (s.enemy) {
+                this.drawArrow(set.enemies.placed, s.x, s.y, s.enemy.direction);
+            }
+            if (s.target_sector) {
+                set.action.button.rctc(x,y,scl*0.25,scl*0.25,0);                
+                if (s.target_sector != sector) {
+                    const ts = m.sectors[s.target_sector];
+                    const tmx = this.transformByDir(ts.x, ts.y, s.target_side);
+                    if (tmx) {
+                        this.drawActionFromSector(ts.level == level?set.arrow.same:set.arrow.to_other,s.x,s.y,tmx);
+                    }
+                }
+            }
+            s.exit.forEach((ex, dir)=> {
+                const mx = this.transformByDir(s.x,s.y, dir);
+                const sd = s.side[dir];
+                const flgs = sd.flags;
+                if (!mx) return;
+                if (!ex) {
+                    this.drawWall(set.walls.edge, mx);
+                } else {
+                    if (sd.primary && (flgs & SideFlag.PRIM_VIS)) {
+                        //primary is visible
+                        if ((flgs & SideFlag.SECRET) || (flgs & SideFlag.TRUESEE)) {
+                            this.drawWall(set.walls.secret,mx);
+                        } else if (!(flgs & SideFlag.PLAY_IMPS)) {
+                            this.drawWall(set.walls.passable, mx);
+                        } else if (!(flgs & SideFlag.MONST_IMPS)) {
+                            this.drawWall(set.walls.enemy_only_passable,mx);
+                        }
+                        this.drawWall(set.walls.solid,mx);                        
+                    } else {
+                        if (flgs & SideFlag.PLAY_IMPS) {
+                            this.drawWall(set.walls.pc_impassable, mx);                            
+                        }
+                        if (flgs & SideFlag.SOUND_IMPS) {
+                            this.drawWall(set.walls.sound_impassable, mx);                            
+                        }
+                        if (flgs &SideFlag.ALARM) {
+                            this.drawWall(set.walls.sound_alarm, mx);
+                        }                        
+                    }
+                }
+                if (sd.target_sector) {
+                    this.drawAction(set.action.wall, mx);
+                    if (sd.target_sector != sector) {
+                        const ts = m.sectors[sd.target_sector];
+                        const tmx = this.transformByDir(ts.x, ts.y, sd.target_side);
+                        if (tmx) {
+                            this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                        }
+                    }
+                }
+                if (sd.actions && sd.actions.length) {
+                    this.drawAction(set.action.script, mx);
+                    sd.actions.forEach(ma=>{
+                        if (ma.getAction() == ActionType.SENDA) {
+                            const senda = ma as TMA_SEND_ACTION;
+                            if (senda.sector != sector && senda.sector) {
+                                const ts = m.sectors[senda.sector];
+                                const tmx = this.transformByDir(ts.x, ts.y, senda.side);
+                                if (tmx) {
+                                    this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                                }                                    
+                            }
+                        }
+                    })
+                }
+                if (sd.items.length) {
+                    this.drawItems(set.items.placed,mx);
+                }
+                if (sd.arc) {
+                    if (flgs & SideFlag.LEFT_ARC) {
+                        this.drawLeftArc(set.arcs.arc, mx);
+                    }
+                    if (flgs & SideFlag.RIGHT_ARC) {
+                        this.drawRightArc(set.arcs.arc, mx);
+                    }
+                }
+                if (sd.niche) {
+                    this.drawNiche(set.walls.niche, mx);
+                }
+            });
+        });
+
+        const drw = new SVGDrawing;
+        Object.values(set).forEach(x=>drw.appendSets(x));
+        const svg = drw.getSvgElement()
+        const w = bbox.right- bbox.left;
+        const h = bbox.bottom - bbox.top;
+        this.dim={width:w,height: h};
+        const x = bbox.left - w;
+        const y = bbox.top - h
+        svg.setAttribute("viewBox", `${x} ${y} ${3*w} ${3*h}`);
+        this.svg = svg;
+        
+        return this.svg;
+    }
+
+    private drawStairs(p:SVGPath, x:number, y:number) {           
+        const figure = [[2,0],[3,0],[3,3],[0,3],[0,2],[1,2],[1,1],[2,1]]
+        const scale = this.scale*0.8/4;
+
+        const mx = new Transform2D([scale,0,0,scale,x-scale*1.5,y-scale*1.5]);
+        figure.forEach((pt, idx)=>{
+            if (idx) p.lt(...mx.xyof(pt[0],pt[1]));
+            else p.mt(...mx.xyof(pt[0],pt[1]));
+        })
+        p.close();
+    }
+
+
+    private drawShip(p:SVGPath, x: number, y:number) {
+        const trup = [[2,10],[14,10],[12,13],[4,13]];
+        const stezen = [[7.5,4],[8.5,4],[8.5,12],[7.5,12]];
+        const plachta = [[8,4],[12,8],[8,8]];
+        const scale = this.scale*0.8/16;
+        const mx = new Transform2D([scale,0,0,scale,x-scale*8,y-scale*8]);
+        [trup,stezen,plachta].forEach(x=>{
+            x.forEach((pt, idx)=>{
+                if (idx) p.lt(...mx.xyof(pt[0],pt[1]));
+                else p.mt(...mx.xyof(pt[0],pt[1]));
+            })
+            p.close();
+        })
+    }
+
+
+    private drawTeleport(p:SVGPath, x:number, y:number) {
+        const figure = [[88.463, 26.181],
+        [106.655, 73.963, 20.582, 103.707, 23.435, 59.721],
+        [26.192, 37.31, 63.482, 29.341, 59.717, 44.827],
+        [9.785, 75.319],
+        [-8.407, 27.537, 77.667, -2.208, 74.814, 41.777],
+        [72.057, 64.19, 34.767, 72.159, 38.531, 56.673]];
+        const scale = this.scale/100;
+        const mx = new Transform2D([scale,0,0,scale,x-scale*50,y-scale*50]);
+        figure.forEach(cmd=>{
+            if (cmd.length == 2) p.mt(...mx.xyof(cmd[0],cmd[1]));
+            else p.bct(...mx.xyof(cmd[0],cmd[1]),...mx.xyof(cmd[2],cmd[3]),...mx.xyof(cmd[4],cmd[5]));
+        })
+    }
+
+    private static drawArrowEx(path: SVGPath, matrix: Transform2D| null) {
+        if (matrix) {
+            path.mt(...matrix.xyof(0.5,0.2))
+                .lt(...matrix.xyof(0.8,0.8))
+                .lt(...matrix.xyof(0.5,0.7))
+                .lt(...matrix.xyof(0.2,0.8))
+                .close();
+        }
+    }
+    
+    private transformByDir(x:number, y:number, dir:number) {
+        const scale =this.scale;
+        x-=0.5;
+        y-=0.5;
+        switch (dir) {
+            case 0:return  new Transform2D([scale,0,0,scale,x*scale,y*scale]);
+            case 1:return  new Transform2D([0,scale,-scale,0,(x+1)*scale,y*scale]);
+            case 2:return  new Transform2D([-scale,0,0,-scale,(x+1)*scale,(y+1)*scale]);
+            case 3:return  new Transform2D([0,-scale,scale,0,x*scale,(y+1)*scale]);
+        }
+        return null;
+    }
+    
+    private drawArrow(path:SVGPath, x:number, y:number, dir:number) {
+        MapDraw.drawArrowEx(path, this.transformByDir(x,y,dir));
+    }
+
+    private drawWall(path: SVGPath, mx: Transform2D) {
+        path.mt(...mx.xyof(0,0)).lt(...mx.xyof(1,0));
+    }
+
+    private drawAction(path: SVGPath, mx: Transform2D) {
+        path.mt(...mx.xyof(0.25,0))
+            .lt(...mx.xyof(0.75,0))
+            .lt(...mx.xyof(0.5,0.25))
+            .close();
+    }
+    private drawItems(path: SVGPath, mx: Transform2D) {
+        if (!mx) return;
+        const [xc,yc] = mx.xyof(0.25,0.25);
+        path.mt(xc,yc).circle(this.scale * 0.2);
+    }
+
+    private drawLeftArc(path: SVGPath, mx: Transform2D) {
+        if (!mx) return;
+        const [xc,yc] = mx.xyof(0,0);
+        const [xd,yd] = mx.xyof(0.2,0);
+        path.mt(xc,yc).lt(xd,yd);
+    }
+    private drawRightArc(path: SVGPath, mx: Transform2D) {
+        const [xc,yc] = mx.xyof(0.8,0);
+        const [xd,yd] = mx.xyof(1,0);
+        path.mt(xc,yc).lt(xd,yd);
+    }
+    private drawNiche(path: SVGPath, mx: Transform2D){
+        path.mt(...mx.xyof(0.25,0))
+            .lt(...mx.xyof(0.25,-0.25))
+            .lt(...mx.xyof(0.75,-0.25))
+            .lt(...mx.xyof(0.75,0))
+            .close();
+    }
+
+    private drawBezierArrow(path: SVGPath, 
+            x1:number, y1:number, x2:number, y2:number, angleStartRad:number, angleEndRad:number, weightStart=0.3, weightEnd=1.0) {
+
+        const scale = this.scale;
+
+        function normalizeAngle(angle:number) {
+            return (angle + 360) % 360;
+        }
+
+        function angleDiff(a1:number, a2:number) {
+            const diff = Math.abs(normalizeAngle(a1) - normalizeAngle(a2));
+            return Math.min(diff, 360 - diff);
+        }
+
+
+        function drawSingleCurve(x1:number, y1:number, x2:number, y2:number, angleStartRad:number, angleEndRad:number, weightStart=0.3, weightEnd=1.0) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const distance = Math.max(scale,Math.hypot(dx, dy));
+
+            const d1 = distance * weightStart;
+            const d2 = distance * weightEnd;
+
+            const radStart = angleStartRad;
+            const radEnd = angleEndRad;
+
+            const cx1 = x1 + d1 * Math.cos(radStart);
+            const cy1 = y1 + d1 * Math.sin(radStart);
+            const cx2 = x2 + d2 * Math.cos(radEnd + Math.PI);
+            const cy2 = y2 + d2 * Math.sin(radEnd + Math.PI);
+
+            path.bct(cx1,cy1,cx2,cy2,x2,y2);
+
+        }
+
+
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const distance = Math.max(scale,Math.hypot(dx, dy));
+
+        const mainAngle = Math.atan2(dy, dx);
+
+        const angleStartNorm = normalizeAngle(angleStartRad);
+        const angleEndNorm = normalizeAngle(angleEndRad);
+        const mainAngleNorm = normalizeAngle(mainAngle);
+
+        const oppAngle = normalizeAngle(mainAngleNorm + 180);
+
+        const isOppositeStart = angleDiff(angleStartNorm, oppAngle) < 15;
+        const isOppositeEnd = angleDiff(angleEndNorm, oppAngle) < 15;
+
+        path.mt(x1,y1);
+
+        if (isOppositeStart && isOppositeEnd) {
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+
+            const rad = (mainAngle + 90);
+            const offset = distance * 0.5;
+            const ctrlX = midX + offset * Math.cos(rad);
+            const ctrlY = midY + offset * Math.sin(rad);
+
+            drawSingleCurve(x1, y1, ctrlX, ctrlY, angleStartRad, mainAngle + 90, weightStart, 0.5);
+            drawSingleCurve(ctrlX, ctrlY, x2, y2, mainAngle + 90, angleEndRad, 0.5, weightEnd);
+        } else {
+            drawSingleCurve(x1, y1, x2, y2, angleStartRad, angleEndRad, weightStart, weightEnd);
+        }
+    }
+
+    private drawArrowOnAction(path: SVGPath, amx:Transform2D) {
+        path.mt(...amx.xyof(0.35,0.5))
+            .lt(...amx.xyof(0.5,0))
+            .lt(...amx.xyof(0.65,0.5))
+            .close();
+    }
+
+    private drawActionFromWall(path: SVGPath, from: Transform2D, to:Transform2D) {
+        const [xf,yf] = from.xyof(0.5,0.05);
+        const [xft,yft] = from.xyof(0.5,0.5);
+        const [xt,yt] = to.xyof(0.5,0.05);
+        const [xtt,ytt] = to.xyof(0.5,0.5);
+
+        const startRad = Math.atan2(yft-yf,xft-xf);
+        const endRad = Math.atan2(yt-ytt, xt-xtt);
+        this.drawBezierArrow(path, xf,yf,xt,yt, startRad,endRad);
+        this.drawArrowOnAction(path, to.rotate(endRad))
+        
+    }
+
+    private drawActionFromSector(path: SVGPath, x:number, y:number, to:Transform2D) {
+        const [xt,yt] = to.xyof(0.5,0.05);
+        const [xtt,ytt] = to.xyof(0.5,0.5);
+        x*=this.scale;
+        y*=this.scale;
+
+        const startRad = Math.atan2(yt-y,xt-x);
+        const endRad = Math.atan2( yt-ytt ,xt-xtt);
+        this.drawBezierArrow(path, x,y,xt,yt, startRad,endRad);
+        this.drawArrowOnAction(path, to.rotate(endRad))
+
+        
+    }
+}
+
+
+export class MapContainer {
+
+
+    map: MapDraw | null = null;
+    container: HTMLElement;
+    scale = 0.5;
+
+    constructor(element: HTMLElement) {
+        this.map = null;
+        this.container = element;
+        this.container.style.position = "relative";
+        this.container.style.overflow = "auto";
+        this.scale = 0.5;
+        this.init_events();
+    }
+
+    get_element() {
+        return this.container;
+    }
+
+    get_map() {
+        return this.map;
+    }
+
+    get_scale() {
+        return this.scale;
+    }
+
+    recalc() {
+        if (!this.map || !this.map.dim) return;
+        const svg = this.map.svg
+        if (!svg) return;
+        const scaled_width = this.map.dim.width*this.scale;
+        const scaled_height = this.map.dim.height*this.scale;
+        const rect = this.container.getBoundingClientRect();
+        const cwidth = rect.right - rect.left;
+        const cheight = rect.bottom - rect.top;        
+        svg.style.position = "absolute";
+        svg.style.width = scaled_width+"px";
+        svg.style.height= scaled_height+"px";
+
+        if (cwidth >= scaled_width) {
+            svg.style.left = ((cwidth-scaled_width)/2)+"px";
+        } else {
+            svg.style.left = "0";
+        }
+        if (cheight >= scaled_height) {
+            svg.style.top = ((cheight-scaled_height)/2)+"px";
+        } else {
+            svg.style.top = "0";
+        }
+    }
+
+    set_map(map: MapDraw) {
+        const to_del = this.container.firstChild;
+        this.map = map;
+        const svg = map.svg;
+        if (svg) this.container.appendChild(svg);
+        if (to_del) this.container.removeChild(to_del);
+        this.recalc();
+    }
+
+    /**
+     * 
+     * @param {number} new_scale 
+     * @param {number} x 
+     * @param {number} y 
+     */
+    set_zoom(new_scale: number, x:number, y:number) {
+        if (new_scale < 0.1) new_scale = 0.1;
+        if (new_scale > 10) new_scale = 10;
+        const prev_zoom = this.scale;
+        this.scale = new_scale;
+
+        const rect = this.container.getBoundingClientRect();
+        const cwidth = rect.right - rect.left;
+        const cheight = rect.bottom - rect.top;
+
+        // Calculate scroll offset to keep (x, y) at the same place after zoom
+        const scrollLeft = this.container.scrollLeft;
+        const scrollTop = this.container.scrollTop;
+
+        const relX = x + scrollLeft;
+        const relY = y + scrollTop;
+
+        const scale_ratio = new_scale / prev_zoom;
+
+        const newRelX = relX * scale_ratio;
+        const newRelY = relY * scale_ratio;
+
+        this.recalc();
+
+        this.container.scrollLeft = newRelX - x;
+        this.container.scrollTop = newRelY - y;
+    }
+
+    init_events() {
+        let dragButton = -1;
+        let dragStart :number[]= [];
+        let scroll = [];
+        this.container.addEventListener('wheel', event => {
+            event.preventDefault(); 
+
+            const delta = event.deltaY;
+            this.set_zoom(this.scale * Math.exp(delta*0.001), event.clientX, event.clientY);
+        });
+        this.container.addEventListener('pointerdown', event => {
+            if (event.isPrimary) {
+                event.preventDefault(); 
+                if (dragButton!=-1) return;
+                dragButton = event.button;
+                dragStart = [event.clientX, event.clientY,this.container.scrollLeft, this.container.scrollTop,0];
+            }
+        });
+
+        this.container.addEventListener('pointermove', event=>{
+            if (event.isPrimary) {
+                event.preventDefault(); 
+                if (dragStart.length == 5) {
+                    const dx = event.clientX - dragStart[0];
+                    const dy = event.clientY - dragStart[1];
+                    if (dx*dx > 25 || dy*dy > 25) {
+                        dragStart[4] = 1;                        
+                        this.container.style.cursor = dragButton?'grabbing':'crosshair';
+                        this.container.setPointerCapture(event.pointerId);
+                    }
+                    if (dragStart[4]) {
+                        if (dragButton == 1) {
+                            this.container.scrollLeft = dragStart[2] - dx;
+                            this.container.scrollTop = dragStart[3] - dy;
+                        }  
+                        else if (dragButton == 0) {
+//                            const pt1 = this.clientToMapLocationRound({x:dragStart[0],y:dragStart[1]});
+//                            const pt2 = this.clientToMapLocationRound({x:event.clientX,y:event.clientY});
+/*                            const rect = make_rect(pt1,pt2);
+                            this.map.selection.set(rect.left,rect.top,rect.right,rect.bottom);*/
+                        }
+                    }               
+                }
+            }
+        });
+
+        this.container.addEventListener('pointerup', event=>{
+            if (event.isPrimary) {
+                event.preventDefault(); 
+                if (dragButton == 0) {
+                    if (!dragStart[4]) {
+//                        const pt = this.clientToMapLocationFloor({x:event.clientX,y:event.clientY});
+//                        const sector = this.find_sector_at(pt.x,pt.y) || 0;
+//                        this.#dist.single_select.trigger({map:this.map,sector:sector,shift:event.shiftKey});
+                    } else {
+/*                        const pt1 = this.clientToMapLocationRound({x:dragStart[0],y:dragStart[1]});
+                        const pt2 = this.clientToMapLocationRound({x:event.clientX,y:event.clientY});
+                        const rect = make_rect(pt1,pt2);
+                        const sectors = [];
+                        let line = false;
+                        if (rect.left == rect.right || rect.bottom == rect.top) {
+                            line = true;
+                            for (const s in this.map.layout) {
+                                const [x, y] = s.split(',').map(Number);
+                                if ((x >=rect.left && x < rect.right && y == rect.bottom && y == rect.top)
+                                 || (x ==rect.left && x == rect.right && y < rect.bottom && y >= rect.top)) {                                    
+                                        sectors.push(this.map.layout[s]);
+                                }                            
+                            }
+                            this.#dist.draw_line.trigger({map:this.map,rect:rect, sectors:sectors, shift:event.shiftKey});
+                        } else {
+                            for (const s in this.map.layout) {
+                                const [x, y] = s.split(',').map(Number);
+                                if (x >=rect.left && y >= rect.top &&
+                                    x < rect.right && y < rect.bottom) {
+                                        sectors.push(this.map.layout[s]);
+                                }                            
+                            }
+                            this.#dist.multiple_select.trigger({map:this.map,rect:rect, sectors:sectors, shift:event.shiftKey});
+                        }
+                        this.map.selection.clear();
+*/
+
+                    }                
+                }              
+                if (dragButton!=-1) {
+                    dragStart = [];
+                    this.container.style.cursor = 'default';   
+                    dragButton = -1;
+                    this.container.releasePointerCapture(event.pointerId);                    
+                }
+            }
+            
+        });
+    }
+    
+    center() {
+        if (this.map && this.map.dim) {
+            const rect = this.container.getBoundingClientRect();
+            const cwidth = rect.right - rect.left;
+            const cheight = rect.bottom - rect.top;
+            this.container.scrollLeft = (this.map.dim.width * this.scale - cwidth) / 2;
+            this.container.scrollTop = (this.map.dim.height * this.scale - cheight) / 2;
+        }
+    }
+
+
+    clientToMap(point :[number, number]) : [number,number]{
+        if (this.map && this.map.svg) {
+            const svgRect = this.map.svg.getBoundingClientRect();
+            const containerRect = this.container.getBoundingClientRect();
+            const scale = this.scale;
+
+            // Calculate the mouse position relative to the SVG element
+            const svgX = (point[0] - svgRect.left) / scale;
+            const svgY = (point[1] - svgRect.top) / scale;
+
+            // Adjust for the SVG viewBox offset
+            const viewBox = this.map.svg.viewBox.baseVal;
+            return [svgX + viewBox.x,svgY + viewBox.y];
+        } else {
+            return point
+        }
+    }
+
+    clientToMapLocationRound(point:[number,number]) : [number, number]{
+        let pt = this.clientToMap(point);
+        return [Math.round(pt[0]/this.scale),Math.round(pt[1]/this.scale)];
+    }
+    clientToMapLocationFloor(point:[number, number]) : [number, number] {
+        let pt = this.clientToMap(point);
+        return [Math.floor(pt[0]/this.scale),Math.floor(pt[1]/this.scale)];        
+    }
+    find_sector_at(x:number,y:number) {
+        return this.map?.layout[`${x},${y}`];
+    }
+
+}
+
+
