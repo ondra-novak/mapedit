@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
 import { MapFile, RawMapFile } from '@/core/map_structs';
@@ -32,6 +32,17 @@ function redraw() {
         mapcontainer.set_map(mapdraw);
     }
 }
+
+const layers= reactive({
+    sector_basic: true,
+    sector_features: true,
+    walls: true,
+    arcs: true,
+    actions: true,
+    arrows: true,
+    enemies: true,
+    items: true
+})
 
 watch([curlevel, curmap], ()=>{
     redraw();
@@ -87,8 +98,18 @@ onUnmounted(StatusBar.onFinalSave)
 <template>
 
 <x-workspace>
-
+<div class="toolbar">
+    <div>Draw</div>
+    <div>Erase</div>
+    <div>Edit</div>
+    <div>Items</div>
+    <div>Enemies</div>
+</div>
+<div class="layers">
     
+</div>
+
+
 <div ref="mapview" class="mapview"></div>
 </x-workspace>
 

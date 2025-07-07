@@ -144,7 +144,7 @@ async function openMap(n: string) {
     n = n.toUpperCase();
     if (!n.endsWith(".MAP")) n = n.substring(0,8)+".MAP";
     list_of_maps.value = undefined;
-    if (StatusBar.changed) {
+    if (vis.value && en.value) {
         const decs=await messageBox("Save current work?",["Don't Save","Save","Cancel"], 1,2);
         if (decs == 2) return ;
         if (decs == 0) {
