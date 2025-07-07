@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
 import { MapFile, RawMapFile } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import MissingFiles from '@/components/MissingFiles.vue';
 import { MapContainer, MapDraw } from '@/core/map_draw';
+import type { Document } from '@/utils/document';
 
 const mapview = ref<HTMLElement>();
 const mapdraw :MapDraw=  new MapDraw();
+const curmap = shallowRef<MapFile>(new MapFile());
+const curlevel = ref<number>(0);
 let mapcontainer: MapContainer | null = null;
 
 const required_files: FileItem[] = [
@@ -17,33 +20,55 @@ const required_files: FileItem[] = [
     {group:AssetGroup.MAPS,name:"ENEMY.DAT",ovr:true}
 ];
 
-
-
-
-async function reload() {
-    const buff = await server.getDDLFile("SKRETI.MAP");
-    const rm = new RawMapFile();
-    rm.parseMap(buff);
-    const m = MapFile.from(rm);
-    mapdraw.draw(m,0);
-    if (mapcontainer) {        
-        mapcontainer.set_map(mapdraw);
-    }
-
+function begin_edit() {
+    const new_rev =StatusBar.cur_map.begin_edit();
+    curmap.value = new_rev;
+    return new_rev;
 }
 
-
-
-async function init() {
-    if (mapview.value)     {
-        mapcontainer = new MapContainer(mapview.value);
+function redraw() {
+    if (mapcontainer) {        
+        mapdraw.draw(curmap.value,curlevel.value);
+        mapcontainer.set_map(mapdraw);
     }
+}
+
+watch([curlevel, curmap], ()=>{
+    redraw();
+});
+
+function onMapLoaded() {
+
+    function reload(doc: Document<MapFile>) {
+        curmap.value = doc.get_current();
+        const start = curmap.value.info.start_sector;
+        curlevel.value = curmap.value.sectors[start].level;
+        redraw();
+        mapcontainer?.center();
+    }
+
     StatusBar.registerSaveAndRevert(()=>{
         console.log("save");
     }, async ()=>{
-       return await reload();
-    });
-    reload();
+        const doc = await StatusBar.reloadMap();
+        reload(doc);
+    });    
+    
+    reload(StatusBar.cur_map);
+}
+
+async function init() {
+    StatusBar.onMapOpen(onMapLoaded);
+    if (mapview.value)     {
+        mapcontainer = new MapContainer(mapview.value);
+    }    
+    if (!StatusBar.cur_map_name.value) {
+        StatusBar.openMapDialog();
+        return;
+    }
+    
+
+    
 }
 
 function onCreateNew() {

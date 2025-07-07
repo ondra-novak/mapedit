@@ -49,29 +49,33 @@ export class Config {
 }
 
 export class ApiClient {
-
-    current_ddl: string = "";
+    
+    current_ddl ;
+    current_ddl_set : ((x:{name:string})=>void) | null = null;
+    
     connect_change_event = new Distributor<boolean>();
-    ddlchange_event = new Distributor<string>();
     gameconnect_event = new Distributor<number>();
     status: KeepAliveStatus = {exit_on_close:true, game_instances:0,keepalive_interval:5000};
     connected: boolean = false;
 
     constructor() {
         this.start_keepalive();
+        this.current_ddl = new Promise<{name?:string}>((ok)=>{this.current_ddl_set = ok;});
     }
 
-    set_current_ddl(s:string) {
+    async set_current_ddl(s:string) {
         const n = encodeURIComponent(s);
-        if (n != this.current_ddl) {
-            this.current_ddl = n;
-            this.ddlchange_event.trigger(s);
+        if (this.current_ddl_set) {
+            this.current_ddl_set({name: s});
+            this.current_ddl_set = null;
+        } else {
+            (await this.current_ddl).name = s;
         }
     }
 
     get_last_status() {return this.status;}
 
-    get_current_ddl() :string {return decodeURIComponent(this.current_ddl);}
+    async get_current_ddl() :Promise<string> {return (await this.current_ddl).name || "empty";}
 
     protected async handle_error(response:Response, message: string) {
             const text = await response.text(); // Může obsahovat chybovou hlášku
@@ -80,9 +84,10 @@ export class ApiClient {
 
     // DDL
     async getDDLFiles(group: number|null, source: string|null): Promise<DDLFiles> {
+        const ddl = await this.get_current_ddl();
         const arg1=group?`group=${group}`:"";
         const arg2=source?`type=${source}`:"";
-        const query = [`api/ddl/${this.current_ddl}`, [arg1,arg2].join('&')].join('?');
+        const query = [`api/ddl/${ddl}`, [arg1,arg2].join('&')].join('?');
         const response = await fetch(query);
         const json = await response.json();
         json.files = json.files.map((x:[string, string, boolean][])=>{
@@ -96,7 +101,8 @@ export class ApiClient {
     }
 
     async getDDLFile(id: string): Promise<ArrayBuffer> {
-        const response = await fetch(`api/ddl/${this.current_ddl}/${encodeURIComponent(id)}`);
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}`);
         if (response.ok) {
             const n = ((await response.bytes()).buffer);
             return n
@@ -106,7 +112,8 @@ export class ApiClient {
     }
 
     async getDDLMGFFile(id: string): Promise<ArrayBuffer> {
-        const response = await fetch(`api/ddl/${this.current_ddl}/mgf/${encodeURIComponent(id)}`);
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/ddl/${ddl}/mgf/${encodeURIComponent(id)}`);
         if (response.ok) {
             const n = ((await response.bytes()).buffer);
             return n
@@ -116,7 +123,8 @@ export class ApiClient {
     }
 
     async putDDLFile(id: string, data: ArrayBuffer, group: number): Promise<void> {
-        const response = await fetch(`api/ddl/${this.current_ddl}/${encodeURIComponent(id)}?group=${group}`, {
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}?group=${group}`, {
             method: "PUT",
             headers: { "Content-Type": "application/octet-stream" },
             body: data
@@ -126,7 +134,8 @@ export class ApiClient {
     }    
 
     async deleteDDLFile(id: string): Promise<void> {
-        const response = await fetch(`api/ddl/${this.current_ddl}/${encodeURIComponent(id)}`, {
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}`, {
             method: "DELETE"
         });
        if (response.status !== 202) {
@@ -135,7 +144,8 @@ export class ApiClient {
     }
 
     async compactDDL(): Promise<any> {
-        const response = await fetch(`api/ddl/${this.current_ddl}/compact`, {
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/ddl/${ddl}/compact`, {
             method: "POST"
         });
         if (response.status !== 202) {
@@ -144,7 +154,8 @@ export class ApiClient {
     }
 
     async mgfCreate(name: string, group: number, frames:number, transparent: boolean): Promise<string> {
-        const response = await fetch(`api/ddl/${this.current_ddl}/mgf`, {
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/ddl/${ddl}/mgf`, {
             method: "POST",
             body: JSON.stringify({
                 filename: name,
@@ -186,8 +197,9 @@ export class ApiClient {
         return await response.text();
     } 
 
-    getDownloadLink(id:string):string {
-        return `api/ddl/${this.current_ddl}/${encodeURIComponent(id)}`;
+    async getDownloadLink(id:string):Promise<string> {
+        const ddl = await this.get_current_ddl();
+        return `api/ddl/${ddl}/${encodeURIComponent(id)}`;
     }
 
     async listAllDDLs() : Promise<DDLEntry[]> {

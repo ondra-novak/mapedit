@@ -1,8 +1,9 @@
 
 import { computed, nextTick, ref } from 'vue'
-import { MapFile } from './map_structs'
 import { server } from './api'
 import { AssetGroup } from './asset_groups'
+import { MapFile } from './map_structs'
+import { Document } from '@/utils/document'
 
 type SaveFn = () => void|Promise<void>
 type RevertFn = () => void|Promise<void>
@@ -14,7 +15,9 @@ class StatusBar {
     inprogress = ref(false);
 
     cur_map_name = ref<string>();
-    cur_map = ref<MapFile>();
+    cur_map = new Document<MapFile>(new MapFile);
+    popup_map_open = ()=>{};
+    on_map_open=()=>{};
 
     stack: [SaveFn|null, RevertFn|null, boolean][] =  [];
     onFinalSave = ()=>{this.onFinalSaveImpl()};
@@ -85,28 +88,34 @@ class StatusBar {
         }
     };
 
-    async loadMap (mapname: string) : Promise<MapFile>   {
-        if (this.cur_map_name.value === mapname) return this.cur_map.value!;
-        const buff = await server.getDDLFile(mapname);
-        this.cur_map.value = MapFile.from(buff);
-        this.cur_map_name.value = mapname;
-        return this.cur_map.value;
+    async loadMap (mapname: string) : Promise<Document<MapFile> >   {
+        if (this.cur_map_name.value === mapname) return this.cur_map;
+        try {
+            const buff = await server.getDDLFile(mapname);
+            this.cur_map.reset(MapFile.from(buff));
+            this.cur_map_name.value = mapname;            
+        } catch (e) {
+            this.cur_map.reset(new MapFile);
+            this.cur_map_name.value = mapname;            
+        }
+        this.on_map_open();
+        return this.cur_map;
     };
 
-    async reloadMap() :Promise<MapFile | null> {
+    async reloadMap() :Promise<Document<MapFile> >  {
         const name = this.cur_map_name.value;
         if (name) {
             this.cur_map_name.value = undefined;
             return await this.loadMap(name);
         } else {
-            return null;
+            return this.cur_map;
         }
     }
 
     async saveMap() : Promise<boolean> {
         const name = this.cur_map_name.value;
         if (name) {
-            await server.putDDLFile(name, this.cur_map.value!.saveToArrayBuffer(), AssetGroup.MAPS);
+            await server.putDDLFile(name, this.cur_map.get_current().saveToArrayBuffer(), AssetGroup.MAPS);
             return true;
         } else {
             return false;
@@ -119,6 +128,13 @@ class StatusBar {
 
     getMapReactive() {
         return this.cur_map;
+    }
+
+    openMapDialog() {
+        this.popup_map_open();
+    }
+    onMapOpen(event: ()=>void) {
+        this.on_map_open = event;
     }
 }
 

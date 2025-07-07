@@ -1,21 +1,24 @@
 <script setup lang="ts">
 
 import { Config, type DDLEntry, server } from "@/core/api";
+import { AssetGroup } from "@/core/asset_groups";
+import { dosname_sanitize } from "@/core/dosname";
 import StatusBar from "@/core/status_bar_control";
-import { messageBoxAlert } from "@/utils/messageBox";
+import { messageBox, messageBoxAlert } from "@/utils/messageBox";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 const vis = StatusBar.visible;
 const en = StatusBar.enabled;
 const conf = ref<boolean>(false);
-const current_ddl = ref(server.get_current_ddl());
+const current_ddl = ref("");
 const connected = ref(true);
 const cur_map = StatusBar.cur_map_name;
 const game_connected = ref(0);
 
 const list_of_projects = ref<DDLEntry[]>();
-const new_project_name = ref<string>("");
+const list_of_maps = ref<string[]>();
+const new_object_name = ref<string>("");
 const focused_element = ref<HTMLInputElement>();
 const router = useRouter();
 const config = ref<Config>(new Config());
@@ -82,16 +85,22 @@ function handleBeforeUnload(event: BeforeUnloadEvent) {
       }
 }
 
+async function openMapPopup() {
+    new_object_name.value = "";
+    list_of_maps.value = (await server.getDDLFiles(AssetGroup.MAPS, null))
+        .files.filter(x=>x.name.toUpperCase().match(".MAP")).map(x=>x.name);
+}
 
 async function init() {
     window.addEventListener("beforeunload", handleBeforeUnload);
+    StatusBar.popup_map_open = openMapPopup;
     watch_server_status();
     watch_game_status();
     config.value = await server.get_config();
     if (!config.value.project) {
         selectProject();
     } else {
-        server.set_current_ddl(config.value.project);
+        await server.set_current_ddl(config.value.project);
         current_ddl.value = config.value.project;
     }
     
@@ -111,7 +120,7 @@ watch(focused_element,()=>{
 async function open_project(name:string) {
     if (!name.endsWith(".ddl")) name = name+".ddl";
     console.log(name);
-    new_project_name.value = "";
+    new_object_name.value = "";
     server.set_current_ddl(name);
     config.value.project = name;
     current_ddl.value = name;
@@ -122,15 +131,42 @@ async function open_project(name:string) {
 
 function open_project_enter(event:Event) {
     var e = event as KeyboardEvent;
-    if (e.key === "Enter" && new_project_name.value) {
+    if (e.key === "Enter" && new_object_name.value) {
         // Only process if not already handled by default
         if (!e.defaultPrevented) {
             e.preventDefault();
-            open_project(new_project_name.value);
+            open_project(new_object_name.value);
         }
     }
 }
 
+async function openMap(n: string) {
+    n = n.toUpperCase();
+    if (!n.endsWith(".MAP")) n = n.substring(0,8)+".MAP";
+    list_of_maps.value = undefined;
+    if (StatusBar.changed) {
+        const decs=await messageBox("Save current work?",["Don't Save","Save","Cancel"], 1,2);
+        if (decs == 2) return ;
+        if (decs == 0) {
+            await StatusBar.triggerRevert();
+        } else {
+            await StatusBar.triggerSave();
+        }
+    }
+    await StatusBar.loadMap(n);
+    router.push("/maps");        
+}
+
+function openMapEnter(event: Event) {
+    var e = event as KeyboardEvent;
+    if (e.key === "Enter" && new_object_name.value) {
+        // Only process if not already handled by default
+        if (!e.defaultPrevented) {
+            e.preventDefault();
+            openMap(new_object_name.value);
+        }
+    }
+}
 
 
 </script>
@@ -139,11 +175,11 @@ function open_project_enter(event:Event) {
         <div class="left">
             <div class="indicator" :class="{connected: connected}" @click="check_connection"></div>
             <div @click="selectProject"> {{ current_ddl }}</div>
-            <div> {{ cur_map }}</div>
+            <div @click="openMapPopup"> {{ cur_map }}</div>
             <div><button v-if="game_connected == 0">Start game client</button>
                  <span v-if="game_connected > 0"> Game client running: {{ game_connected }}</span>        
             </div>            
-            <div v-if="game_connected > 0"><button>Restart</button></div>
+            <div v-if="game_connected > 0"><button>Stop</button></div>
             <div v-if="game_connected > 0"><button>Teleport to sector</button></div>
         </div>
         <div class="right">
@@ -154,7 +190,7 @@ function open_project_enter(event:Event) {
             </div>
         </div>
     </div>
-    <div v-if="list_of_projects !== undefined" class="select-project-popup">
+    <div v-if="list_of_projects !== undefined" class="select-project popup">
         <datalist id="statusBar216840"><option v-for="v of list_of_projects" :key="v.name" :value="v.name"></option></datalist>
         <div>
             <div class="title">Open or create new project</div>
@@ -171,12 +207,29 @@ function open_project_enter(event:Event) {
             </div>
             <div class="nw">
                 <span>Create new adventure</span>
-                <input type="text" v-model="new_project_name" ref="focused_element" list="statusBar216840" @keydown="$event=>open_project_enter($event)">
-                <button @click="open_project(new_project_name)">Open / Create</button> 
+                <input type="text" v-model="new_object_name" ref="focused_element" list="statusBar216840" @keydown="$event=>open_project_enter($event)">
+                <button @click="open_project(new_object_name)">Open / Create</button> 
             </div>
         </div>
     </div>
-    <div v-if="!connected" class="select-project-popup">
+    <div v-if="list_of_maps !== undefined" class="select-map popup">
+        <datalist id="statusBar178969"><option v-for="v of list_of_maps" :key="v" :value="v"></option></datalist>
+        <div>
+            <div class="title">Open or create new map</div>
+            <button class="close" @click="list_of_maps = undefined"></button>
+            <div class="srl">
+                <div class="row dta" v-for="v of list_of_maps" :key="v" @click="openMap(v)">
+                    <div>{{ v}}</div>
+                </div>
+            </div>
+            <div class="nw">
+                <span>Create new map</span>
+                <input type="text" v-model="new_object_name" @input="new_object_name=dosname_sanitize(new_object_name)" ref="focused_element" list="statusBar178969" @keydown="$event=>openMapEnter($event)" maxlength="12">
+                <button @click="openMap(new_object_name)">Open / Create</button> 
+            </div>
+        </div>
+    </div>
+    <div v-if="!connected" class="select-project.popup">
         <div>
             <div>
             <p>Lost connection to backend! It probably exited or crashed</p>            
@@ -213,79 +266,83 @@ function open_project_enter(event:Event) {
     padding: 1rem;
 }
 
-.select-project-popup {
+.popup {
     position: fixed;
     left:0;top:0;right: 0;bottom: 0;
     background-color: #0008;
 }
 
-.select-project-popup > div {
+.popup > div {
     position: absolute;
     left:0;
     right:0;
-    top: 20vh;
+    top: 20%;
     background-color: #ddd;
-    width: 60%;
-    min-width: 30rem;
     padding: 1rem ;
     margin: auto;
     box-shadow: 3px 3px 5px black;
+
 }
-.select-project-popup .title {
+
+.select-project.popup > div {
+    width: 60%;
+    min-width: 30rem;
+}
+.select-project.popup .title {
     margin-bottom: 0.5rem;    
 }
 
-.select-project-popup .srl {
+.popup .srl {
     height: 50vh;
     overflow: auto;
     border: 1px inset #FFF;
 }
-.select-project-popup .row {
+.select-project.popup .row {
     display:flex;
 }
-.select-project-popup .row.hdr {
+.select-project.popup .row.hdr {
     background-color: #bbb;
     position: sticky;
     top: 0;
 }
 
-.select-project-popup .row.dta {
+.popup .row.dta {
     cursor: pointer;
 }
-.select-project-popup .row.dta:hover {
+.popup .row.dta:hover {
     background-color: white;
 }
 
-.select-project-popup .row > * {
+.popup .row > * {
     padding: 0.2rem;
-    border-bottom: 1px solid;
+    
 }
-.select-project-popup .row > *:first-child {
+.select-project.popup .row > *:first-child {
     flex-grow: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.select-project-popup .row > *:nth-child(2) {
+.select-project.popup .row > *:nth-child(2) {
     width: 5rem;
     text-align: right;
     border-left: 1px solid;
     border-right: 1px solid;
 
 }
-.select-project-popup .row > *:last-child {
+.select-project.popup .row > *:last-child {
     width: 11rem;
     overflow: hidden;
     text-align: right;
     white-space: nowrap;
 
 }
-.select-project-popup .nw {
+.select-project.popup .nw {
     display:flex;
     gap: 0.5rem;
     align-items: center;
 }
-.select-project-popup .nw input {
+.select-project.popup .nw input {
     flex-grow: 1;
 }
 .left {
@@ -335,5 +392,15 @@ function open_project_enter(event:Event) {
     content: "Map: ";
 }
 
+
+.select-map.popup > div {
+    width: 20em;
+}
+.select-map.popup .nw {
+    text-align: center;
+}
+.select-map.popup .row {
+    text-align: center;
+}
 
 </style>

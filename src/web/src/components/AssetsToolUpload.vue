@@ -44,9 +44,9 @@ async function do_upload() {
     }
 }
 
-function updateModel() {
+async function updateModel() {
     if (filename.value) {
-        download_link.value = server.getDownloadLink(filename.value);
+        download_link.value = await server.getDownloadLink(filename.value);
     }
 }
 
