@@ -5,8 +5,8 @@ import { AssetGroup } from './asset_groups'
 import { MapFile } from './map_structs'
 import { Document } from '@/utils/document'
 
-type SaveFn = () => void|Promise<void>
-type RevertFn = () => void|Promise<void>
+type SaveFn = () => void|Promise<any>
+type RevertFn = () => void|Promise<any>
 
 class StatusBar {
     fnSave = ref<SaveFn | null>(null)
@@ -40,7 +40,7 @@ class StatusBar {
         this.changed.value = false
     };
     
-    async triggerSave(): Promise<void> {
+    async triggerSave(): Promise<any> {
         if (this.fnSave.value && this.changed.value){
             const n = this.fnSave.value();
             this.inprogress.value = true;
@@ -54,7 +54,7 @@ class StatusBar {
         } 
     };
 
-    async triggerRevert (): Promise<void>  {
+    async triggerRevert (): Promise<any>  {
         if (this.fnRevert.value) {
             const n = this.fnRevert.value()
             this.inprogress.value = true;

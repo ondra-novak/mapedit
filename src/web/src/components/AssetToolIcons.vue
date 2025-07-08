@@ -10,7 +10,7 @@ import { ColorLUT } from '@/core/lut';
 import { AssetGroup } from '@/core/asset_groups';
 
 const emit = defineEmits<{
-  (e: 'upload', name: string, done?: Promise<void>): void
+  (e: 'upload', name: string, done?: Promise<any>): void
 }>();
 
 

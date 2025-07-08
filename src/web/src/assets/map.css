@@ -1,16 +1,27 @@
+
+.mapview {
+    width: 100%;
+    height: 100%;
+    overflow: auto;    
+    position: relative;
+}
+
 .mapview svg {
     width:100%;
     height: 100%;
 }
 
 .mapview svg .sector.lava{
-    fill:indianred;
+    fill:rgb(255, 185, 81);
+}
+.mapview svg .sector.acid{
+    fill:rgb(170, 212, 198);
 }
 .mapview svg .sector.normal{
     fill: white;
 }
 .mapview svg .sector.water{
-    fill: blue;
+    fill: rgb(183, 183, 253);
 }
 .mapview svg .sectorfeat.stairs{
     fill: black;
@@ -37,10 +48,10 @@
     fill: red;
 }
 .mapview svg .sectorfeat.ship{
-    fill: black;
+    fill: blue;
 }
 .mapview svg .sectorfeat.lvplace{
-    fill: yellow;
+    fill: rgb(255, 238, 0);
 }
 .mapview svg .sectorfeat.teleport{
     stroke: blue;
@@ -108,8 +119,23 @@
 }
 
 .mapview svg .arrow.out {
-    stroke-dasharray: 2 4 2 2;
+    stroke-dasharray: 3 1;
+    stroke: green
 }
 .mapview svg .arrow.in {
-    stroke-dasharray: 4 4;
+    stroke-dasharray: 3 1;
+    stroke: purple   ;
+}
+
+.disable_sector_basic .mapview svg .sector,
+.disable_sector_features .mapview svg .sectorfeat,
+.disable_walls .mapview svg .wall,
+.disable_arc .mapview svg .arc,
+.disable_actions .mapview svg .action,
+.disable_arrows .mapview svg .arrow.same,
+.disable_ext_arrows .mapview svg .arrow.in,
+.disable_ext_arrows .mapview svg .arrow.out,
+.disable_enemies .mapview svg .enemy,
+.disable_items .mapview svg .items {
+    visibility: hidden;
 }

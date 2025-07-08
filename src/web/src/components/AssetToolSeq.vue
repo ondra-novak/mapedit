@@ -9,7 +9,7 @@ import { PCXProfile, PCX } from '@/core/pcx';
 import StatusBar from '@/core/status_bar_control'
 
 const emit = defineEmits<{
-  (e: 'upload', name: string, done?: Promise<void>): void
+  (e: 'upload', name: string, done?: Promise<any>): void
 }>();
 
 

@@ -89,7 +89,7 @@ void DDLManager::compact() const
     });
 
 
-    auto tf = newddl.create_ddl(items.size()+16);
+    auto tf = newddl.create_ddl(static_cast<unsigned int>(items.size()+16));
     for (unsigned int idx = 0, cnt = static_cast<unsigned int>(items.size()); idx<cnt; ++idx) {
         auto payload = get_file(sf,items[idx]);        
         replace_entry(tf,idx+1,items[idx].get_name(),{payload.data(), payload.size()},items[idx].group);
@@ -168,7 +168,7 @@ std::size_t DDLManager::parse_ddl(std::istream &f, Callback &&callback)
 
     auto save = f.tellg();
     do {
-        uint32_t group;
+        uint32_t group = 0;
         if (first.get_name() != directory_mark) {
             if (giter == gend) group = def_group;
             else group = giter->first;
@@ -313,6 +313,15 @@ bool DDLManager::check_empty(std::iostream &f)
 {
     f.seekg(0, std::ios::end);
     return f.tellg() == 0;
+}
+
+bool DDLManager::exists(std::string_view name) const
+{
+    std::optional<std::vector<char>> out;
+    std::fstream f(_pathname, std::ios::in|std::ios::binary);
+    if (!f) return false;
+    auto fnfo = find_file(f, name);
+    return fnfo.has_value();
 }
 
 void DDLManager::build_ddl_directory(std::ostream &f, std::span<const PreparedDirItem> list)  { 

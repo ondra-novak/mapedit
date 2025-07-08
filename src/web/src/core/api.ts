@@ -122,15 +122,20 @@ export class ApiClient {
         }
     }
 
-    async putDDLFile(id: string, data: ArrayBuffer, group: number): Promise<void> {
+    async putDDLFile(id: string, data: ArrayBuffer, group: number, fail_if_exists = false): Promise<boolean> {
         const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}?group=${group}`, {
+        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}?group=${group}&fexists=${fail_if_exists?1:0}`, {
             method: "PUT",
             headers: { "Content-Type": "application/octet-stream" },
             body: data
         });
        if (response.status !== 202) {
+            if (response.status == 409) {
+                return false;
+            }
+            await this.handle_error(response, "Failed to upload file.")        
        }
+       return true;
     }    
 
     async deleteDDLFile(id: string): Promise<void> {
@@ -139,7 +144,7 @@ export class ApiClient {
             method: "DELETE"
         });
        if (response.status !== 202) {
-            await this.handle_error(response, "Failed to upload file.")
+            await this.handle_error(response, "Failed to erase file.")
        }
     }
 

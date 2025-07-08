@@ -70,6 +70,7 @@ public:
 
     Stats get_stats() const;
 
+    bool exists(std::string_view name) const;
 
 
 protected:

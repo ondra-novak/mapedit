@@ -17,7 +17,7 @@ let tile1ImageData : ImageDataResult | null = null;
 let tile2ImageData : ImageDataResult | null = null;
 
 const emit = defineEmits<{
-  (e: 'upload', name: string, prom: Promise<void>): void
+  (e: 'upload', name: string, prom: Promise<any>): void
 }>();
 
 

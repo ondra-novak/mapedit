@@ -3,6 +3,7 @@
 import { Config, type DDLEntry, server } from "@/core/api";
 import { AssetGroup } from "@/core/asset_groups";
 import { dosname_sanitize } from "@/core/dosname";
+import { readFileToArrayBuffer } from "@/core/read_file";
 import StatusBar from "@/core/status_bar_control";
 import { messageBox, messageBoxAlert } from "@/utils/messageBox";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -168,6 +169,25 @@ function openMapEnter(event: Event) {
     }
 }
 
+function importMap() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".MAP";
+    input.onchange = async () => {
+        if (input.files && input.files.length > 0) {
+            const browsed_file = input.files[0];            
+            const name = dosname_sanitize(browsed_file.name);
+            const buffer = await readFileToArrayBuffer(browsed_file);                        
+            const ok = await server.putDDLFile(name,buffer,AssetGroup.MAPS,true);
+            if (!ok) {
+                await messageBoxAlert("Map file already exists");
+            } else {
+                openMap(name);
+            }
+        }
+    };
+    input.click();    
+}
 
 </script>
 <template>
@@ -191,7 +211,6 @@ function openMapEnter(event: Event) {
         </div>
     </div>
     <div v-if="list_of_projects !== undefined" class="select-project popup">
-        <datalist id="statusBar216840"><option v-for="v of list_of_projects" :key="v.name" :value="v.name"></option></datalist>
         <div>
             <div class="title">Open or create new project</div>
             <button v-if="current_ddl" class="close" @click="list_of_projects = undefined"></button>
@@ -199,7 +218,7 @@ function openMapEnter(event: Event) {
                 <div class="row hdr">
                     <div>Name</div><div>Size</div><div>Last edited</div>                
                 </div>
-                <div class="row dta" v-for="v of list_of_projects!" :key="v.name" @click="open_project(v.name)">
+                <div class="row dta" v-for="v of list_of_projects!.filter(x=>x.name.toLowerCase().includes(new_object_name.toLowerCase()))" :key="v.name" @click="open_project(v.name)">
                     <div>{{ v.name }}</div>
                     <div>{{ v.size }}</div>
                     <div>{{ v.last_write.toLocaleString() }}</div>
@@ -207,25 +226,27 @@ function openMapEnter(event: Event) {
             </div>
             <div class="nw">
                 <span>Create new adventure</span>
-                <input type="text" v-model="new_object_name" ref="focused_element" list="statusBar216840" @keydown="$event=>open_project_enter($event)">
+                <input type="text" v-model="new_object_name" ref="focused_element" @keydown="$event=>open_project_enter($event)">
                 <button @click="open_project(new_object_name)">Open / Create</button> 
             </div>
         </div>
     </div>
     <div v-if="list_of_maps !== undefined" class="select-map popup">
-        <datalist id="statusBar178969"><option v-for="v of list_of_maps" :key="v" :value="v"></option></datalist>
         <div>
             <div class="title">Open or create new map</div>
             <button class="close" @click="list_of_maps = undefined"></button>
             <div class="srl">
-                <div class="row dta" v-for="v of list_of_maps" :key="v" @click="openMap(v)">
+                <div class="row dta" v-for="v of list_of_maps.filter(x=>x.toLowerCase().includes(new_object_name.toLocaleLowerCase()))" :key="v" @click="openMap(v)">
                     <div>{{ v}}</div>
                 </div>
             </div>
             <div class="nw">
                 <span>Create new map</span>
-                <input type="text" v-model="new_object_name" @input="new_object_name=dosname_sanitize(new_object_name)" ref="focused_element" list="statusBar178969" @keydown="$event=>openMapEnter($event)" maxlength="12">
+                <input type="text" v-model="new_object_name" @input="new_object_name=dosname_sanitize(new_object_name)" ref="focused_element"  @keydown="$event=>openMapEnter($event)" maxlength="12">
                 <button @click="openMap(new_object_name)">Open / Create</button> 
+            </div>
+            <div class="import">
+                <button @click="importMap">Import map</button>
             </div>
         </div>
     </div>
@@ -293,7 +314,7 @@ function openMapEnter(event: Event) {
 }
 
 .popup .srl {
-    height: 50vh;
+    height: 30vh;
     overflow: auto;
     border: 1px inset #FFF;
 }
@@ -399,8 +420,19 @@ function openMapEnter(event: Event) {
 .select-map.popup .nw {
     text-align: center;
 }
+
+.select-map.popup .nw > * {
+    display:block;
+    margin: 0.2rem auto;
+}
 .select-map.popup .row {
     text-align: center;
+}
+.select-map.popup .import {
+    text-align: center;
+    border-top: 1px  dotted;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
 }
 
 </style>

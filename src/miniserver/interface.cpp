@@ -229,10 +229,18 @@ bool WebInterface::ddl_put(Request &req)
         return req.response({413,"Content Too Large"},{},"");
     }
     uint32_t group =0;
+    bool fail_if_exists = false;
     auto iter = std::find_if(req.query.begin(), req.query.end(), [](const auto &kv){return kv.first == "group";});
     if (iter != req.query.end()) group = static_cast<uint32_t>(std::stoul(iter->second));
-    user.put(req.path_vars[1], req.body,group);
-    return req.response({202,"Accepted"},{},"");
+    iter = std::find_if(req.query.begin(), req.query.end(), [](const auto &kv){return kv.first == "fexists";});
+    if (iter != req.query.end()) fail_if_exists = static_cast<uint32_t>(std::stoul(iter->second)) != 0;
+    const std::string &name = req.path_vars[1];
+    if (fail_if_exists && user.exists(name)) {
+        return req.response({409,"Conflict"},{},"");
+    } else {
+        user.put(req.path_vars[1], req.body,group);
+        return req.response({202,"Accepted"},{},"");
+    }
 }
 
 bool WebInterface::ddl_delete(Request &req)

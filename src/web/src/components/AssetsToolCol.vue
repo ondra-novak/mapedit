@@ -24,7 +24,7 @@ const average_colors = ref<RGB[]>([]);
 
 
 const emit = defineEmits<{
-  (e: 'upload', name: string, done?:Promise<void>): void
+  (e: 'upload', name: string, done?:Promise<any>): void
 }>();
 
 

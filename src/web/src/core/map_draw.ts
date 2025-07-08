@@ -29,7 +29,7 @@ export class MapDraw {
             sector:{
                 normal: new SVGPath("sector normal"),
                 lava: new SVGPath("sector lava"),
-                acid: new SVGPath("sector normal"),
+                acid: new SVGPath("sector acid"),
                 water: new SVGPath("sector water"),                
                 stairs: new SVGPath("sectorfeat stairs"),
             },
@@ -79,7 +79,7 @@ export class MapDraw {
         }
         
 
-        const bbox = {left:0,top:0,right:0,bottom: 0};
+        const bbox = {left:999999,top:999999,right:-999999,bottom: -999999};
 
         const scl = this.scale;
         const sclp = scl>>1;
@@ -90,21 +90,27 @@ export class MapDraw {
             const x = s.x*scl;
             const y = s.y*scl;
 
+            if (x < bbox.left) bbox.left = x;
+            if (x > bbox.right) bbox.right = x;
+            if (y < bbox.top) bbox.top = y;
+            if (y > bbox.bottom) bbox.bottom = y;
+
+
             if (s.level != level) {
-                if (s.action && s.target_sector && m.sectors[s.target_sector].level == level) {
+                if (s.target_sector && m.sectors[s.target_sector].level == level) {
                     const ts = m.sectors[s.target_sector];
                     const mx = this.transformByDir(ts.x, ts.y, s.target_side);
-                    if (mx) this.drawActionFromSector(set.arrow.from_other, x,y, mx);
+                    if (mx) this.drawActionFromSector(set.arrow.from_other, s.x,s.y, mx);
                 }
                 s.side.forEach((sd,dir)=>{
-                    const mx = this.transformByDir(x,y, dir);
+                    const mx = this.transformByDir(s.x,s.y, dir);
                     if (!mx) return;
                     if (sd.target_sector) {
-                        if (m.sectors[sd.target_sector].level == level) {
-                            const ts = m.sectors[sd.target_sector];
-                            const smx = this.transformByDir(ts.x, ts.y, s.target_side);
+                        const ts = m.sectors[sd.target_sector];
+                        if (ts.level == level) {
+                            const smx = this.transformByDir(ts.x, ts.y, sd.target_side);
                             if (smx) {
-                                this.drawActionFromWall(set.arrow.from_other,smx,mx);
+                                this.drawActionFromWall(set.arrow.from_other,mx,smx);
                             }
                         }
                     }
@@ -112,11 +118,11 @@ export class MapDraw {
                         sd.actions.forEach(ma=>{
                             if (ma.getAction() == ActionType.SENDA) {
                                 const senda = ma as TMA_SEND_ACTION;
-                                if (senda.sector && m.sectors[senda.sector].level == level) {
-                                    const ts = m.sectors[senda.sector];
-                                    const smx = this.transformByDir(ts.x, ts.y, s.target_side);
+                                const ts = m.sectors[senda.sector];
+                                if (senda.sector && ts.level == level) {
+                                    const smx = this.transformByDir(ts.x, ts.y, senda.side);
                                     if (smx) {
-                                        this.drawActionFromWall(set.arrow.from_other,smx,mx);
+                                        this.drawActionFromWall(set.arrow.from_other,mx,smx);
                                     }                                    
                                 }
                             }
@@ -127,10 +133,6 @@ export class MapDraw {
                 return;
             }
 
-            if (x < bbox.left) bbox.left = x;
-            if (x > bbox.right) bbox.right = x;
-            if (y < bbox.top) bbox.top = y;
-            if (y > bbox.bottom) bbox.bottom = y;
 
             this.layout[`${s.x},${s.y}`] = sector;
 
@@ -181,6 +183,7 @@ export class MapDraw {
                 case SectorType.Normal: bgr = set.sector.normal;break;
                 case SectorType.Pit:    bgr=set.sector.normal;
                                         set.sectorfeats.pit.mt(x,y).circle(scl/3);
+                                        break;
                 case SectorType.Ship:   bgr = set.sector.water; 
                                         this.drawShip(set.sectorfeats.ship, x,y);
                                         break;
@@ -287,10 +290,10 @@ export class MapDraw {
         const svg = drw.getSvgElement()
         const w = bbox.right- bbox.left;
         const h = bbox.bottom - bbox.top;
-        this.dim={width:w,height: h};
         const x = bbox.left - w;
-        const y = bbox.top - h
-        svg.setAttribute("viewBox", `${x} ${y} ${3*w} ${3*h}`);
+        const y = bbox.top - h;
+        this.dim={width:3*w,height: 3*h};
+        svg.setAttribute("viewBox", `${x} ${y} ${this.dim.width} ${this.dim.height}`);
         this.svg = svg;
         
         return this.svg;
@@ -408,12 +411,12 @@ export class MapDraw {
         const scale = this.scale;
 
         function normalizeAngle(angle:number) {
-            return (angle + 360) % 360;
+            return (angle + 2*Math.PI) % (2*Math.PI);
         }
 
         function angleDiff(a1:number, a2:number) {
             const diff = Math.abs(normalizeAngle(a1) - normalizeAngle(a2));
-            return Math.min(diff, 360 - diff);
+            return Math.min(diff, 2*Math.PI - diff);
         }
 
 
@@ -448,24 +451,24 @@ export class MapDraw {
         const angleEndNorm = normalizeAngle(angleEndRad);
         const mainAngleNorm = normalizeAngle(mainAngle);
 
-        const oppAngle = normalizeAngle(mainAngleNorm + 180);
+        const oppAngle = normalizeAngle(mainAngleNorm + Math.PI);
 
-        const isOppositeStart = angleDiff(angleStartNorm, oppAngle) < 15;
-        const isOppositeEnd = angleDiff(angleEndNorm, oppAngle) < 15;
+        const isOppositeStart = angleDiff(angleStartNorm, oppAngle) < 0.1;
+        const isOppositeEnd = angleDiff(angleEndNorm, oppAngle) < 0.1;
 
         path.mt(x1,y1);
 
-        if (isOppositeStart && isOppositeEnd) {
+        if (isOppositeStart || isOppositeEnd) {
             const midX = (x1 + x2) / 2;
             const midY = (y1 + y2) / 2;
 
-            const rad = (mainAngle + 90);
-            const offset = distance * 0.5;
+            const rad = (mainAngle + Math.PI/2);
+            const offset = distance * 0.2;
             const ctrlX = midX + offset * Math.cos(rad);
             const ctrlY = midY + offset * Math.sin(rad);
 
-            drawSingleCurve(x1, y1, ctrlX, ctrlY, angleStartRad, mainAngle + 90, weightStart, 0.5);
-            drawSingleCurve(ctrlX, ctrlY, x2, y2, mainAngle + 90, angleEndRad, 0.5, weightEnd);
+            drawSingleCurve(x1, y1, ctrlX, ctrlY, angleStartRad, mainAngle, weightStart, 0.5);
+            drawSingleCurve(ctrlX, ctrlY, x2, y2, mainAngle, angleEndRad, 0.5, weightEnd);
         } else {
             drawSingleCurve(x1, y1, x2, y2, angleStartRad, angleEndRad, weightStart, weightEnd);
         }
@@ -486,7 +489,7 @@ export class MapDraw {
 
         const startRad = Math.atan2(yft-yf,xft-xf);
         const endRad = Math.atan2(yt-ytt, xt-xtt);
-        this.drawBezierArrow(path, xf,yf,xt,yt, startRad,endRad);
+        this.drawBezierArrow(path, xf,yf,xt,yt, startRad,endRad,0.5);
         this.drawArrowOnAction(path, to.rotate(endRad))
         
     }
@@ -512,15 +515,21 @@ export class MapContainer {
 
     map: MapDraw | null = null;
     container: HTMLElement;
-    scale = 0.5;
+    scale = 1;
+    scrollLeft = 0;
+    scrollTop = 0;
 
-    constructor(element: HTMLElement) {
+    constructor() {
         this.map = null;
-        this.container = element;
-        this.container.style.position = "relative";
-        this.container.style.overflow = "auto";
-        this.scale = 0.5;
+        this.container = document.createElement("DIV");
+        this.container.setAttribute("class","mapview");
         this.init_events();
+    }
+
+    add_to_DOM(new_parent: HTMLElement) {
+        new_parent.appendChild(this.container);
+        this.container.scrollLeft = this.scrollLeft;
+        this.container.scrollTop = this.scrollTop;
     }
 
     get_element() {
@@ -567,6 +576,8 @@ export class MapContainer {
         if (svg) this.container.appendChild(svg);
         if (to_del) this.container.removeChild(to_del);
         this.recalc();
+        this.container.scrollLeft = this.scrollLeft;
+        this.container.scrollTop = this.scrollTop;
     }
 
     /**
@@ -581,9 +592,6 @@ export class MapContainer {
         const prev_zoom = this.scale;
         this.scale = new_scale;
 
-        const rect = this.container.getBoundingClientRect();
-        const cwidth = rect.right - rect.left;
-        const cheight = rect.bottom - rect.top;
 
         // Calculate scroll offset to keep (x, y) at the same place after zoom
         const scrollLeft = this.container.scrollLeft;
@@ -603,10 +611,27 @@ export class MapContainer {
         this.container.scrollTop = newRelY - y;
     }
 
+    zoom_rel(step: number) {
+        const rect = this.container.getBoundingClientRect();
+        const px = (rect.right - rect.left)/2;
+        const py = (rect.bottom - rect.top)/2;
+        this.set_zoom(this.scale * Math.exp(step), px, py);
+    }
+
+    zoom_reset() {
+        this.scale = 1;
+        this.recalc();
+        this.center();
+    }
+
     init_events() {
         let dragButton = -1;
         let dragStart :number[]= [];
         let scroll = [];
+        this.container.addEventListener('scroll',()=>{
+            this.scrollLeft = this.container.scrollLeft;
+            this.scrollTop = this.container.scrollTop;
+        });
         this.container.addEventListener('wheel', event => {
             event.preventDefault(); 
 
@@ -635,8 +660,8 @@ export class MapContainer {
                     }
                     if (dragStart[4]) {
                         if (dragButton == 1) {
-                            this.container.scrollLeft = dragStart[2] - dx;
-                            this.container.scrollTop = dragStart[3] - dy;
+                            this.scrollLeft = this.container.scrollLeft = dragStart[2] - dx;
+                            this.scrollTop = this.container.scrollTop = dragStart[3] - dy;
                         }  
                         else if (dragButton == 0) {
 //                            const pt1 = this.clientToMapLocationRound({x:dragStart[0],y:dragStart[1]});
@@ -700,12 +725,16 @@ export class MapContainer {
     }
     
     center() {
-        if (this.map && this.map.dim) {
+        const inner = this.container.firstChild as SVGSVGElement;
+        if (inner) {
             const rect = this.container.getBoundingClientRect();
             const cwidth = rect.right - rect.left;
             const cheight = rect.bottom - rect.top;
-            this.container.scrollLeft = (this.map.dim.width * this.scale - cwidth) / 2;
-            this.container.scrollTop = (this.map.dim.height * this.scale - cheight) / 2;
+            // Use the actual width/height of the SVG element (style, not bounding rect)
+            const svgWidth = parseFloat(inner.style.width || "0");
+            const svgHeight = parseFloat(inner.style.height || "0");
+            this.scrollLeft = this.container.scrollLeft = Math.max(0, (svgWidth - cwidth) / 2);
+            this.scrollTop = this.container.scrollTop = Math.max(0, (svgHeight - cheight) / 2);
         }
     }
 
@@ -741,5 +770,7 @@ export class MapContainer {
     }
 
 }
+
+
 
 

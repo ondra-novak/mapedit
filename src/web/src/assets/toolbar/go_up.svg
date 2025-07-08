@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" >
+  <rect x="20.059" y="80.096" width="80.089" height="19.495" style=""/>
+  <rect x="39.937" y="60.108" width="60.211" height="19.988" style=""/>
+  <rect x="60.418" y="40.12" width="39.73" height="19.988" style=""/>
+  <rect x="80.16" y="20.132" width="19.988" height="19.988" style=""/>
+  <path d="M 31.038 61.277 H 72.376 L 72.376 48.923 L 94.473 64.709 L 72.376 80.496 L 72.376 68.141 H 31.038 V 61.277 Z" style="" transform="matrix(0.71777, -0.69628, 0.69628, 0.71777, -52.554558, 30.110701)"/>
+</svg>

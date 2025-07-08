@@ -25,7 +25,7 @@ function setTextareaRef(el: HTMLTextAreaElement | null, index: number) {
 
 
 const emit = defineEmits<{
-  (e: 'upload', name: string, p?:Promise<void>): void
+  (e: 'upload', name: string, p?:Promise<any>): void
 }>();
 
 
