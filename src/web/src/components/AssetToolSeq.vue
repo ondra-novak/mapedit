@@ -7,9 +7,14 @@ import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import CanvasView from './CanvasView.vue';
 import { PCXProfile, PCX } from '@/core/pcx';
 import StatusBar from '@/core/status_bar_control'
+import { EnemyFlags1, type EnemyDef } from '@/core/enemy_struct';
 
 const emit = defineEmits<{
   (e: 'upload', name: string, done?: Promise<any>): void
+}>();
+
+const props = defineProps<{
+    def?: EnemyDef
 }>();
 
 
@@ -45,14 +50,6 @@ async function onUpdateModel() {
     });
     list_files.value = ffiles.map(f=>f.name);
 
-    try {
-        const anim = await server.getDDLFile(selfile.value || "");
-        animations.value = SeqFile.fromArrayBuffer(anim);
-        big.value = animations.value.big;
-    } catch (e) {
-        console.warn(e);
-        animations.value = new SeqFile([]);
-    }
     
     StatusBar.registerSaveAndRevert(()=>{
         save();
@@ -60,6 +57,33 @@ async function onUpdateModel() {
         StatusBar.setChangedFlag(false);
         onUpdateModel();
     })
+
+    try {
+        const anim = await server.getDDLFile(selfile.value || "");
+        animations.value = SeqFile.fromArrayBuffer(anim, stem);
+
+        if (animations.value.isOldFormat() && props.def) {
+            animations.value.big = (props.def.stay_strategy & EnemyFlags1.MOB_BIG) != 0;
+            animations.value.hit_pos = (props.def.hit_pos-1);
+            for (let i = 0; i < 6; i++) {
+                const a = animations.value.animation;
+                a[i] =  a[i].splice(0, props.def.anim_counts[i]);                    
+                for (let j = 0; j < a[i].length; ++j) {
+                    a[i][j].offset_x = props.def.adjusting[i][j+1];
+                }
+                if (i < 4) {
+                    a[i+6][0].offset_x = props.def.adjusting[i][0];
+                }
+            }            
+            StatusBar.setChangedFlag(true);
+        }
+
+        big.value = animations.value.big;
+    } catch (e) {
+        console.warn(e);
+        animations.value = new SeqFile([]);
+    }
+
     onChangePhase();
 }   
 
@@ -71,18 +95,6 @@ function onChangePhase() {
     }
 }
 
-function face2filename(face:string) {
-    const stem = filename.value?.split(".SEQ")[0];            
-    const name = `${stem}${face}.PCX`;
-    return name;
-
-}
-
-function filename2face(f:string) {
-    const stem = filename.value?.split(".SEQ")[0] || "";        
-    return f.substring(stem.length, stem.length+2);
-}
-
 async function onChangeFrame() {
     if (animations.value && cur_phase.value != undefined && cur_frame.value !== undefined) {
         const sq = animations.value;
@@ -91,8 +103,8 @@ async function onChangeFrame() {
         const frinfo = sq.animation[ph][fr];
         let w = 0;
         if (frinfo) {
-            cur_face.value = frinfo.suffix;
-            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(face2filename(frinfo.suffix))));
+            cur_face.value = frinfo.name;
+            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(frinfo.name)));
             w = cur_image.value.width ;
             if (frinfo.offset_x <= -1000) {
                 frinfo.offset_x = w/2;                
@@ -114,7 +126,7 @@ function go_prev() {
 function go_next() {
     if (animations.value &&cur_phase.value !== undefined && cur_frame.value !== undefined ) {
             if(cur_frame.value < animations.value.animation[cur_phase.value].length-1) ++cur_frame.value;
-            else cur_frame.value = 1;
+            else cur_frame.value = 0;
     } 
 }
 
@@ -190,7 +202,7 @@ function onChangeFace () {
     if (cur_face.value  !== undefined  && animations.value && cur_phase.value !== undefined  && cur_frame.value  !== undefined )  {
         if (!animations.value.animation[cur_phase.value]) animations.value.animation[cur_phase.value] = [];
         animations.value.animation[cur_phase.value][cur_frame.value] = {
-            suffix:cur_face.value,
+            name:cur_face.value,
             offset_x:cur_offset.value,
             offset_y:0
         };
@@ -267,19 +279,19 @@ onUnmounted(StatusBar.onFinalSave);
                 <option value="2">Stand/Walk back</option>
                 <option value="4">Attack</option>
                 <option value="5">Damaged (hit)</option>
-                <option value="6">Idle front (opt)</option>
-                <option value="7">Idle left (opt)</option>
-                <option value="9">Idle right (opt)</option>
-                <option value="8">Idle back (opt)</option>
+                <option value="6">Idle front</option>
+                <option value="7">Idle left</option>
+                <option value="9">Idle right</option>
+                <option value="8">Idle back</option>
             </select>
             <select v-model="cur_face" size="16" @change="onChangeFace">
-                <option v-for="v of list_files" :value="filename2face(v)" :key="v">{{ v }} </option>
+                <option v-for="v of list_files" :value="v" :key="v">{{ v }} </option>
             </select>
         </div>
         <div class="top-panel">
             <button @click="on_play_anim">|&gt;</button>
             <button @click="go_prev">&lt;&lt;</button>            
-            <div> {{  cur_frame?cur_frame:"standing" }} / {{ animations?animations.animation[cur_phase].length-1:-1 }}</div>
+            <div> {{  cur_frame+1 }} / {{ animations?animations.animation[cur_phase].length:0 }}</div>
             <button @click="go_next">&gt;&gt;</button>            
             <button @click="insert_frame">+</button>
             <button @click="delete_frame">-</button>
@@ -305,7 +317,7 @@ onUnmounted(StatusBar.onFinalSave);
     position: relative;
     padding-left: 10rem;
     padding-top: 2rem;
-    min-height: 29rem;
+    min-height: 35rem;
     width: 40rem;
     margin: auto;    
 }

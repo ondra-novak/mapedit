@@ -216,12 +216,21 @@ async function loadAppearence() {
          if (e.mobs_name) {                    
             try {
                 const seqdata = await server.getDDLFile(e.mobs_name + ".SEQ");
-                const seq = SeqFile.fromArrayBuffer(seqdata);
-                const suffix= seq.animation[0][0].suffix;
-                const imgdata = await server.getDDLFile(e.mobs_name+suffix+".PCX");
+                const seq = SeqFile.fromArrayBuffer(seqdata, e.mobs_name);
+                let frm = seq.animation[4][seq.hit_pos||0];
+                if (!frm) {
+                    const row = seq.animation.find(x=>x.length != 0);
+                    if (!row){
+                        appearence.value = undefined;
+                        return;
+                    }
+                    frm = row[0];
+                }
+                const name= frm.name;
+                const imgdata = await server.getDDLFile(name);
                 const pcx = PCX.fromArrayBuffer(imgdata);
                 appearence.value = pcx;
-                let ofs = seq.animation[0][0].offset_x;
+                let ofs = frm.offset_x;
                 if (ofs < -999) ofs = pcx.width/2;
                 appearence_margin.value = `-${pcx.height/2}px -${ofs}px`;
             }
@@ -492,9 +501,9 @@ function closeAppearence() {
                     </x-form>
                 </x-section>
             </div>
-            <x-section class="appearence">
+            <x-section class="appearence" @click="openAppearence">
                 <x-section-title>Appearence</x-section-title>
-                <div :style="{margin: appearence_margin}" @click="openAppearence">
+                <div :style="{margin: appearence_margin}">
                     <CanvasView :canvas="appearence?appearence.createCanvas(PCXProfile.enemy,palettes && form.palette<0?palettes.palettes[-form.palette-1]:undefined):null" />
                 </div>
             </x-section>
@@ -601,7 +610,7 @@ function closeAppearence() {
     </div>
     <div class="edit-seq" v-if="edit_seq">
         <div>
-            <AssetToolSeq v-model="edit_seq" />
+            <AssetToolSeq v-model="edit_seq" :def="enemies[selected_enemy || 0]" />
             <button @click="closeAppearence" class="close"></button>
         </div>
     </div>
@@ -725,10 +734,13 @@ div.multiple > *{
 }
 .edit-seq > div{
     position: absolute;
-    top: 15%;
-    left: 50%;
-    margin-left: -410px;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
     width: 820px;
+    height: 37rem;
     background-color: #eee;
     padding: 10px;
     border: 1px black;
