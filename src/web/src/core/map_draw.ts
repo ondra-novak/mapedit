@@ -7,6 +7,12 @@ import Distributor from "./distributor";
 
 
 
+export function rectFromPoints(x1:number, y1:number, x2:number, y2:number): DOMRectReadOnly {
+    if (x1 > x2) [x1, x2] = [x2, x1];
+    if (y1 > y2) [y1, y2] = [y2, y1];
+    return new DOMRectReadOnly(x1,y1,x2-x1,y2-y1);
+}
+
 
 export class MapDraw {
 
@@ -204,7 +210,7 @@ export class MapDraw {
                 this.drawArrow(set.enemies.placed, s.x, s.y, s.enemy.direction);
             }
             if (s.target_sector) {
-                set.action.button.rctc(x,y,scl*0.25,scl*0.25,0);                
+                if (s.action) set.action.button.rctc(x,y,scl*0.25,scl*0.25,0);                
                 if (s.target_sector != sector) {
                     const ts = m.sectors[s.target_sector];
                     const tmx = this.transformByDir(ts.x, ts.y, s.target_side);
@@ -244,7 +250,7 @@ export class MapDraw {
                     }
                 }
                 if (sd.target_sector) {
-                    this.drawAction(set.action.wall, mx);
+                    if (sd.action) this.drawAction(set.action.wall, mx);
                     if (sd.target_sector != sector) {
                         const ts = m.sectors[sd.target_sector];
                         const tmx = this.transformByDir(ts.x, ts.y, sd.target_side);
@@ -294,10 +300,92 @@ export class MapDraw {
         const y = bbox.top - h;
         this.dim={width:3*w,height: 3*h};
         svg.setAttribute("viewBox", `${x} ${y} ${this.dim.width} ${this.dim.height}`);
-        this.svg = svg;
-        
+        this.svg = svg;        
+        this.rect_selction = null;
+        this.selection = null;
+        this.focus = null;
+
         return this.svg;
     }
+
+    drawSelectionBox(x1:number, y1:number, x2: number, y2:number) {
+        if (this.svg) {
+            const rc = rectFromPoints(x1,y1,x2,y2);
+            const s = this.scale;
+            const s2 = s>>1;
+            if (this.rect_selction) {
+                this.svg.removeChild(this.rect_selction);
+            }
+            if (rc.width == 0 || rc.height == 0)  this.rect_selction = SVGDrawing.createLine(rc.left*s-s2, rc.top*s-s2, rc.right*s-s2, rc.bottom*s-s2,{},"rect-selection");
+            else this.rect_selction = SVGDrawing.createRectangle(rc.x*s-s2, rc.y*s-s2, rc.width*s, rc.height*s,{},"rect-selection");
+            this.svg.appendChild(this.rect_selction);
+        }
+    }
+
+    drawSelectedSectors(m: MapFile, level:number, sectors: number[]) {
+        if (this.svg) {
+            if (this.selection) {
+                this.svg.removeChild(this.selection);
+            }
+            const p = new SVGPath("selection")
+            const scl = this.scale;
+            sectors.forEach(n=>{
+                const s = m.sectors[n];
+                if (s && s.level == level) {
+                    const x= s.x*scl;
+                    const y= s.y*scl;
+                    p.rctc(x,y,scl,scl);                    
+                }
+            });
+            this.selection = p.build();
+            this.svg.append(this.selection);
+        }
+    }
+
+    removeSelectionBox() {
+        if (this.rect_selction) {
+            this.svg?.removeChild(this.rect_selction);
+            this.rect_selction = null;
+        }
+    }
+
+    drawFocusedWall(m: MapFile, level: number, sector: number, side: number) {
+        if (this.svg && side >= 0 && side < 4) { 
+            if (this.focus) {
+                this.svg.removeChild(this.focus);                
+            }
+            const p = new SVGPath("focus");
+            const q = new SVGPath("focus-bgr");
+            const w = new SVGPath("focus-itm");
+            const scl = this.scale;
+            const sect = m.sectors[sector];
+            if (sect && sect.level == level) {
+                const x = sect.x;
+                const y = sect.y;
+                const trn = this.transformByDir(x,y,side);
+                if (trn) {                    
+                    p.mt(...trn.xyof(0,0))
+                     .lt(...trn.xyof(1,0))
+                     .lt(...trn.xyof(1,0.2))
+                     .lt(...trn.xyof(0,0.2))
+                     .close();
+                    p.mt(...trn.xyof(0.5,0.2))
+                     .lt(...trn.xyof(0.4,0.5))
+                     .lt(...trn.xyof(0.6,0.5))
+                     .close();
+                    q.rctc(...trn.xyof(0.5,0.5),this.scale,this.scale);
+                    w.mt(...trn.xyof(0.25,0.25)).circle(0.2*this.scale);
+                    this.focus = SVGDrawing.createElement("g");                    
+                    this.svg.appendChild(this.focus);
+                    this.focus.appendChild(q.build());
+                    this.focus.appendChild(w.build());
+                    this.focus.appendChild(p.build());
+                    
+                }
+            }
+        }
+    }
+
 
     private drawStairs(p:SVGPath, x:number, y:number) {           
         const figure = [[2,0],[3,0],[3,3],[0,3],[0,2],[1,2],[1,1],[2,1]]
@@ -401,8 +489,7 @@ export class MapDraw {
         path.mt(...mx.xyof(0.25,0))
             .lt(...mx.xyof(0.25,-0.25))
             .lt(...mx.xyof(0.75,-0.25))
-            .lt(...mx.xyof(0.75,0))
-            .close();
+            .lt(...mx.xyof(0.75,0));            
     }
 
     private drawBezierArrow(path: SVGPath, 
@@ -518,6 +605,13 @@ export class MapContainer {
     scale = 1;
     scrollLeft = 0;
     scrollTop = 0;
+
+    onClickXY = (pt: DOMPointReadOnly, shift: boolean, control: boolean) => {
+        console.log("Clicked at:" , pt, shift,control);
+    };
+    onSelectRect = (rc: DOMRectReadOnly,shift:boolean, control:boolean) => {
+        console.log("Selected:", rc, shift, control);
+    };
 
     constructor() {
         this.map = null;
@@ -664,10 +758,9 @@ export class MapContainer {
                             this.scrollTop = this.container.scrollTop = dragStart[3] - dy;
                         }  
                         else if (dragButton == 0) {
-//                            const pt1 = this.clientToMapLocationRound({x:dragStart[0],y:dragStart[1]});
-//                            const pt2 = this.clientToMapLocationRound({x:event.clientX,y:event.clientY});
-/*                            const rect = make_rect(pt1,pt2);
-                            this.map.selection.set(rect.left,rect.top,rect.right,rect.bottom);*/
+                            const pt1 = this.clientToMap([dragStart[0], dragStart[1]], true);
+                            const pt2 = this.clientToMap([event.clientX,event.clientY], true);
+                            this.map?.drawSelectionBox(...pt1,...pt2);
                         }
                     }               
                 }
@@ -679,50 +772,27 @@ export class MapContainer {
                 event.preventDefault(); 
                 if (dragButton == 0) {
                     if (!dragStart[4]) {
-//                        const pt = this.clientToMapLocationFloor({x:event.clientX,y:event.clientY});
-//                        const sector = this.find_sector_at(pt.x,pt.y) || 0;
-//                        this.#dist.single_select.trigger({map:this.map,sector:sector,shift:event.shiftKey});
+                        const pt = this.clientToMap([dragStart[0], dragStart[1]], false);
+                        this.onClickXY(new DOMPointReadOnly(...pt), event.shiftKey, event.ctrlKey);
                     } else {
-/*                        const pt1 = this.clientToMapLocationRound({x:dragStart[0],y:dragStart[1]});
-                        const pt2 = this.clientToMapLocationRound({x:event.clientX,y:event.clientY});
-                        const rect = make_rect(pt1,pt2);
-                        const sectors = [];
-                        let line = false;
-                        if (rect.left == rect.right || rect.bottom == rect.top) {
-                            line = true;
-                            for (const s in this.map.layout) {
-                                const [x, y] = s.split(',').map(Number);
-                                if ((x >=rect.left && x < rect.right && y == rect.bottom && y == rect.top)
-                                 || (x ==rect.left && x == rect.right && y < rect.bottom && y >= rect.top)) {                                    
-                                        sectors.push(this.map.layout[s]);
-                                }                            
-                            }
-                            this.#dist.draw_line.trigger({map:this.map,rect:rect, sectors:sectors, shift:event.shiftKey});
-                        } else {
-                            for (const s in this.map.layout) {
-                                const [x, y] = s.split(',').map(Number);
-                                if (x >=rect.left && y >= rect.top &&
-                                    x < rect.right && y < rect.bottom) {
-                                        sectors.push(this.map.layout[s]);
-                                }                            
-                            }
-                            this.#dist.multiple_select.trigger({map:this.map,rect:rect, sectors:sectors, shift:event.shiftKey});
-                        }
-                        this.map.selection.clear();
-*/
-
+                        const pt1 = this.clientToMap([dragStart[0], dragStart[1]], true);
+                        const pt2 = this.clientToMap([event.clientX,event.clientY], true);
+                        this.map?.removeSelectionBox();
+                        this.onSelectRect(rectFromPoints(...pt1,...pt2), event.shiftKey, event.ctrlKey);
+                    
                     }                
                 }              
                 if (dragButton!=-1) {
                     dragStart = [];
-                    this.container.style.cursor = 'default';   
+                    this.container.style.cursor = 'pointer';   
                     dragButton = -1;
                     this.container.releasePointerCapture(event.pointerId);                    
                 }
             }
             
         });
-    }
+
+        this.container.style.cursor = 'pointer';    }
     
     center() {
         const inner = this.container.firstChild as SVGSVGElement;
@@ -739,36 +809,39 @@ export class MapContainer {
     }
 
 
-    clientToMap(point :[number, number]) : [number,number]{
-        if (this.map && this.map.svg) {
-            const svgRect = this.map.svg.getBoundingClientRect();
-            const containerRect = this.container.getBoundingClientRect();
-            const scale = this.scale;
 
-            // Calculate the mouse position relative to the SVG element
-            const svgX = (point[0] - svgRect.left) / scale;
-            const svgY = (point[1] - svgRect.top) / scale;
 
-            // Adjust for the SVG viewBox offset
-            const viewBox = this.map.svg.viewBox.baseVal;
-            return [svgX + viewBox.x,svgY + viewBox.y];
+    clientToMap(point :[number, number], vertex?: boolean) : [number,number]{
+        if (this.map?.svg) {
+
+
+            const pt = new DOMPointReadOnly(...point);
+            const mx = this.map.svg.getScreenCTM();
+            const ptt = pt.matrixTransform(mx?.inverse());
+            const scale = this.map.scale;
+            const shft = vertex?scale/2:0;
+            return [Math.round((ptt.x+shft)/this.map.scale), Math.round((ptt.y+shft)/this.map.scale)];
         } else {
             return point
         }
     }
+}
 
-    clientToMapLocationRound(point:[number,number]) : [number, number]{
-        let pt = this.clientToMap(point);
-        return [Math.round(pt[0]/this.scale),Math.round(pt[1]/this.scale)];
-    }
-    clientToMapLocationFloor(point:[number, number]) : [number, number] {
-        let pt = this.clientToMap(point);
-        return [Math.floor(pt[0]/this.scale),Math.floor(pt[1]/this.scale)];        
-    }
-    find_sector_at(x:number,y:number) {
-        return this.map?.layout[`${x},${y}`];
-    }
 
+export function findSectorAtPos(m: MapFile, level: number , pt: DOMPointReadOnly) : number  {
+    return m.sectors.findIndex(s=>{
+        return Math.abs(s.x - pt.x) < 0.5 && Math.abs(s.y - pt.y) < 0.5 && s.level == level;
+    })
+}
+
+export function makeSectorSelection(m: MapFile, level: number , rect: DOMRectReadOnly) : number[] {    
+    return m.sectors.reduce((a,s,idx) => {
+        if (s.level == level && rect.left-0.5 < s.x && rect.right+0.5 > s.x
+                                && rect.top-0.5 < s.y && rect.bottom+0.5 > s.y) {
+                                    a.push(idx);
+                                }
+        return a;
+    },[] as number[]);
 }
 
 

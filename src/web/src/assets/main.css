@@ -102,3 +102,41 @@ button.close::before {
 input, button, select {
   font-size: 1rem;
 }
+
+.popup-lb {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #0008;
+}
+
+.popup-lb > div{
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: fit-content;
+  height: fit-content;
+  overflow: auto;
+  background-color: #ccc;
+  max-width: 95vw;
+  max-height: 95vh;
+  margin: auto;
+  box-shadow: 3px 3px 5px black;
+}
+
+.popup-lb .buttons {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: #bbb;
+  justify-content: flex-end;
+
+}
+
+.popup-lb .buttons  > * {
+  width: 6rem;
+}

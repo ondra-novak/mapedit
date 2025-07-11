@@ -824,17 +824,26 @@ export class RawMapFile {
 }
 
 
-abstract class AssetConfiguration {
+export abstract class AssetConfiguration {
     name : string | null = null;
     abstract get_key() : string 
     get_name() : string {
-        return this.name || this.get_key();
+        if (this.name) return this.name;
+        const pxms = this.get_pixmaps();
+        const s = pxms[0]?pxms[0][0]:""
+        if (s) {
+            if (pxms.length == 1) return s;
+            else return `${s} (${pxms.length})`;
+        } else {
+            return this.name || this.get_key();
+        }
     }
     abstract get_pixmaps():string[][];
+
 }
 
 
-class WallConfiguration extends AssetConfiguration{
+export class WallConfiguration extends AssetConfiguration{
     graphics: string[][] = [];
     anim_frames: number = 0;
     alternate: boolean = false;
@@ -945,7 +954,7 @@ export class ArcConfiguration extends AssetConfiguration {
 
 
 
-const FloorCeilMode = {
+export const FloorCeilMode = {
     SINGLE: 0,
     ALTERNATE: 1,
     TWO_DIRECTIONS: 2,
@@ -994,8 +1003,17 @@ export class FloorCeilConfiguration extends AssetConfiguration {
 
 }
 
-class ConfigurationPalette<T extends AssetConfiguration> {
-    map: Record<string, T> = {};
+export class ConfigurationPalette<T extends AssetConfiguration> {
+    map: Record<string, T> = {};    
+    type: new (...args: any[]) => T;
+
+    constructor(ctor: new (...args: any[]) => T) {
+        this.type = ctor;
+    }
+
+    holds(ctor: new (...args: any[]) => any) : boolean{
+        return this.type == ctor;
+    }
 
     add(conf: T|null) : T|null{
         if (conf === null) return conf;
@@ -1087,17 +1105,17 @@ class ConfigurationSaveMap {
 export class MapFile {
     
     sectors: MapSector[] = [];
-    wall_palette = new ConfigurationPalette<WallConfiguration>;
-    arc_palette = new ConfigurationPalette<ArcConfiguration>;
-    floor_pallete = new ConfigurationPalette<FloorCeilConfiguration>;
-    ceil_palette = new ConfigurationPalette<FloorCeilConfiguration>
+    wall_palette = new ConfigurationPalette<WallConfiguration>(WallConfiguration);
+    arc_palette = new ConfigurationPalette<ArcConfiguration>(ArcConfiguration);
+    floor_pallete = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration);
+    ceil_palette = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration)
     info = new MAPGLOBAL;
 
     static from(map_or_buff: RawMapFile | ArrayBuffer) {
-        const w = new ConfigurationPalette<WallConfiguration>;
-        const a = new ConfigurationPalette<ArcConfiguration>;
-        const f = new ConfigurationPalette<FloorCeilConfiguration>;
-        const c = new ConfigurationPalette<FloorCeilConfiguration>;
+        const w = new ConfigurationPalette<WallConfiguration>(WallConfiguration);
+        const a = new ConfigurationPalette<ArcConfiguration>(ArcConfiguration);
+        const f = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration);
+        const c = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration);
         let m: RawMapFile;
         if (map_or_buff instanceof RawMapFile) {
             m = map_or_buff;

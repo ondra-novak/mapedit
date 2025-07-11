@@ -14,6 +14,7 @@ import svg_pencil from '@/assets/toolbar/pencil.svg'
 import svg_eraser from '@/assets/toolbar/eraser.svg'
 import svg_chest from '@/assets/toolbar/chest.svg'
 import svg_enemy from '@/assets/toolbar/enemy.svg'
+import PalleteEditor from '@/components/PalleteEditor.vue';
 
 const EditMode = {
     Edit:0,
@@ -32,6 +33,10 @@ const settings = reactive(globalState("mapview_settings",{
 }));
 const mapcontainer = globalState("mapcontainer",()=>new MapContainer);
 const layers_opened = ref(false);
+
+const cur_palettes = reactive(globalState("palette", {
+    wall:"",floor:"",ceil:"",arcs:""
+}));
 
 
 
@@ -158,6 +163,14 @@ onUnmounted(StatusBar.onFinalSave)
                             disable_items:!layers.items
                             }"></div>
 </div>                            
+<div class="right">
+    <div class="palette">
+        <div><span>Wall</span><PalleteEditor :palette="curmap.wall_palette" :listview="true" v-model="cur_palettes.wall"></PalleteEditor></div>
+        <div><span>Arc</span><PalleteEditor :palette="curmap.arc_palette" :listview="true" v-model="cur_palettes.arcs"></PalleteEditor></div>
+        <div><span>Floor</span><PalleteEditor :palette="curmap.floor_pallete" :listview="true" v-model="cur_palettes.floor"></PalleteEditor></div>
+        <div><span>Ceil</span><PalleteEditor :palette="curmap.ceil_palette" :listview="true" v-model="cur_palettes.ceil"></PalleteEditor></div>
+    </div>
+</div>
 <div class="layers" v-if="layers_opened">
     <button class="close" @click="layers_opened=false"></button>
     <x-form>
@@ -232,6 +245,27 @@ x-workspace {
 .mapcont {
     height: 100%;
 }
+
+.right {
+    width: 20rem;
+
+}
+
+.right .palette {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+
+.right .palette > div {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+}
+
+
 
 
 </style>

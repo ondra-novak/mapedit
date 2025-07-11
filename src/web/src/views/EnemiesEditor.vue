@@ -478,9 +478,9 @@ function closeAppearence() {
                             <option v-if="palettes && palettes.palettes.length>0" :value="palettes.palettes.length">Randomize</option>
                             <option v-for="(p, idx) of (palettes?palettes.palettes:[])" :key="idx" :value="-idx-1">Palette {{ idx }}</option>
                         </select></label>
-                        <label><span>Speed (px per frame)</span><input type="number" v-model="form.speed"></label>
-                        <label><span>Sight range</span><input type="number" v-model="form.sightrange"></label>
-                        <label><span>Engage range</span><input type="number" v-model="form.engagerange"></label>
+                        <label><span>Speed (px per frame)</span><input v-watch-range type="number" v-model="form.speed" min="0" max="200"></label>
+                        <label><span>Sight range</span><input v-watch-range type="number" v-model="form.sightrange"  min="0" max="100"></label>
+                        <label><span>Engage range</span><input v-watch-range type="number" v-model="form.engagerange"  min="0" max="100"></label>
                     </x-form>
                 </x-section>
                 <x-section>
@@ -510,15 +510,15 @@ function closeAppearence() {
             <x-section>
                 <x-form>
                     <x-section-title>Stats</x-section-title>
-                    <label><span>Hit points</span><input v-model="form.stat_hp" type="number" min="0" max="65535"/></label>
-                    <label><span>Strength</span><input v-model="form.stat_str"type="number" min="0" max="100"/></label>
-                    <label><span>Magic (% of casting)</span><input v-model="form.stat_mg" type="number" min="0" max="100"/></label>
-                    <label><span>Movement (/15 actions)</span><input v-model="form.stat_mv" type="number" min="0" max="100"/></label>
-                    <label><span>Dexterity</span><input v-model="form.stat_dex" type="number" min="0" max="100"/></label>
-                    <label><span>Defense</span><div><input v-model="form.stat_def_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_def_max" type="number" min="0" max="65535"/></div></label>
-                    <label><span>Attack</span><div><input v-model="form.stat_att_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_att_max" type="number" min="0" max="65535"/></div></label>
-                    <label><span>Extra damage</span><input v-model="form.stat_damage" type="number" /></label>
-                    <label><span>Magic attack</span><div><input v-model="form.stat_mg_min" type="number" min="0" max="65535"/>-<input v-model="form.stat_mg_min" type="number" min="0" max="65535"/></div></label>
+                    <label><span>Hit points</span><input v-model="form.stat_hp" v-watch-range type="number" min="0" max="65535"/></label>
+                    <label><span>Strength</span><input v-model="form.stat_str"v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Magic (% of casting)</span><input v-model="form.stat_mg" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Movement (/15 actions)</span><input v-model="form.stat_mv" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Dexterity</span><input v-model="form.stat_dex" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Defense</span><div><input v-model="form.stat_def_min" v-watch-range type="number" min="0" max="65535"/>-<input v-model="form.stat_def_max" v-watch-range type="number" min="0" max="65535"/></div></label>
+                    <label><span>Attack</span><div><input v-model="form.stat_att_min" v-watch-range type="number" min="0" max="65535"/>-<input v-model="form.stat_att_max" v-watch-range type="number" min="0" max="65535"/></div></label>
+                    <label><span>Extra damage</span><input v-model="form.stat_damage" v-watch-range type="number" /></label>
+                    <label><span>Magic attack</span><div><input v-model="form.stat_mg_min" v-watch-range type="number" min="0" max="65535"/>-<input v-model="form.stat_mg_min" v-watch-range type="number" min="0" max="65535"/></div></label>
                     <label><span>Magic attack type</span><div><select v-model="form.stat_mg_type">
                         <option value="-1">--select--</option>
                         <option value="0">fire</option>
@@ -527,12 +527,12 @@ function closeAppearence() {
                         <option value="3">air</option>
                         <option value="4">mind</option>
                     </select></div></label>
-                    <label><span>Protection (fire)</span><input  v-model="form.stat_prot_f" type="number" min="0" max="100"/></label>
-                    <label><span>Protection (water)</span><input  v-model="form.stat_prot_w" type="number" min="0" max="100"/></label>
-                    <label><span>Protection (earth)</span><input  v-model="form.stat_prot_e" type="number" min="0" max="100"/></label>
-                    <label><span>Protection (air)</span><input  v-model="form.stat_prot_a" type="number" min="0" max="100"/></label>
-                    <label><span>Protection (mind)</span><input  v-model="form.stat_prot_m" type="number" min="0" max="100"/></label>
-                    <label><span>Regeneration</span><input v-model="form.stat_reg" type="number" min="0" max="65535"/></label>
+                    <label><span>Protection (fire)</span><input  v-model="form.stat_prot_f" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Protection (water)</span><input  v-model="form.stat_prot_w" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Protection (earth)</span><input  v-model="form.stat_prot_e" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Protection (air)</span><input  v-model="form.stat_prot_a" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Protection (mind)</span><input  v-model="form.stat_prot_m" v-watch-range type="number" min="0" max="100"/></label>
+                    <label><span>Regeneration</span><input v-model="form.stat_reg" v-watch-range type="number" min="0" max="65535"/></label>
                 </x-form>
             </x-section>
             <x-section>
@@ -559,9 +559,9 @@ function closeAppearence() {
                     <label><input type="checkbox" v-model="chk_f2.MOB_SENSE"/><span>See invisible</span></label>
                     <label><input type="checkbox" v-model="chk_f1.MOB_GUARD"/><span>Guarding the home room</span></label>
                     <label><input type="checkbox" v-model="chk_f1.MOB_PICK"/><span>Scavenger</span></label>
-                    <label><input type="checkbox" v-model="chk_f2.MOB_CASTING"/><span>Spellcaster - spell id: <input v-model="form.casting" type="number"></span></label>
+                    <label><input type="checkbox" v-model="chk_f2.MOB_CASTING"/><span>Spellcaster - spell id: <input v-model="form.casting" v-watch-range type="number"></span></label>
                     <label><input type="checkbox" v-model="chk_f1.MOB_ROGUE"/><span>Ranger (shoots): </span></label>
-                    <label><span>Flee probability [%]</span><input v-model="form.flee_prob" type="number" min="0" max="100"/></label>
+                    <label><span>Flee probability [%]</span><input v-model="form.flee_prob" v-watch-range type="number" min="0" max="100"/></label>
                     <label><span>Special Behavior</span><select v-model="form.specproc">
                         <option value="0">Nothing</option>
                         <option value="2">Turn around in cycle</option>
@@ -573,15 +573,15 @@ function closeAppearence() {
                         <option value="8">Attack at wimpy</option>
                         <option value="9">Held on place</option>
                     </select></label>
-                    <label><span>Dialog number</span><input type="number" v-model="form.dialognum"></label>
+                    <label><span>Dialog number</span><input v-watch-range type="number" v-model="form.dialognum"  min="0" max="32767"></label>
                 </x-form>
             </x-section>
             <x-section>
                 <x-section-title>Other properties</x-section-title>
                 <x-form>
-                    <label><span>Drop money</span><input v-model="form.money" type="number" min="0" max="65535"/></label>
-                    <label><span>Total experience</span><input v-model="form.exp" type="number" min="0" max="999999"/></label>
-                    <label><span>Kill experience</span><input v-model="form.bonus_exp" type="number" min="0" max="999999"/></label>
+                    <label><span>Drop money</span><input v-model="form.money" v-watch-range type="number" min="0" max="65535"/></label>
+                    <label><span>Total experience</span><input v-model="form.exp" v-watch-range type="number" min="0" max="999999"/></label>
+                    <label><span>Kill experience</span><input v-model="form.bonus_exp" v-watch-range type="number" min="0" max="999999"/></label>
                     <label><span>Inventory</span></label>
                     <div class="inventory">
                      <div v-for="n of form.inventory.filter(x=>x)">{{ items[n-1].jmeno }} <button @click="inventory_erase(n)">X</button></div>

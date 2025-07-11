@@ -254,12 +254,16 @@ export class SVGDrawing {
     }
 
 
-/*    createRectangle(x, y, width, height, attributes = {}, className = "") {
-        const rect = this.createElement("rect", { x, y, width, height, ...attributes }, className);
-        this.appendElement(rect);
-        return rect;
+    static createRectangle(x:number, y:number, width:number, height:number, attributes = {}, className = "") {
+        return this.createElement("rect", { x:round(x), y:round(y), width:round(width), height:round(height), ...attributes }, className);
     }
 
+    static createLine(x1:number, y1:number, x2:number, y2:number, attributes = {}, className = "") {
+        return this.createElement("line", { x1:round(x1), y1:round(y1), x2:round(x2), y2:round(y2), ...attributes }, className);
+        
+    }
+
+    /*
     createCircle(cx, cy, r, attributes = {}, className = "") {
         const circle = this.createElement("circle", { cx, cy, r, ...attributes }, className);
         this.appendElement(circle);
