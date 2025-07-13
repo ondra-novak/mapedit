@@ -605,6 +605,7 @@ export class MapContainer {
     scale = 1;
     scrollLeft = 0;
     scrollTop = 0;
+    cursor = "default";
 
     onClickXY = (pt: DOMPointReadOnly, shift: boolean, control: boolean) => {
         console.log("Clicked at:" , pt, shift,control);
@@ -618,6 +619,11 @@ export class MapContainer {
         this.container = document.createElement("DIV");
         this.container.setAttribute("class","mapview");
         this.init_events();
+    }
+
+    set_cursor(cursor:string) {
+        this.cursor = cursor;
+        this.container.style.cursor = this.cursor;
     }
 
     add_to_DOM(new_parent: HTMLElement) {
@@ -784,15 +790,15 @@ export class MapContainer {
                 }              
                 if (dragButton!=-1) {
                     dragStart = [];
-                    this.container.style.cursor = 'pointer';   
+                    this.container.style.cursor = this.cursor;   
                     dragButton = -1;
                     this.container.releasePointerCapture(event.pointerId);                    
                 }
             }
             
         });
-
-        this.container.style.cursor = 'pointer';    }
+        this.container.style.cursor = this.cursor;
+     }
     
     center() {
         const inner = this.container.firstChild as SVGSVGElement;

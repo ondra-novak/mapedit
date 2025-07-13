@@ -839,21 +839,25 @@ export abstract class AssetConfiguration {
         }
     }
     abstract get_pixmaps():string[][];
+    abstract clone(): AssetConfiguration;
 
 }
 
 
 export class WallConfiguration extends AssetConfiguration{
-    graphics: string[][] = [];
+    graphics: string[][] = [["","",""]];
     anim_frames: number = 0;
+    position: number=0;
     alternate: boolean = false;
-    reverse_dir: boolean = false;
+    forward_dir: boolean = false;
     repeat_anim: boolean = false;
     ping_pong: boolean = false;
     allow_offset: boolean = false;
+    secondary_front: boolean = false;
     offset_x:number = 250;
     offset_y:number = 160;
     lclip: number = 0;    
+    
 
 
     static from(side:TSIDE, fronts: string[], lefts: string[], rights: string[], sec: boolean ) : WallConfiguration | null{
@@ -863,21 +867,23 @@ export class WallConfiguration extends AssetConfiguration{
 
         r.alternate = sec?false:((side.flags & SideFlag.DOUBLE_SIDE) != 0);
         r.anim_frames = ((sec?side.sec_anim:side.prim_anim) & 0xF)+1;
-        r.reverse_dir = sec?((side.flags & SideFlag.SEC_FORV) == 0):((side.flags & SideFlag.PRIM_FORV) == 0);
+        r.forward_dir = sec?((side.flags & SideFlag.SEC_FORV) != 0):((side.flags & SideFlag.PRIM_FORV) != 0);
         r.ping_pong = sec?((side.flags & SideFlag.SEC_GAB) != 0):((side.flags & SideFlag.PRIM_GAB) != 0);
         r.repeat_anim = sec?((side.flags & SideFlag.SEC_ANIM) != 0):((side.flags & SideFlag.PRIM_ANIM) != 0);
+        r.position = sec?0:((side.oblouk & 0x60)>>5);
         const count_graphics = r.anim_frames*(r.alternate?2:1);
-
+        r.graphics = [];
         for (let l = 0; l < count_graphics; ++l) {
             const idx = l+side_id-1;
             r.graphics.push([fronts[idx],lefts[idx],rights[idx]]);
         }
+        r.offset_x = side.xsec*2;
+        r.offset_y = side.ysec*2;
         if ((side.flags & SideFlag.SPEC) == 0 && sec) {
-            r.offset_x = side.xsec*2;
-            r.offset_y = side.ysec*2;
-            r.allow_offset = r.offset_x != 250 || r.offset_y != 160;
+            r.allow_offset = true;
         }
         r.lclip = side.lclip;
+        r.secondary_front = (side.target_side & 0x80) != 0
         return r;
     }
 
@@ -891,7 +897,9 @@ export class WallConfiguration extends AssetConfiguration{
             this.alternate?"X":"S",
             this.repeat_anim?"R":"N",
             this.ping_pong?"P":"N",
-            this.allow_offset?"O":"S",                        
+            this.allow_offset?"O":"S",                      
+            this.position,
+            this.secondary_front?"F":"B",
             this.lclip.toString(36),
         ]
         if (this.allow_offset) {
@@ -904,21 +912,20 @@ export class WallConfiguration extends AssetConfiguration{
         return this.graphics;
     }
 
-    adjust_flags_prim(flags: number) : number{
-        flags &= ~(SideFlag.PRIM_ANIM|SideFlag.PRIM_FORV|SideFlag.PRIM_GAB|SideFlag.DOUBLE_SIDE);
-        if (this.alternate) flags |=SideFlag.DOUBLE_SIDE;
-        if (this.repeat_anim) flags |=SideFlag.PRIM_ANIM;
-        if (!this.reverse_dir) flags |= SideFlag.PRIM_FORV;
-        if (this.ping_pong) flags |= SideFlag.PRIM_GAB;
-        return flags;
+    adjust_flags_prim(side: TSIDE) {
+        side.flags &= ~(SideFlag.PRIM_ANIM|SideFlag.PRIM_FORV|SideFlag.PRIM_GAB|SideFlag.DOUBLE_SIDE);
+        if (this.alternate) side.flags |=SideFlag.DOUBLE_SIDE;
+        if (this.repeat_anim) side.flags |=SideFlag.PRIM_ANIM;
+        if (this.forward_dir) side.flags |= SideFlag.PRIM_FORV;
+        if (this.ping_pong) side.flags |= SideFlag.PRIM_GAB;
     }
-    adjust_flags_sec(flags: number) : number{
-        flags &= ~(SideFlag.SEC_ANIM|SideFlag.SEC_FORV|SideFlag.SEC_GAB|SideFlag.SPEC);
-        if (!this.allow_offset) flags |=SideFlag.SPEC;
-        if (this.repeat_anim) flags |=SideFlag.SEC_ANIM;
-        if (!this.reverse_dir) flags |= SideFlag.SEC_FORV;
-        if (this.ping_pong) flags |= SideFlag.SEC_GAB;
-        return flags;
+    adjust_flags_sec(side: TSIDE){
+        side.flags &= ~(SideFlag.SEC_ANIM|SideFlag.SEC_FORV|SideFlag.SEC_GAB|SideFlag.SPEC);
+        if (!this.allow_offset) side.flags |=SideFlag.SPEC;
+        if (this.repeat_anim) side.flags |=SideFlag.SEC_ANIM;
+        if (this.forward_dir) side.flags |= SideFlag.SEC_FORV;
+        if (this.ping_pong) side.flags |= SideFlag.SEC_GAB;
+        return side.flags;
     }
     get_anim() : number {
         if (this.anim_frames > 1 && this.anim_frames <= 16) {
@@ -928,6 +935,13 @@ export class WallConfiguration extends AssetConfiguration{
             return 0;
         }
 
+    }
+
+    clone(): AssetConfiguration {
+        const nw = new WallConfiguration();
+        Object.assign(nw, this);
+        nw.graphics = nw.graphics.map(x=>x.slice());
+        return nw;
     }
 
 }
@@ -950,24 +964,29 @@ export class ArcConfiguration extends AssetConfiguration {
     get_pixmaps(): string[][] {
         return [[this.left,this.right]];
     }
+
+    clone(): AssetConfiguration {
+        return Object.assign(new ArcConfiguration(), this);
+    }
 }
 
 
 
 export const FloorCeilMode = {
+    ANIMATED:-1,
     SINGLE: 0,
     ALTERNATE: 1,
     TWO_DIRECTIONS: 2,
     TWO_DIRECTIONS_ALTERNATE: 3,
     FOUR_DIRECTIONS: 4,
     FOUR_DIRECTIONS_ALTERNATE: 5,
-}
+} as const;
+
+export const FloorCeilModeRequiredFrames = [1,2,2,4,4,8] as const;
 
 export class FloorCeilConfiguration extends AssetConfiguration {
-    pixmaps:string[] = [];
-    animation: boolean = false;
-    frames: number = 0;
-    mode = FloorCeilMode.SINGLE;
+    pixmaps:string[] = [""];
+    mode : number = FloorCeilMode.SINGLE;
     
     static from(sector: TSECTOR, layout: TMAP_LAYOUT, lists: string[], is_ceil: boolean) : FloorCeilConfiguration|null{
         const ret = new FloorCeilConfiguration;
@@ -977,11 +996,12 @@ export class FloorCeilConfiguration extends AssetConfiguration {
         let f = sector.flags;
         if (is_ceil) f = f >> 4;
         f = f & 0xF;
-        ret.animation = (f & 0x8) != 0;
-        ret.frames = (f & 0x7)+1;
+        const animation = (f & 0x8) != 0;
+        const frames = (f & 0x7)+1;
         ret.mode = f & 0x7;
-        if (ret.animation) {
-            ret.pixmaps = lists.slice(id, id+ret.frames);
+        if (animation) {
+            ret.pixmaps = lists.slice(id, id+frames);
+            ret.mode = FloorCeilMode.ANIMATED;
         } else {
             const cnts  = [1,2,2,4,4,8];
             ret.pixmaps = lists.slice(id, id+cnts[ret.mode]);
@@ -990,15 +1010,20 @@ export class FloorCeilConfiguration extends AssetConfiguration {
     }
 
     get_key() {        
-        return [this.pixmaps[0],this.animation?"!":"#",this.frames.toString(36),this.mode.toString(36)].join("");
+        return [this.pixmaps[0],this.mode.toString(),this.pixmaps.length.toString(36)].join("");
     }
 
     get_pixmaps(): string[][] {
         return this.pixmaps.map(x=>[x]);
     }
     get_flags() {
-        if (this.animation) return 0x8 | (this.frames-1);
+        if (this.mode == FloorCeilMode.ANIMATED) return 0x8 | (this.pixmaps.length & 0x7);
         else return this.mode;
+    }
+    clone(): AssetConfiguration {
+        const nw =  Object.assign(new FloorCeilConfiguration(), this);
+        nw.pixmaps = nw.pixmaps.slice();
+        return nw;
     }
 
 }
@@ -1047,6 +1072,7 @@ export class MapSide {
     target_sector: number = 0;
     niche: NicheDef | null = null; 
     actions: TMA_GEN[] = [];
+    item_can_be_placed_behind: boolean = false;
     items: number[] = [];      //items always lying in front of side on left 
 }
 
@@ -1054,7 +1080,7 @@ export class MapSector {
 
     floor: FloorCeilConfiguration | null = null;
     ceil: FloorCeilConfiguration | null = null;
-    type: number = 0;
+    type: number = SectorType.Empty;
     flags: number = 0;
     action: number = 0;
     target_side :number = 0;
@@ -1138,10 +1164,11 @@ export class MapFile {
                 n.action = side.action;
                 n.flags = side.flags;
                 n.target_sector = side.target_sector;
-                n.target_side = side.target_side;                
+                n.target_side = side.target_side & 0x3;                
                 n.niche = m.niches[place] || null;
                 n.actions = m.actions[place] || [];
                 n.items = m.items[place] || [];
+                n.item_can_be_placed_behind = (side.oblouk & 0x80) != 0;
                 nw.side[i] = n;
                 
             }
@@ -1204,30 +1231,29 @@ export class MapFile {
             return sect.side.map((s,side)=>{
                 const out = new TSIDE;
                 out.action = s.action;
-                let f = s.flags;
+                out.flags = s.flags;
                 out.prim = walls.to_id(s.primary);
                 out.sec = walls.to_id(s.secondary);
+                out.oblouk = arc.to_id(s.arc) | ((s.primary?.position || 0) << 5) | (s.item_can_be_placed_behind?0x80:0);
+                out.target_sector = s.target_sector;
+                out.target_side = s.target_side;
                 if (s.primary) {
-                    f = s.primary.adjust_flags_prim(f);
+                    s.primary.adjust_flags_prim(out);
                     out.prim_anim = s.primary.get_anim();
                     out.lclip = s.primary.lclip;                    
-                    if (f & SideFlag.DOUBLE_SIDE) {
+                    if (out.flags & SideFlag.DOUBLE_SIDE) {
                         const alt = ((sect.x + sect.y + side) & 1) != 0;
                         if (alt) out.prim+=(s.primary.anim_frames);
                     }
                 } 
                 if (s.secondary) {
-                    f = s.secondary.adjust_flags_sec(f);
+                    s.secondary.adjust_flags_sec(out);
                     out.sec_anim = s.secondary.get_anim();
                     if (s.secondary.allow_offset) {
                         out.xsec = s.secondary.offset_x>>1;
                         out.ysec = s.secondary.offset_y>>1;                        
                     }                    
                 }
-                out.flags = f;
-                out.oblouk = arc.to_id(s.arc);
-                out.target_sector = s.target_sector;
-                out.target_side = s.target_side;                
                 return out;
 
             });
@@ -1330,5 +1356,20 @@ export class MapFile {
 
 }
 
+export class GlobalPaletteConfiguration<T extends AssetConfiguration> {
+    list: T[] = [];
+
+    merge(palette: ConfigurationPalette<T>) {
+        const m = Object.assign({} as Record<string, T>, palette.map);
+        this.list.forEach(x=>{
+            const k = x.get_key();
+            if (m[k]) return;
+            m[k] = x;
+        });
+        this.list = Object.values(m);
+    }
+    
+
+}
 
 

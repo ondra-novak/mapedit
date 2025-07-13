@@ -1,28 +1,28 @@
 <script setup lang="ts">
 import { server, type Config } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, WallConfiguration } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, FloorCeilMode, FloorCeilModeRequiredFrames, GlobalPaletteConfiguration, WallConfiguration } from '@/core/map_structs';
 import { shallowClone } from '@/utils/document';
-import { nextTick, ref, Teleport, watch, type Ref } from 'vue';
+import { nextTick, onMounted, reactive, ref, Teleport, watch, type Ref } from 'vue';
 import CanvasView from './CanvasView.vue';
 import { PCX, PCXProfile } from '@/core/pcx';
-import { messageBoxConfirm } from '@/utils/messageBox';
-
-
-const model = defineModel<string>()
-const add_mark = "!!!!ADD!!!";
+import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
+import globalState from '@/utils/global';
 
 const props = defineProps<{
-    palette: ConfigurationPalette<WallConfiguration> | ConfigurationPalette<FloorCeilConfiguration> | ConfigurationPalette<ArcConfiguration>,
-    listview: boolean
+    palette: ConfigurationPalette<AssetConfiguration>,
+    type: string,
+    listview: boolean,
 }>();
 
-const emits = defineEmits<{
-    (e:"add", conf: AssetConfiguration): void,
-}>();
 
-const edit_item = ref<string>();
+const model = defineModel<AssetConfiguration|null>()
+const model_index = ref<number>(-1);
+const global_palette = reactive(
+    globalState<GlobalPaletteConfiguration<AssetConfiguration> >(`palette_${props.type}`,new GlobalPaletteConfiguration<AssetConfiguration>)
+);
 const list_assets = ref<string[]>();
+
 const cur_wall = ref<WallConfiguration>();
 const cur_arc = ref<ArcConfiguration>();
 const cur_floorceil = ref<FloorCeilConfiguration>();
@@ -31,7 +31,7 @@ const cur_frame = ref<number>(0);
 
 const preview_place = ref<HTMLElement>();
 
-
+/*
 watch(edit_item, async () => {
     cur_wall.value = undefined;
     cur_arc.value = undefined;
@@ -53,13 +53,14 @@ watch(edit_item, async () => {
             cur_arc.value = new ArcConfiguration();
         } else if (props.palette.holds(FloorCeilConfiguration)) {
             cur_floorceil.value = new FloorCeilConfiguration();
+            cur_floorceil.value.pixmaps = [""];
         } 
     }
     cur_frame.value = 0;
     const lst = (await server.getDDLFiles(AssetGroup.WALLS, null)).files.map(x=>x.name);
     list_assets.value = lst;
 })
-
+*/
 watch([cur_wall, cur_frame, preview_place],async ()=>{
     const cw = cur_wall.value;
     const pp = preview_place.value;
@@ -97,61 +98,121 @@ watch([cur_arc, preview_place],async ()=>{
     }
 },{deep:true})
 
+watch([cur_floorceil, cur_frame, preview_place],async ()=>{
+    const cw = cur_floorceil.value;
+    const pp = preview_place.value;
+    if (cw && pp) {
+        const prom = server.getDDLFile(cw.pixmaps[cur_frame.value]).then((buff)=>{
+            return PCX.fromArrayBuffer(buff).createCanvas(PCXProfile.default);
+        })
+        const c = await prom;
+        pp.innerHTML = "";
+        pp.appendChild(c);
+    }
+},{deep:true})
+
+
 
 function showDetail() {
-    if (model.value && model.value != add_mark) {
-        edit_item.value = model.value;
+    if (model.value) {
+        if (props.type == "wall") cur_wall.value = model.value.clone() as WallConfiguration;
+        else if (props.type == "arc") cur_arc.value = model.value.clone() as ArcConfiguration;
+        else if (props.type == "floor") cur_floorceil.value = model.value.clone() as FloorCeilConfiguration;
+        else if (props.type == "ceil") cur_floorceil.value = model.value.clone() as FloorCeilConfiguration;
     }
 }
 
-function cloneWall() {
-    if (cur_wall.value) {
-        if (edit_item.value) {
-            const w = shallowClone(cur_wall.value) as WallConfiguration;
-            w.graphics = w.graphics.map(x=>shallowClone(x) as string[]);
-            edit_item.value = "";
-            nextTick(()=>{
-                cur_wall.value = w;
-            });    
-        } else {
-            const cw = cur_wall.value;
-            cw.anim_frames = cw.graphics.length * (cw.alternate?2:1);
-            emits("add", cw);
-            cur_wall.value = undefined;
-            edit_item.value = undefined;
-        }
-    } else if (cur_arc.value) {
-        if (edit_item.value) {
-            const w = shallowClone(cur_arc.value) as ArcConfiguration;
-            edit_item.value = "";
-            nextTick(()=>{
-                cur_arc.value = w;
-            });    
-        } else {
-            const cw = cur_arc.value;            
-            emits("add", cw);
-            cur_arc.value = undefined;
-            edit_item.value = undefined;
-        }
+function getEditedConf(): AssetConfiguration | null{
+    return cur_wall.value || cur_arc.value || cur_floorceil.value || null;
+}
 
+function deleteItem() {
+    if (model_index.value >=0) {
+        global_palette.list.splice(model_index.value,1);
+        model_index.value = -1;
+        model.value = null;
+    }
+    closeDlg();
+}
+
+
+function updateItem() {
+    if (cur_floorceil.value 
+            && cur_floorceil.value.mode != FloorCeilMode.ANIMATED 
+            && cur_floorceil.value.pixmaps.length != FloorCeilModeRequiredFrames[cur_floorceil.value.mode]) {
+                messageBoxAlert("Can't update item: Type of floor/ceil doesn't match to frame count");
+                return;
+            }
+
+    const a = getEditedConf();
+    if (a) {
+        const idx = model_index.value < 0?global_palette.list.findIndex(x=>x.get_key() == a.get_key()):model_index.value;
+        if (idx < 0) {
+            global_palette.list.unshift(a);
+        } else {
+            global_palette.list[idx] = a;
+        }
+        model_index.value = idx;
+    }
+    closeDlg();
+}
+
+function cloneItem() {
+    const a = getEditedConf();
+    if (a) {
+        nextTick(()=>{
+            if (cur_wall.value) cur_wall.value = a as WallConfiguration;
+            else if (cur_arc.value) cur_arc.value = a as ArcConfiguration;
+            else if (cur_floorceil.value) cur_floorceil.value = a as FloorCeilConfiguration;
+
+        })
     }
 }
 
 watch([model],()=>{
-    if (model.value == add_mark) {
-        edit_item.value="";
+    if (model.value) {
+        const k = model.value.get_key();
+        model_index.value = global_palette.list.findIndex(x=>x.get_key() == k);
+    } else {
+        model_index.value = -1;
+    }
+})
+
+watch([model_index],()=>{
+    const idx = model_index.value;
+    if (idx == -1) model.value = null;
+    else if (idx == -2) {
+        model.value = null;
+        if (props.type == "wall") {
+            cur_wall.value = new WallConfiguration();
+        } else if (props.type == "arc") {
+            cur_arc.value = new ArcConfiguration();
+        } else if (props.type == "floor" || props.type == "ceil") {
+            cur_floorceil.value = new FloorCeilConfiguration();
+        }
+    }  else {
+        model.value = global_palette.list[idx] || null;
     }
 })
 
 function closeDlg() {
-    edit_item.value = undefined;
-    if (model.value == add_mark) model.value = "";
+    cur_arc.value = undefined;
+    cur_floorceil.value = undefined;
+    cur_wall.value = undefined;
+    cur_frame.value = 0;
+    if (model_index.value === -2) model_index.value = -1;
+
+
 }
 
 function dupFrame() {
     if (cur_wall.value) {
         const f = cur_wall.value.graphics[cur_frame.value]
         cur_wall.value.graphics.splice(cur_frame.value,0,[f[0],f[1],f[2]]);
+        cur_frame.value++;
+    } else if (cur_floorceil.value) {
+        const f = cur_floorceil.value.pixmaps[cur_frame.value]
+        cur_floorceil.value.pixmaps.splice(cur_frame.value,0,f);
         cur_frame.value++;
     }
 
@@ -160,20 +221,36 @@ function dupFrame() {
 function delFrame() {
     if (cur_wall.value) {
         cur_wall.value.graphics.splice(cur_frame.value,1);
-        if (cur_frame.value) cur_frame.value--;
+        if (cur_frame.value) cur_frame.value--;    
+    } else if (cur_floorceil.value) {
+        cur_floorceil.value.pixmaps.splice(cur_frame.value,1);
+        if (cur_frame.value) cur_frame.value--;    
     }
 }
 
+function paletteUpdate() {
+global_palette.merge(props.palette);
+model_index.value = -1;
+}
 
+function init() {
+    paletteUpdate();
+}
+
+watch(()=>props.palette, ()=>{
+    paletteUpdate();
+})
+
+onMounted(init);
 </script>
 <template>
-<select v-model="model" :size="props.listview?2:1" @dblclick="showDetail">
-    <option value="">(none)</option>
-    <option :value="add_mark">Add new...</option>
-    <option v-for="(val, k) of props.palette.map" :key="k" :value="k"> {{ val.get_name() }}</option>
+<select v-model="model_index" :size="props.listview?2:1" @dblclick="showDetail">
+    <option value="-1">(none)</option>
+    <option value="-2">Add new...</option>
+    <option v-for="(val, k) of global_palette.list" :key="k" :value="k"> {{ val.get_name() }}</option>
 </select>
 <Teleport to="body">
-<div class="popup-lb" v-if="edit_item !== undefined">
+<div class="popup-lb" v-if="cur_wall || cur_floorceil || cur_arc">
     <div class="edit-window">
         <datalist id="palette5578"><option v-for="v of list_assets" :key="v" :value="v"></option></datalist>
         <div class="content">
@@ -181,28 +258,34 @@ function delFrame() {
                 <div class="wall-preview checkerboard" ref="preview_place">
                 </div>
                 <div class="control">
-                    <button @click="dupFrame" :disabled="!!edit_item">+</button>
+                    <button @click="dupFrame" >+</button>
                     <button @click="cur_frame = cur_frame>0?cur_frame-1:cur_frame"
                         >&lt;&lt;</button> {{ cur_frame+1 }} / {{ cur_wall.graphics.length }} <button
                         @click = "cur_frame = cur_frame>=cur_wall.graphics.length-1?cur_wall.graphics.length-1:cur_frame+1">&gt;&gt;</button>
-                    <button @click="delFrame" :disabled="!!edit_item || cur_wall.graphics.length<2">-</button>
+                    <button @click="delFrame" :disabled="cur_wall.graphics.length<2">-</button>
                 </div>
                 <x-section>
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
-                        <label><span>Name:</span><input :disabled="!!edit_item" type="text" v-model="cur_wall.name"></label>
-                        <label><span>Front (main):</span><input :disabled="!!edit_item" type="text" v-model="cur_wall.graphics[cur_frame][0]" list="palette5578"></label>
-                        <label><span>Left :</span><input :disabled="!!edit_item"type="text" v-model="cur_wall.graphics[cur_frame][1]" list="palette5578"></label>
-                        <label><span>Right :</span><input :disabled="!!edit_item"type="text" v-model="cur_wall.graphics[cur_frame][2]" list="palette5578"></label>
-                        <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input :disabled="!!edit_item" type="text" v-model="cur_wall.lclip" v-watch-range min="1" max="16"></label>
-                        <label><input :disabled="!!edit_item" type="checkbox" v-model="cur_wall.alternate"><span>Alternating</span></label>
-                        <label><input :disabled="!!edit_item" type="checkbox" v-model="cur_wall.repeat_anim"><span>Repeat animation</span></label>
-                        <label><input :disabled="!!edit_item" type="checkbox" v-model="cur_wall.ping_pong"><span>Ping ping animation</span></label>
-                        <label><input :disabled="!!edit_item" type="checkbox" v-model="cur_wall.reverse_dir"><span>Animate reverse</span></label>
-                        <label><input :disabled="!!edit_item" type="checkbox" v-model="cur_wall.allow_offset"><span>Allow offset (secondary)</span></label>
+                        <label><span>Name:</span><input  type="text" v-model="cur_wall.name"></label>
+                        <label><span>Front (main):</span><input  type="text" v-model="cur_wall.graphics[cur_frame][0]" list="palette5578"></label>
+                        <label><span>Left :</span><input type="text" v-model="cur_wall.graphics[cur_frame][1]" list="palette5578"></label>
+                        <label><span>Right :</span><input type="text" v-model="cur_wall.graphics[cur_frame][2]" list="palette5578"></label>
+                        <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input  type="text" v-model="cur_wall.lclip" v-watch-range min="1" max="16"></label>
+                        <label><input  type="checkbox" v-model="cur_wall.alternate"><span>Alternating</span></label>
+                        <label><input  type="checkbox" v-model="cur_wall.repeat_anim"><span>Repeat animation</span></label>
+                        <label><input  type="checkbox" v-model="cur_wall.ping_pong"><span>Ping ping animation</span></label>
+                        <label><input  type="checkbox" v-model="cur_wall.forward_dir"><span>Animate forward</span></label>
+                        <label><input  type="checkbox" v-model="cur_wall.secondary_front"><span>If secondary, draw as sector's backdrop</span></label>
+                        <label><input  type="checkbox" v-model="cur_wall.allow_offset"><span>Allow offset (secondary)</span></label>
                         <label><span>Offset [X,Y]</span>
-                            <div><input type="number" :disabled="!cur_wall.allow_offset || !!edit_item" v-model="cur_wall.offset_x" v-watch-range min="-255" max="+255">
-                            <input type="number" :disabled="!cur_wall.allow_offset || !!edit_item"v-model="cur_wall.offset_y" v-watch-range min="-255" max="+255"></div></label>
+                            <div><input type="number" :disabled="!cur_wall.allow_offset" v-model="cur_wall.offset_x" v-watch-range min="-255" max="+255">
+                            <input type="number" :disabled="!cur_wall.allow_offset"v-model="cur_wall.offset_y" v-watch-range min="-255" max="+255"></div></label>
+                        <label><span>Primary wall position</span><select v-model="cur_wall.position">
+                            <option :value="0">Normal (default)</option>
+                            <option :value="1">Above</option>
+                            <option :value="2">Below</option>
+                        </select></label>
                     </x-form>
                 </x-section>
             </div>
@@ -212,16 +295,45 @@ function delFrame() {
                 <x-section>
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
-                        <label><span>Name:</span><input :disabled="!!edit_item" type="text" v-model="cur_arc.name"></label>
-                        <label><span>Left :</span><input :disabled="!!edit_item"type="text" v-model="cur_arc.left" list="palette5578"></label>
-                        <label><span>Right :</span><input :disabled="!!edit_item"type="text" v-model="cur_arc.right" list="palette5578"></label>
+                        <label><span>Name:</span><input  type="text" v-model="cur_arc.name"></label>
+                        <label><span>Left :</span><input type="text" v-model="cur_arc.left" list="palette5578"></label>
+                        <label><span>Right :</span><input type="text" v-model="cur_arc.right" list="palette5578"></label>
+                    </x-form>
+                </x-section>
+            </div>
+            <div v-if="cur_floorceil">
+                <div class="floor-preview" ref="preview_place">
+                </div>
+                <div class="control">
+                    <button @click="dupFrame" :disabled="cur_floorceil.pixmaps.length>=8">+</button>
+                    <button @click="cur_frame = cur_frame>0?cur_frame-1:cur_frame"
+                        >&lt;&lt;</button> {{ cur_frame+1 }} / {{ cur_floorceil.pixmaps.length }} <button
+                        @click = "cur_frame = cur_frame>=cur_floorceil.pixmaps.length-1?cur_floorceil.pixmaps.length-1:cur_frame+1">&gt;&gt;</button>
+                    <button @click="delFrame" :disabled="cur_floorceil.pixmaps.length<2">-</button>
+                </div>
+                <x-section>
+                    <x-section-title>Configuration</x-section-title>
+                    <x-form>
+                        <label><span>Name:</span><input  type="text" v-model="cur_floorceil.name"></label>
+                        <label><span>Bitmap :</span><input type="text" v-model="cur_floorceil.pixmaps[cur_frame]" list="palette5578"></label>
+                        <label><span>Mode: </span><select v-model="cur_floorceil.mode">
+                            <option :value="-1">Animated</option>
+                            <option :value="0">Single (1 frame)</option>
+                            <option :value="1">Alternate (2 frames)</option>
+                            <option :value="2">Two directions (2 frames)</option>
+                            <option :value="3">Two directions alternating (4 frames)</option>
+                            <option :value="4">Four directions (4 frames)</option>
+                            <option :value="5">Four directions alternating (8 frames)</option>
+                        </select></label>
                     </x-form>
                 </x-section>
             </div>
         </div>
         <div class="buttons">
-            <button v-if="edit_item" @click="cloneWall">Clone</button>
-            <button v-if="!edit_item" @click="cloneWall">Create</button>
+            <button v-if="model_index < 0" @click="updateItem">Add</button>
+            <button v-if="model_index >= 0" @click="deleteItem">Delete</button>
+            <button v-if="model_index >= 0" @click="cloneItem">Clone</button>
+            <button v-if="model_index >= 0" @click="updateItem">Update</button>
             <button @click="closeDlg">Close</button>
         </div>
         <button class="close" @click="closeDlg"></button>

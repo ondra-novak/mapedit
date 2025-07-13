@@ -1,7 +1,7 @@
 
-export function shallowClone<T>(obj: T | T[]):T|T[] {
+export function shallowClone<T>(obj: T):T {
     if (obj === null || typeof obj !== "object") return obj;
-    if (Array.isArray(obj)) return obj.slice();
+    if (Array.isArray(obj)) return obj.slice() as T;
     const cloned = Object.create(Object.getPrototypeOf(obj));
     return Object.assign(cloned, obj);
 }
@@ -56,5 +56,12 @@ export class Document<T> {
         ++this.current;
         this.undoredo_stack.splice(this.current, this.undoredo_stack.length - this.current, r as T);
         return r as T;
+    }
+    add_change(doc: T) {
+        ++this.current;
+        this.undoredo_stack.splice(this.current, this.undoredo_stack.length - this.current);
+        deepFreeze(doc);
+        this.undoredo_stack.push(doc);
+
     }
 }
