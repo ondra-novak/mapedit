@@ -25,7 +25,7 @@ export const AnimationTypeIndex = {
 
 export type AnimationTypeIndexType = typeof AnimationTypeIndex[keyof typeof  AnimationTypeIndex];
 export const AnimationTypeLetter : string[] = ['F','L','B','L','C','H'] as const;
-export const AnimationTypeMirror = [false,false,false,true,false,false,false,true,false,false] as const;
+export const AnimationTypeMirror = [false,false,false,true,false,false,false,false,false,true] as const;
 
 
 
