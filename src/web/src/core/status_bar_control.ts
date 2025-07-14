@@ -2,7 +2,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { server } from './api'
 import { AssetGroup } from './asset_groups'
-import { MapFile } from './map_structs'
+import { MapFile, MapPalettes } from './map_structs'
 import { Document } from '@/utils/document'
 
 type SaveFn = () => void|Promise<any>
@@ -16,6 +16,7 @@ class StatusBar {
 
     cur_map_name = ref<string>();
     cur_map = new Document<MapFile>(new MapFile);
+    cur_map_palettes = new MapPalettes;
     popup_map_open = ()=>{};
     on_map_open=()=>{};
 
@@ -92,7 +93,9 @@ class StatusBar {
         if (this.cur_map_name.value === mapname) return this.cur_map;
         try {
             const buff = await server.getDDLFile(mapname);
-            this.cur_map.reset(MapFile.from(buff));
+            const mapdata = MapFile.from(buff);            
+            this.cur_map.reset(mapdata[0]);
+            this.cur_map_palettes = mapdata[1];
             this.cur_map_name.value = mapname;            
         } catch (e) {
             this.cur_map.reset(new MapFile);
@@ -120,6 +123,10 @@ class StatusBar {
         } else {
             return false;
         }
+    }
+
+    getMapPalettes():MapPalettes{
+        return this.cur_map_palettes;
     }
     
     getMapNameReactive() {

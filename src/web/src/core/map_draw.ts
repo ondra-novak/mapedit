@@ -39,6 +39,9 @@ export class MapDraw {
                 water: new SVGPath("sector water"),                
                 stairs: new SVGPath("sectorfeat stairs"),
             },
+            grid: {
+                grid:new SVGPath("grid"),
+            },
             sectorfeats :{
                 flute_arrow: new SVGPath("sectorfeat flute"),
                 pit: new SVGPath("sectorfeat pit"),
@@ -200,7 +203,7 @@ export class MapDraw {
                                         this.drawTeleport(set.sectorfeats.teleport, x, y);
                                         break;
                 case SectorType.Water: bgr = set.sector.water;break;
-                case SectorType.Whirpool: bgr = set.sector.water;break;
+                case SectorType.Whirpool: bgr = set.sector.water;
                                         set.sectorfeats.death.rctc(x,y,scl*0.5, scl*0.5,45);
                                         break;
                 default: bgr = set.sector.normal;                
@@ -292,13 +295,19 @@ export class MapDraw {
         });
 
         const drw = new SVGDrawing;
+        if (bbox.right < bbox.left) {
+            bbox.left = bbox.right = bbox.top = bbox.bottom = 0;
+        }
+        const extend = scl * 10;
+        const x = bbox.left - extend;
+        const y = bbox.top - extend;
+        const w = (bbox.right- bbox.left)+2*extend;
+        const h = (bbox.bottom - bbox.top)+2*extend;
+        for (let i = scl>>1; i <=w; i+=scl) set.grid.grid.mt((x+i), y).vr((h+1));        
+        for (let i = scl>>1; i <=h; i+=scl) set.grid.grid.mt(x, (y+i)).hr((w+1));
         Object.values(set).forEach(x=>drw.appendSets(x));
         const svg = drw.getSvgElement()
-        const w = bbox.right- bbox.left;
-        const h = bbox.bottom - bbox.top;
-        const x = bbox.left - w;
-        const y = bbox.top - h;
-        this.dim={width:3*w,height: 3*h};
+        this.dim={width:w,height: h};
         svg.setAttribute("viewBox", `${x} ${y} ${this.dim.width} ${this.dim.height}`);
         this.svg = svg;        
         this.rect_selction = null;

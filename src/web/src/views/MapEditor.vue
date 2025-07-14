@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
-import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapSector, RawMapFile, SectorType, SideFlag, WallConfiguration } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, RawMapFile, SectorType, SectorTypeName, SideFlag, WallConfiguration } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import MissingFiles from '@/components/MissingFiles.vue';
 import {MapContainer, MapDraw } from '@/core/map_draw';
@@ -15,6 +15,7 @@ import svg_eraser from '@/assets/toolbar/eraser.svg'
 import svg_chest from '@/assets/toolbar/chest.svg'
 import svg_enemy from '@/assets/toolbar/enemy.svg'
 import PalleteEditor from '@/components/PalleteEditor.vue';
+import { walk } from 'vue/compiler-sfc';
 
 const EditMode = {
     Edit:0,
@@ -28,8 +29,10 @@ const mapview = ref<HTMLElement>();
 const mapdraw :MapDraw=  new MapDraw();
 const curmap = shallowRef<MapFile>(new MapFile());
 const settings = reactive(globalState("mapview_settings",{
-    curlevel : 0,
+    curlevel : 0 as number,
     edit_mode: EditMode.Edit as number,
+    sector_type: SectorType.Normal as number,
+    split_mode: 0 as number,
 }));
 const mapcontainer = globalState("mapcontainer",()=>new MapContainer);
 const layers_opened = ref(false);
@@ -38,6 +41,8 @@ const control_state = reactive({
     can_redo: false
 });
 
+const mapLoadedPalettes = ref(new MapPalettes);
+
 type PaletteModels = {
     wall: WallConfiguration|null;
     arc: ArcConfiguration|null;
@@ -45,7 +50,9 @@ type PaletteModels = {
     ceil: FloorCeilConfiguration|null;
 };
 
-const cur_palettes = reactive(globalState<PaletteModels>("palette", {wall:null,floor:null,ceil:null,arc:null}));
+
+
+const cur_palettes = reactive(globalState<PaletteModels>("palette", {wall:null,floor:null,ceil:null,arc:null,sector_type:0}));
 
 function updateControls() {
     control_state.can_redo = StatusBar.cur_map.can_redo();
@@ -104,6 +111,29 @@ function connectSectors(sectors: MapSector[], from: number, to:number, dir: numb
     sd2.flags &= ~flags_off;
 }
 
+function disconnectSectors(sectors: MapSector[], from :number, dir:number) {
+    const revdir = (dir+2) & 3;
+    const s1 = sectors[from] = shallowClone(sectors[from]);
+    const t = s1.exit[dir];
+    if (!t || sectors[t].exit[revdir] != from) return false;
+    const s2 = sectors[t] = shallowClone(sectors[t]);
+    s1.exit = shallowClone(s1.exit);
+    s1.exit[dir] = 0;
+    s2.exit = shallowClone(s2.exit);
+    s2.exit[revdir] = 0;
+    const sds1 = s1.side = shallowClone(s1.side);
+    const sds2 = s2.side = shallowClone(s2.side);
+    const sd1 = sds1[dir] = shallowClone(sds1[dir]);
+    const sd2 = sds2[revdir] = shallowClone(sds2[revdir]);
+    const flags_on = SideFlag.PRIM_VIS|SideFlag.SEC_VIS|SideFlag.PLAY_IMPS|SideFlag.MONST_IMPS|SideFlag.THING_IMPS|SideFlag.SOUND_IMPS;
+    const flags_off = SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC;
+    sd1.flags &= flags_off;
+    sd1.flags |= flags_on;
+    sd2.flags &= flags_off;
+    sd2.flags |= flags_on;
+    return true;
+}
+
 function drawRect(rc: DOMRectReadOnly) {
     const map = begin_edit();
     const free_sectors :number[] =  [];
@@ -117,48 +147,67 @@ function drawRect(rc: DOMRectReadOnly) {
         }        
         return mp;
     }, {} as Record<string,number>);
+    map.sectors = shallowClone(map.sectors);
+    let done_anything = false;
     if (rc.width == 0) {
-
+        for (let y = rc.top; y < rc.bottom; ++y) {
+            let idx :number| undefined = sectormap[`${rc.left},${y}`];
+            if (idx && disconnectSectors(map.sectors, idx, 3)) done_anything = true;
+        }
     } else if (rc.height == 0) {
-
+        for (let x = rc.left; x < rc.right; ++x) {
+            let idx :number| undefined = sectormap[`${x},${rc.top}`];
+            if (idx && disconnectSectors(map.sectors, idx, 0)) done_anything = true;
+        }
     } else {
-        map.sectors = shallowClone(map.sectors);
         if (map.sectors.length == 0) map.sectors.push(new MapSector()); //sector 0 is always empty
         for (let x = rc.left; x < rc.right; ++x) {
             for (let y = rc.top; y < rc.bottom; ++y) {
+                done_anything = true;
                 let idx :number| undefined = sectormap[`${x},${y}`];
+                let sect;
                 if (!idx) {
                     idx = free_sectors.shift(); 
                     if (!idx) {
                         idx = map.sectors.length;
                         map.sectors.push(new MapSector());
                     }
-                    const sect = map.sectors[idx] = new MapSector();                    
+                    sect = map.sectors[idx] = new MapSector();                    
                     sect.x = x;
                     sect.y = y;
                     sect.level = settings.curlevel;
-                    sect.type = SectorType.Normal;
-                    sectormap[`${x},${y}`] = idx;                                        
+                    sectormap[`${x},${y}`] = idx;    
+                } else {
+                    sect = map.sectors[idx] = shallowClone(map.sectors[idx]);                    
+                    sect.side = shallowClone(sect.side);
+                    sect.side = sect.side.map(x=>shallowClone(x));
                 }
+                sect.type = settings.sector_type;
+                sect.side.forEach(x=>{
+                    x.flags = SideFlag.PLAY_IMPS | SideFlag.MONST_IMPS| SideFlag.SOUND_IMPS | SideFlag.THING_IMPS
+                            | SideFlag.PRIM_VIS | SideFlag.SEC_FORV 
+                    x.primary = cur_palettes.wall;
+                    x.secondary = null;
+                    x.arc= cur_palettes.arc;
+                });                         
+                sect.floor = cur_palettes.floor;
+                sect.ceil = cur_palettes.ceil;          
                 [[0,-1],[1,0],[0,1],[-1,0]].forEach((d,dir)=>{
                     const t = sectormap[`${x+d[0]},${y+d[1]}`];
                     if (t) {
                         connectSectors(map.sectors, idx, t, dir);
                     }
-                })
+                })                
             }
         }
-        end_edit(map);
     }
-
-
-
+    if (done_anything) end_edit(map);
 }
 
 function onMapSelectRect(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
     switch (settings.edit_mode) {
-        case EditMode.Draw: if (control) eraseRect(rc); else drawRect(rc);
-        case EditMode.Erase: if (control) drawRect(rc); else eraseRect(rc);
+        case EditMode.Draw: if (control) eraseRect(rc); else drawRect(rc); break;
+        case EditMode.Erase: if (control) drawRect(rc); else eraseRect(rc);break;
     }    
 }
 
@@ -178,6 +227,7 @@ function redraw() {
 }
 
 const layers= reactive(globalState("layers",{
+    grid: true,
     sector_basic: true,
     sector_features: true,
     walls: true,
@@ -200,10 +250,10 @@ watch([()=>settings.edit_mode, curmap], ()=>{
 
     }
 });
-
 function onMapLoaded() {
 
     function reload(doc: Document<MapFile>) {
+        mapLoadedPalettes.value = StatusBar.getMapPalettes();
         curmap.value = doc.get_current();
         const start = curmap.value.info.start_sector;
         settings.curlevel = curmap.value.sectors[start].level;
@@ -216,6 +266,7 @@ function onMapLoaded() {
     }, async ()=>{
         const doc = await StatusBar.reloadMap();
         reload(doc);
+        mapLoadedPalettes.value = StatusBar.getMapPalettes();
     });    
     
     reload(StatusBar.cur_map);
@@ -292,20 +343,36 @@ function add_configuration<T extends AssetConfiguration>(conf: AssetConfiguratio
                             disable_arrows: !layers.arrows,
                             disable_ext_arrows: !layers.ext_arrows,
                             disable_enemies: !layers.enemies,
-                            disable_items:!layers.items
+                            disable_items:!layers.items,
+                            disable_grid: !layers.grid
                             }"></div>
 </div>                            
 <div class="right">
     <div class="palette">
-        <div><span>Wall</span><PalleteEditor :palette="curmap.wall_palette" :listview="true" v-model="cur_palettes.wall" type="wall"></PalleteEditor></div>
-        <div><span>Arc</span><PalleteEditor :palette="curmap.arc_palette" :listview="true" v-model="cur_palettes.arc" type="arc"></PalleteEditor></div>
-        <div><span>Floor</span><PalleteEditor :palette="curmap.floor_pallete" :listview="true" v-model="cur_palettes.floor" type="floor"></PalleteEditor></div>
-        <div><span>Ceil</span><PalleteEditor :palette="curmap.ceil_palette" :listview="true" v-model="cur_palettes.ceil"  type="ceil"></PalleteEditor></div>
+        <div><span>Draw settings</span><x-form>
+            <label><span>Sector type</span><select v-model="settings.sector_type" size="1">
+            <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
+        </select></label>
+            <label><span>Split mode</span><select v-model="settings.split_mode">
+                <option :value="0">Disconnect</option>
+                <option :value="-1">Thin wall</option>
+                <option :value="SideFlag.PLAY_IMPS">Player barrier</option>
+                <option :value="SideFlag.MONST_IMPS">Enemy barrier</option>
+                <option :value="SideFlag.THING_IMPS">Item barrier</option>
+                <option :value="SideFlag.SOUND_IMPS">Sound barrier</option>
+                <option :value="SideFlag.SECRET|SideFlag.PRIM_VIS|SideFlag.NOT_AUTOMAP">Secret wall</option>                
+            </select></label>
+        </x-form></div>
+        <div class="h"><span>Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="cur_palettes.wall" type="wall"></PalleteEditor></div>
+        <div class="h"><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="cur_palettes.arc" type="arc"></PalleteEditor></div>
+        <div class="h"><span>Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="cur_palettes.floor" type="floor"></PalleteEditor></div>
+        <div class="h"><span>Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="cur_palettes.ceil"  type="ceil"></PalleteEditor></div>
     </div>
 </div>
 <div class="layers" v-if="layers_opened">
     <button class="close" @click="layers_opened=false"></button>
     <x-form>
+        <label><input type="checkbox" v-model="layers.grid"><span>Grid</span></label>
         <label><input type="checkbox" v-model="layers.sector_basic"><span>Sector type</span></label>
         <label><input type="checkbox" v-model="layers.sector_features"><span>Sector features</span></label>
         <label><input type="checkbox" v-model="layers.walls"><span>Walls</span></label>
@@ -385,16 +452,25 @@ x-workspace {
 
 .right .palette {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     height: 100%;
+    padding: 0.5rem;
+    box-sizing: border-box;
 }
 
+.right .palette div {
+    flex-grow: 1;    
+}
+.right .palette div>span {
+    font-weight: bold;
+    display: block;
+    background: linear-gradient(45deg, #aaa, transparent);
+}
 
-.right .palette > div {
-    flex-grow: 1;
+.right .palette > div.h {
     display: flex;
-    flex-direction: column;
-    text-align: center;
+    flex-direction: column;    
 }
 
 .toolbar > .disabled img {
@@ -408,6 +484,9 @@ x-workspace {
 }
 .toolbar > .disabled:active  img {
     transform: none;
+}
+.toolbar {
+    user-select: none;
 }
 
 

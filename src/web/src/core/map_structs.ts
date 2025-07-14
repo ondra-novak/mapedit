@@ -59,7 +59,7 @@ export const SectorTypeName = Object.entries(SectorType).reduce((a,b)=>{
                                 a[b[1]] = b[0]; return a;}, [] as string[]);
 
 export const SideFlag = {
-    AUTOMAP: 0x1,
+    NOT_AUTOMAP: 0x1,   //this flag is reversed in editor
     PLAY_IMPS: 0x2,
     MONST_IMPS: 0x4,
     THING_IMPS: 0x8,
@@ -1051,12 +1051,18 @@ export class ConfigurationPalette<T extends AssetConfiguration> {
         }
     }
 
-    merge_user_palette(user: T[]) {
-        user.forEach(p=>{
-            const key = p.get_key();
-            if (this.map[key]) this.map[key].name = p.name;
-            else this.map[key] = p;
-        });
+    import_names(pfx: string, lst: Record<string,string>) {
+        for (const k in this.map) {
+            const n = lst[pfx+k];
+            if (n) this.map[k].name = n;
+        }
+    }
+    export_names(pfx: string, lst: Record<string,string>) {
+        for (const k in this.map) {
+            if (this.map[k].name) {                
+                lst[pfx+k] = this.map[k].name;
+            }
+        }
     }
 
 }
@@ -1096,6 +1102,7 @@ export class MapSector {
 class ConfigurationSaveMap {
 
     map : Record<string, [ string[][], number ]> = {};
+    names : Record<string, string> = {};
     next_id = 1;
 
     to_id(conf: AssetConfiguration | null) : number {
@@ -1108,6 +1115,7 @@ class ConfigurationSaveMap {
         const def2 = [pxms, this.next_id] as [ string[][], number ];
         this.map[key] = def2;
         this.next_id = def2[1]+ pxms.length;
+        if (conf.name) this.names[conf.get_key()] = conf.name;
         return def2[1];
     }
 
@@ -1127,28 +1135,28 @@ class ConfigurationSaveMap {
 
 }
 
-
-export class MapFile {
-    
-    sectors: MapSector[] = [];
+export class MapPalettes {
     wall_palette = new ConfigurationPalette<WallConfiguration>(WallConfiguration);
     arc_palette = new ConfigurationPalette<ArcConfiguration>(ArcConfiguration);
     floor_pallete = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration);
     ceil_palette = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration)
+    
+}
+
+
+export class MapFile {
+    
+    sectors: MapSector[] = [];
     info = new MAPGLOBAL;
 
-    static from(map_or_buff: RawMapFile | ArrayBuffer) {
+    static from(buff: ArrayBuffer) : [ MapFile, MapPalettes ] {
         const w = new ConfigurationPalette<WallConfiguration>(WallConfiguration);
         const a = new ConfigurationPalette<ArcConfiguration>(ArcConfiguration);
         const f = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration);
         const c = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration);
         let m: RawMapFile;
-        if (map_or_buff instanceof RawMapFile) {
-            m = map_or_buff;
-        } else {
-            m = new RawMapFile();
-            m.parseMap(map_or_buff);
-        }
+        m = new RawMapFile();
+        m.parseMap(buff);
         const r = m.sectors.map((s,idx)=>{
             const nw = new MapSector;
             nw.action = s.action;
@@ -1162,7 +1170,7 @@ export class MapFile {
                 n.secondary = w.add(WallConfiguration.from(side, m.pixmap_front,m.pixmap_left,m.pixmap_right, true));
                 n.arc = a.add(ArcConfiguration.from(side, m.pixmap_arc_left,m.pixmap_arc_right));
                 n.action = side.action;
-                n.flags = side.flags;
+                n.flags = side.flags ^ SideFlag.NOT_AUTOMAP;
                 n.target_sector = side.target_sector;
                 n.target_side = side.target_side & 0x3;                
                 n.niche = m.niches[place] || null;
@@ -1187,20 +1195,21 @@ export class MapFile {
 
         if (m.user_palette.length) {
             const def = JSON.parse(m.user_palette);
-            w.merge_user_palette(def.walls);
-            a.merge_user_palette(def.arcs);
-            f.merge_user_palette(def.floors);
-            c.merge_user_palette(def.ceils);
+            w.import_names("w",def);
+            a.import_names("a",def);
+            f.import_names("f",def);
+            c.import_names("c",def);
         }
 
         const q = new MapFile;
-        q.wall_palette = w;
-        q.arc_palette = a;
-        q.floor_pallete = f;
-        q.ceil_palette = c;
+        const p = new MapPalettes;
+        p.wall_palette = w;
+        p.arc_palette = a;
+        p.floor_pallete = f;
+        p.ceil_palette = c;
         q.sectors = r;        
         q.info = m.info;
-        return q;
+        return [q,p];
     }
 
     saveToArrayBuffer() : ArrayBuffer {
@@ -1231,7 +1240,7 @@ export class MapFile {
             return sect.side.map((s,side)=>{
                 const out = new TSIDE;
                 out.action = s.action;
-                out.flags = s.flags;
+                out.flags = s.flags ^ SideFlag.NOT_AUTOMAP;
                 out.prim = walls.to_id(s.primary);
                 out.sec = walls.to_id(s.secondary);
                 out.oblouk = arc.to_id(s.arc) | ((s.primary?.position || 0) << 5) | (s.item_can_be_placed_behind?0x80:0);
@@ -1324,12 +1333,11 @@ export class MapFile {
         }
 
 
-        const userpal = {
-            walls: Object.values(this.wall_palette.map).filter(x=>x.name),
-            arcs: Object.values(this.arc_palette.map).filter(x=>x.name),
-            floors: Object.values(this.floor_pallete.map).filter(x=>x.name),
-            ceils: Object.values(this.ceil_palette.map).filter(x=>x.name),
-        }
+        const userpal : Record<string, string> = {};
+        for (const k in walls.names) userpal["w"+k] = walls.names[k];
+        for (const k in arc.names) userpal["a"+k] = arc.names[k];
+        for (const k in floors.names) userpal["f"+k] = floors.names[k];
+        for (const k in ceils.names) userpal["c"+k] = ceils.names[k];
 
         const enc = new TextEncoder();
 

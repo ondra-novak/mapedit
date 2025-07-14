@@ -15,7 +15,7 @@
     fill:rgb(255, 185, 81);
 }
 .mapview svg .sector.acid{
-    fill:rgb(170, 212, 198);
+    fill:rgb(134, 216, 51);
 }
 .mapview svg .sector.normal{
     fill: white;
@@ -30,10 +30,11 @@
     fill: blue;
 }
 .mapview svg .sectorfeat.pit{
-    fill: #444;
+    fill: black;
 }
 .mapview svg .sectorfeat.column{
-    fill: black;
+    fill: #888;
+    stroke: black;
 }
 .mapview svg .sectorfeat.button{
     stroke: black;
@@ -41,7 +42,7 @@
 }
 .mapview svg .sectorfeat.button.pressed{
     stroke: black;
-    fill: green;
+    fill: rgb(0, 255, 0);
 
 }
 .mapview svg .sectorfeat.death{
@@ -49,6 +50,7 @@
 }
 .mapview svg .sectorfeat.ship{
     fill: blue;
+    stroke: blue;
 }
 .mapview svg .sectorfeat.lvplace{
     fill: rgb(255, 238, 0);
@@ -133,6 +135,7 @@
 .disable_sector_features .mapview svg .sectorfeat,
 .disable_walls .mapview svg .wall,
 .disable_arc .mapview svg .arc,
+.disable_grid .mapview svg .grid,
 .disable_actions .mapview svg .action,
 .disable_arrows .mapview svg .arrow.same,
 .disable_ext_arrows .mapview svg .arrow.in,
@@ -163,4 +166,9 @@
 }
 .mapview svg .focus-itm {
     fill: #0F04;
+}
+.mapview svg .grid {
+    stroke: black;
+    stroke-dasharray: 4 20;
+    stroke-dashoffset: 14;
 }
