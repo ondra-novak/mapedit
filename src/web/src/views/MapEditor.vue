@@ -52,7 +52,7 @@ type PaletteModels = {
 
 
 
-const cur_palettes = reactive(globalState<PaletteModels>("palette", {wall:null,floor:null,ceil:null,arc:null,sector_type:0}));
+const cur_palettes = reactive(globalState<PaletteModels>("palette", {wall:null,floor:null,ceil:null,arc:null}));
 
 function updateControls() {
     control_state.can_redo = StatusBar.cur_map.can_redo();
