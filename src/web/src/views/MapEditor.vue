@@ -5,7 +5,7 @@ import { server, type FileItem } from '@/core/api';
 import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, RawMapFile, SectorType, SectorTypeName, SideFlag, WallConfiguration } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import MissingFiles from '@/components/MissingFiles.vue';
-import {MapContainer, MapDraw } from '@/core/map_draw';
+import {makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
 import { shallowClone, type Document } from '@/utils/document';
 import  globalState from '@/utils/global';
 
@@ -91,7 +91,19 @@ function onMapClickXY(pt: DOMPointReadOnly, shift: boolean, control: boolean) {
 
 
 function eraseRect(rc: DOMRectReadOnly) {
-
+    const m = begin_edit();
+    const sectors = makeSectorSelection(m, settings.curlevel, rc);
+    if (sectors.length) {
+        m.sectors = shallowClone(m.sectors);
+        sectors.forEach(sect=>{
+            m.sectors[sect] = shallowClone(m.sectors[sect]);
+            for (let sd = 0; sd < 4; ++sd) {
+                disconnectSectors(m.sectors, sect, sd, 0);
+            }
+            m.sectors[sect] = new MapSector;
+        });
+        end_edit(m);
+    }
 }
 
 function connectSectors(sectors: MapSector[], from: number, to:number, dir: number) {
@@ -111,27 +123,89 @@ function connectSectors(sectors: MapSector[], from: number, to:number, dir: numb
     sd2.flags &= ~flags_off;
 }
 
-function disconnectSectors(sectors: MapSector[], from :number, dir:number) {
+function disconnectSectors(sectors: MapSector[], from :number, dir:number, mode: number) {
     const revdir = (dir+2) & 3;
     const s1 = sectors[from] = shallowClone(sectors[from]);
     const t = s1.exit[dir];
     if (!t || sectors[t].exit[revdir] != from) return false;
     const s2 = sectors[t] = shallowClone(sectors[t]);
-    s1.exit = shallowClone(s1.exit);
-    s1.exit[dir] = 0;
-    s2.exit = shallowClone(s2.exit);
-    s2.exit[revdir] = 0;
+    if (mode == 0) {
+        s1.exit = shallowClone(s1.exit);
+        s2.exit = shallowClone(s2.exit);
+        s1.exit[dir] = 0;
+        s2.exit[revdir] = 0;
+    }
     const sds1 = s1.side = shallowClone(s1.side);
     const sds2 = s2.side = shallowClone(s2.side);
     const sd1 = sds1[dir] = shallowClone(sds1[dir]);
     const sd2 = sds2[revdir] = shallowClone(sds2[revdir]);
-    const flags_on = SideFlag.PRIM_VIS|SideFlag.SEC_VIS|SideFlag.PLAY_IMPS|SideFlag.MONST_IMPS|SideFlag.THING_IMPS|SideFlag.SOUND_IMPS;
-    const flags_off = SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC;
-    sd1.flags &= flags_off;
+    const flags_on = mode < 1? SideFlag.PRIM_VIS|SideFlag.PLAY_IMPS|SideFlag.MONST_IMPS|SideFlag.THING_IMPS|SideFlag.SOUND_IMPS:mode;
+    const flags_off = mode < 1? SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC: 0;
+    sd1.flags &= ~flags_off;
     sd1.flags |= flags_on;
-    sd2.flags &= flags_off;
+    sd2.flags &= ~flags_off;
     sd2.flags |= flags_on;
+    if (flags_on & SideFlag.PRIM_VIS) {
+        sd1.primary = cur_palettes.wall;
+        sd2.primary = cur_palettes.wall;
+    }
+    if (flags_on & SideFlag.SEC_VIS) {
+        sd1.secondary = cur_palettes.wall;
+        sd2.secondary = cur_palettes.wall;
+    }
+    if (flags_on & (SideFlag.LEFT_ARC | SideFlag.RIGHT_ARC)) {
+        sd1.arc = cur_palettes.arc;
+        sd2.arc = cur_palettes.arc;
+    }
     return true;
+}
+
+function drawRectArcs(m: MapFile, rc: DOMRectReadOnly) {
+    const sectors = makeSectorSelection(m, settings.curlevel, rc);
+    if (sectors.length) {
+        m.sectors = shallowClone(m.sectors);
+        sectors.forEach(sect=>{
+            const s =m.sectors[sect] = shallowClone(m.sectors[sect]);
+            for (let sd = 0; sd < 4; ++sd) {
+                const side = s.side[sd] = shallowClone(s.side[sd]);
+                side.arc = null;
+                side.flags &= ~(SideFlag.LEFT_ARC | SideFlag.RIGHT_ARC);
+                const r = (sd + 1) & 0x3;
+                const l = (sd + 3) & 0x3;
+                if (cur_palettes.arc && s.exit[sd]) {
+                    const s2 = m.sectors[s.exit[sd]];
+                    let setr = false;
+                    let setl = false;
+                    if (s2) {
+                        const sdr = s2.side[r];
+                        if (sdr.primary && sdr.flags & SideFlag.PRIM_VIS)  {
+                            setr = true;
+                        }
+                        const sdl = s2.side[l];
+                        if (sdl.primary && sdl.flags & SideFlag.PRIM_VIS)  {
+                            setl = true;
+                        }
+                    }
+                    if (!s.exit[l] || (s.side[l].flags & SideFlag.PRIM_VIS) != 0) {
+                        setl = false;
+                    }
+                    if (!s.exit[r] || (s.side[r].flags & SideFlag.PRIM_VIS) != 0) {
+                        setr = false;
+                    }
+                    if (setr || setl) {
+                        side.arc = cur_palettes.arc;
+                        if (setl) {
+                            side.flags |= SideFlag.LEFT_ARC;
+                        }
+                        if (setr) {
+                            side.flags |= SideFlag.RIGHT_ARC;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
 }
 
 function drawRect(rc: DOMRectReadOnly) {
@@ -152,12 +226,12 @@ function drawRect(rc: DOMRectReadOnly) {
     if (rc.width == 0) {
         for (let y = rc.top; y < rc.bottom; ++y) {
             let idx :number| undefined = sectormap[`${rc.left},${y}`];
-            if (idx && disconnectSectors(map.sectors, idx, 3)) done_anything = true;
+            if (idx && disconnectSectors(map.sectors, idx, 3, settings.split_mode)) done_anything = true;
         }
     } else if (rc.height == 0) {
         for (let x = rc.left; x < rc.right; ++x) {
             let idx :number| undefined = sectormap[`${x},${rc.top}`];
-            if (idx && disconnectSectors(map.sectors, idx, 0)) done_anything = true;
+            if (idx && disconnectSectors(map.sectors, idx, 0, settings.split_mode)) done_anything = true;
         }
     } else {
         if (map.sectors.length == 0) map.sectors.push(new MapSector()); //sector 0 is always empty
@@ -201,6 +275,7 @@ function drawRect(rc: DOMRectReadOnly) {
             }
         }
     }
+    drawRectArcs(map,rc);
     if (done_anything) end_edit(map);
 }
 
@@ -361,6 +436,10 @@ function add_configuration<T extends AssetConfiguration>(conf: AssetConfiguratio
                 <option :value="SideFlag.THING_IMPS">Item barrier</option>
                 <option :value="SideFlag.SOUND_IMPS">Sound barrier</option>
                 <option :value="SideFlag.SECRET|SideFlag.PRIM_VIS|SideFlag.NOT_AUTOMAP">Secret wall</option>                
+                <option :value="SideFlag.PRIM_VIS">Primary wall visible</option>                
+                <option :value="SideFlag.SEC_VIS">Secondary wall visible</option>                
+                <option :value="SideFlag.ALARM">Alarm wall</option>                
+                <option :value="SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC">Set arcs</option>                
             </select></label>
         </x-form></div>
         <div class="h"><span>Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="cur_palettes.wall" type="wall"></PalleteEditor></div>

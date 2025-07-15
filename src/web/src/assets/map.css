@@ -62,19 +62,30 @@
     stroke-width: 2px;
 }
 .mapview svg .wall.sound_impassable{
-    stroke: purple;
+    mix-blend-mode: multiply;
+    stroke: #8F8;
 }
 .mapview svg .wall.alarm{
+    mix-blend-mode: multiply;
     stroke: red;
 }
 .mapview svg .wall.solid{
     stroke: black;
 }
+.mapview svg .wall.secondary {
+    stroke: #0008;
+    stroke-dasharray: 2 2;
+}
 .mapview svg .wall.passable{
     stroke: #aaa;
 }
+.mapview svg .wall.item_barrier{
+    mix-blend-mode: multiply;
+    stroke: #88F;
+}
 .mapview svg .wall.impassable{
-    stroke: rgb(255, 219, 119);
+    mix-blend-mode: multiply;
+    stroke: rgba(255, 219, 119);
 }
 .mapview svg .wall.enemy_only_passable{
     stroke: greenyellow;
@@ -106,7 +117,8 @@
     fill: red;
 }
 .mapview svg .enemy.impassable{
-    fill: #8A8;
+    stroke: #F88;
+    mix-blend-mode: multiply;
 }
 .mapview svg .enemy.direction{
     fill: #aaa;

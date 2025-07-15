@@ -54,8 +54,10 @@ export class MapDraw {
                 teleport: new SVGPath("sectorfeat teleport"),
             },
             walls :{
+                secondary_wall: new SVGPath("wall secondary"),
                 sound_impassable: new SVGPath("wall sound_impassable"), //sound can't pass (other can)
                 sound_alarm: new SVGPath("wall alarm"),
+                item_barrier:  new SVGPath("wall item_barrier"),  
                 solid:  new SVGPath("wall solid"), //solid wall, but sector connected
                 passable: new SVGPath("wall passable"), //solid wall, but passable for player
                 pc_impassable: new SVGPath("wall impassable"),  //hidden wall, impassable for player
@@ -230,6 +232,12 @@ export class MapDraw {
                 if (!ex) {
                     this.drawWall(set.walls.edge, mx);
                 } else {
+                    if (sd.secondary && (flgs & SideFlag.SEC_VIS)) {                        
+                        const iscolumn = s.type == SectorType.Column
+                                    || s.type == SectorType.DeathColumn
+                                    || s.type == SectorType.Teleport;
+                        this.drawWall(set.walls.secondary_wall,mx,iscolumn?0.48:sd.secondary.secondary_front?0.95:0.05);
+                    }
                     if (sd.primary && (flgs & SideFlag.PRIM_VIS)) {
                         //primary is visible
                         if ((flgs & SideFlag.SECRET) || (flgs & SideFlag.TRUESEE)) {
@@ -246,6 +254,12 @@ export class MapDraw {
                         }
                         if (flgs & SideFlag.SOUND_IMPS) {
                             this.drawWall(set.walls.sound_impassable, mx);                            
+                        }
+                        if (flgs & SideFlag.MONST_IMPS) {
+                            this.drawWall(set.enemies.areas, mx);                            
+                        }
+                        if (flgs & SideFlag.THING_IMPS) {
+                            this.drawWall(set.walls.item_barrier, mx);                            
                         }
                         if (flgs &SideFlag.ALARM) {
                             this.drawWall(set.walls.sound_alarm, mx);
@@ -467,8 +481,8 @@ export class MapDraw {
         MapDraw.drawArrowEx(path, this.transformByDir(x,y,dir));
     }
 
-    private drawWall(path: SVGPath, mx: Transform2D) {
-        path.mt(...mx.xyof(0,0)).lt(...mx.xyof(1,0));
+    private drawWall(path: SVGPath, mx: Transform2D, offset = 0) {
+        path.mt(...mx.xyof(0,offset)).lt(...mx.xyof(1,offset));
     }
 
     private drawAction(path: SVGPath, mx: Transform2D) {
@@ -485,13 +499,13 @@ export class MapDraw {
 
     private drawLeftArc(path: SVGPath, mx: Transform2D) {
         if (!mx) return;
-        const [xc,yc] = mx.xyof(0,0);
-        const [xd,yd] = mx.xyof(0.2,0);
+        const [xc,yc] = mx.xyof(0,0.03);
+        const [xd,yd] = mx.xyof(0.2,0.03);
         path.mt(xc,yc).lt(xd,yd);
     }
     private drawRightArc(path: SVGPath, mx: Transform2D) {
-        const [xc,yc] = mx.xyof(0.8,0);
-        const [xd,yd] = mx.xyof(1,0);
+        const [xc,yc] = mx.xyof(0.8,0.03);
+        const [xd,yd] = mx.xyof(1,0.03);
         path.mt(xc,yc).lt(xd,yd);
     }
     private drawNiche(path: SVGPath, mx: Transform2D){
@@ -851,8 +865,8 @@ export function findSectorAtPos(m: MapFile, level: number , pt: DOMPointReadOnly
 
 export function makeSectorSelection(m: MapFile, level: number , rect: DOMRectReadOnly) : number[] {    
     return m.sectors.reduce((a,s,idx) => {
-        if (s.level == level && rect.left-0.5 < s.x && rect.right+0.5 > s.x
-                                && rect.top-0.5 < s.y && rect.bottom+0.5 > s.y) {
+        if (s.level == level && rect.left-0.5 < s.x && rect.right-0.5 > s.x
+                                && rect.top-0.5 < s.y && rect.bottom-0.5 > s.y) {
                                     a.push(idx);
                                 }
         return a;
