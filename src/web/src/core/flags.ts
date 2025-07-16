@@ -48,7 +48,9 @@ export function useBitmaskCheckbox2<T extends Record<string, number> >(
         }        
     })
 
-    return [bitmask, rcheckboxes]
+    return [bitmask, rcheckboxes];
+}
 
-
+export function setFlag(flg: number, mask: number, v: boolean) {
+  return v?flg | mask:flg & ~mask;
 }

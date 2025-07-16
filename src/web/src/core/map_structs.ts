@@ -1142,10 +1142,7 @@ export class MapSector {
     y: number = 0;
     level : number = 0;
     enemy: EnemyOnSector | null = null;
-    flg_dark_fog = false;
-    flg_secret = false;
-    flg_no_teleport = false;
-    flg_automaped = false;
+    flags: number = 0;
 }
 
 class ConfigurationSaveMap {
@@ -1238,10 +1235,7 @@ export class MapFile {
             nw.level = ml.layer;
             nw.exit = s.exit.slice();            
             nw.enemy = m.enemies[idx] || null;
-            nw.flg_dark_fog = (ml.flags & SectorFlags2.DarkFog) != 0;
-            nw.flg_no_teleport = (ml.flags & SectorFlags2.NoSummon) != 0;
-            nw.flg_secret = (ml.flags & SectorFlags2.Secret) != 0;
-            nw.flg_automaped = (ml.flags & SectorFlags2.Automapped) != 0;
+            nw.flags = ml.flags;
             return nw;
         });
 
@@ -1324,10 +1318,7 @@ export class MapFile {
             out.x = s.x;
             out.y = s.y;
             out.layer = s.level;
-            out.flags = (s.flg_automaped?SectorFlags2.Automapped:0) 
-                        |(s.flg_dark_fog?SectorFlags2.DarkFog:0)
-                        |(s.flg_no_teleport?SectorFlags2.NoSummon:0)
-                        |(s.flg_secret?SectorFlags2.Secret:0)
+            out.flags = s.flags;
             return out;
         })
 

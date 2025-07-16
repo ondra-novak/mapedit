@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
-import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, WallConfiguration } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, WallConfiguration } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import MissingFiles from '@/components/MissingFiles.vue';
 import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
@@ -76,7 +76,12 @@ type PaletteModels = {
     ceil: FloorCeilConfiguration|null;
 };
 
-
+const SectorFlagsNames = {
+    DarkFog: "Always fog to black",
+    Secret: "Secret",
+    NoSummon: "No Teleport",
+    Automapped: "Already automapped"
+}
 
 
 function updateControls() {
@@ -110,10 +115,7 @@ function doRedo() {
     }
 }
 
-function onMapClickXY(pt: DOMPointReadOnly, side:number,  shift: boolean, control: boolean) {
-    if ((settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Items)) {
-        if (!control) {
-            const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
+function updateFocusData(sect: number, side: number) {
             if (sect > 0) {
                 const sdef = shallowClone(curmap.value.sectors[sect]);
                 sdef.exit = shallowClone(sdef.exit);
@@ -126,6 +128,14 @@ function onMapClickXY(pt: DOMPointReadOnly, side:number,  shift: boolean, contro
             } else {
                 focus.value = undefined;
             }
+
+}
+
+function onMapClickXY(pt: DOMPointReadOnly, side:number,  shift: boolean, control: boolean) {
+    if ((settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Items)) {
+        if (!control) {
+            const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
+            updateFocusData(sect,side);
             if (!shift) {
                 selection.value = [];
             }
@@ -497,6 +507,44 @@ watch([()=>settings.edit_mode,selection],()=>{
 })
 
 
+function applySector() {
+    if (focus.value) {
+        if (selection.value && selection.value.length) {
+            const changes : ((s:MapSector)=>void)[] = [];
+
+            const old = curmap.value.sectors[focus.value.sector];
+            const nw = focus.value.sector_def;
+            if (old.action != nw.action) changes.push((s:MapSector)=>s.action = nw.action);
+            if (old.ceil != nw.ceil) changes.push((s:MapSector)=>s.ceil = nw.ceil);
+            if (old.flags != nw.flags) changes.push((s:MapSector)=>{
+                s.flags &= old.flags & ~nw.flags;
+                s.flags |= nw.flags & ~old.flags;
+            });
+            if (old.floor != nw.floor) changes.push((s:MapSector)=>s.floor =nw.floor);
+            if (old.target_sector != nw.target_sector || old.target_side != nw.target_side) changes.push((s:MapSector)=>{
+                s.target_sector = nw.target_sector;
+                s.target_side = nw.target_side;
+            }); 
+            if (old.type != nw.type) changes.push((s:MapSector)=>s.type =nw.type);
+            if (changes.length) {
+                const m  = begin_edit();
+                m.sectors = shallowClone(m.sectors);            
+                selection.value.forEach(sect=>{
+                    const s = m.sectors[sect] = shallowClone(m.sectors[sect]);
+                    for (const f of changes) f(s);
+                });
+                end_edit(m);
+            }
+            updateFocusData(focus.value.sector, focus.value.side);
+        } else {
+            const m = begin_edit();
+            m.sectors = shallowClone(m.sectors);
+            m.sectors[focus.value.sector] = focus.value.sector_def;
+            end_edit(m);
+            updateFocusData(focus.value.sector, focus.value.side);
+        }
+    }
+}
 </script>
 
 <template>
@@ -561,17 +609,21 @@ watch([()=>settings.edit_mode,selection],()=>{
             </select></label>
             <label><span>Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="false" v-model="focus.sector_def.ceil" type="ceil"></PalleteEditor></label>
             <label><span>Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="false" v-model="focus.sector_def.floor" type="floor"></PalleteEditor></label>
-            <label><input type="checkbox" v-model="focus.sector_def.flg_automaped"><span>Already mapped</span></label>
-            <label><input type="checkbox" v-model="focus.sector_def.flg_secret"><span>Secret</span></label>
-            <label><input type="checkbox" v-model="focus.sector_def.flg_no_teleport"><span>No teleport</span></label>
-            <label><input type="checkbox" v-model="focus.sector_def.flg_dark_fog"><span>Always fog to dark</span></label>
+            <label v-for="(v,k) of SectorFlagsNames" :key="k">
+                <input type="checkbox" @change="focus.sector_def.flags^=SectorFlags2[k]" :checked="(focus.sector_def.flags & SectorFlags2[k])!=0">
+                <span> {{ v }}</span>
+            </label>
             <label><span>Action</span><select v-model="focus.sector_def.action">
                 <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
             </select></label>
-            <label><span>Target</span><button :disabled="(link?.side || 0) == -1" @click="focus.sector_def.target_sector=link?.sector || 0;focus.sector_def.target_side = link?.side || 0"> Side {{ focus.sector_def.target_sector }}:{{focus.sector_def.target_side }} </button></label>
+            <div class="label"><span>Target</span><div class="target">
+                    <button :disabled="(link?.side || 0) == -1" @click="focus.sector_def.target_sector=link?.sector || 0;focus.sector_def.target_side = link?.side || 0"> Side {{ focus.sector_def.target_sector }}:{{focus.sector_def.target_side }} </button>
+                    <button :disabled="focus.sector_def.target_sector == 0" @click="focus.sector_def.target_sector = focus.sector_def.target_side = 0">X</button></div>
+            </div>
             <div class="label"><span>Exits</span><div class="exits"><button :disabled="!link" 
                  v-for="v of [0,1,2,3]" :key="v" @click="focus.sector_def.exit[v] = link?.sector || 0">{{ focus.sector_def.exit[v] }}</button></div></div>
         </x-form>
+        <div class="buttons"><button @click="applySector">Apply changes</button></div>
         </div>
         <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }}</span>
         <x-form>
@@ -753,6 +805,13 @@ x-workspace {
     ;
 
 }
+
+.palette .buttons {
+    text-align: center;
+}
+
+.target {display: flex;width: 30%;}
+.target > *:first-child {flex-grow: 1;}
 
 
 
