@@ -23,6 +23,12 @@
 .mapview svg .sector.water{
     fill: rgb(183, 183, 253);
 }
+
+.mapview svg .sector-conn {
+    fill: none;
+    stroke: #0088;
+    stroke-width: 2px;
+}
 .mapview svg .sectorfeat.stairs{
     fill: black;
 }
@@ -153,6 +159,7 @@
 .disable_ext_arrows .mapview svg .arrow.in,
 .disable_ext_arrows .mapview svg .arrow.out,
 .disable_enemies .mapview svg .enemy,
+.disable_sector_connections .mapview svg .sector-conn,
 .disable_items .mapview svg .items {
     visibility: hidden;
 }

@@ -1,9 +1,9 @@
 const GlobalState : Record<string, any> = {}
 
 
-function globalState<T>(name: string, init: T | (() => T)): T {
+function globalState<T>(name: string, init: T | (() => T), force_reset = false): T {
     const st = GlobalState[name];
-    if (st !== undefined) {
+    if (!force_reset && st !== undefined) {
         return st as T;
     } else {
         const value = typeof init === 'function' ? (init as () => T)() : init;
@@ -11,5 +11,6 @@ function globalState<T>(name: string, init: T | (() => T)): T {
         return value;
     }
 }
+
 
 export default globalState;

@@ -34,9 +34,10 @@ bool fast_copy_file(const std::filesystem::path& from, const std::filesystem::pa
         return false;
     }
 
-#if defined(__linux__) && defined(__GLIBC__)
     off_t offset = 0;
     struct stat stat_buf;
+
+#if defined(__linux__) && defined(__GLIBC__)
     if (fstat(src, &stat_buf) == 0) {
         ssize_t bytes_copied = copy_file_range(src, nullptr, dst, nullptr, stat_buf.st_size, 0);
         if (bytes_copied == stat_buf.st_size) {
@@ -48,8 +49,6 @@ bool fast_copy_file(const std::filesystem::path& from, const std::filesystem::pa
 #endif
 
     // Fallback: sendfile
-    off_t offset = 0;
-    struct stat stat_buf;
     if (fstat(src, &stat_buf) == 0) {
         ssize_t bytes_sent = sendfile(dst, src, &offset, stat_buf.st_size);
         if (bytes_sent == stat_buf.st_size) {

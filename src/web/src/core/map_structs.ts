@@ -103,6 +103,8 @@ export const SectorFlags = {
     Automapped: 0x1,        //visible on map (from beginning)    
  }
 
+
+
 abstract class WithSchema  {
     abstract getSchema():Schema;
 };
@@ -674,6 +676,50 @@ export const ActionType = {
     IFSTP: 39,  //if sector type
 }
 
+export const SimpleActionType = {
+NONE: 0,
+OPEN_DOOR: 1,
+CLOSE_DOOR: 2,
+OPEN_CLOSE: 3,
+RUN_PRIM: 4,
+SHOW_PRIM: 5,
+HIDE_PRIM: 6,
+SHOW_HIDE_PRIM: 7,
+RUN_SEC: 8,
+SHOW_SEC: 9,
+HIDE_SEC: 10,
+SHOW_HIDE_SEC: 11,
+HIDE_PRIM_SEC: 12,
+OPEN_TELEPORT: 15,
+CLOSE_TELEPORT: 16,
+CODELOCK_LOG2: 17,
+CODELOCK_LOG3: 18,
+}
+
+export const SimpleActionTypeName = [
+    "None",
+/*OPEN_DOOR: 1,*/ "Open door",
+/*CLOSE_DOOR: 2,*/ "Close door",
+/*OPEN_CLOSE: 3,*/ "Open/Close door",
+/*RUN_PRIM: 4,*/   "Animate primary",
+/*SHOW_PRIM: 5,*/  "Show primary",
+/*HIDE_PRIM: 6,*/  "Hide primary",
+/*SHOW_HIDE_PRIM: 7,*/ "Show/Hide primary",
+/*RUN_SEC: 8,*/    "Animate secodary",
+/*SHOW_SEC: 9,*/   "Show secondary",
+/*HIDE_SEC: 10,*/  "Hide secondary",
+/*SHOW_HIDE_SEC: 11,*/ "Show/Hide secondary",
+/*HIDE_PRIM_SEC: 12,*/ "Hide primary and secondary",
+/*DISPLAY_TEXT: 13,*/  null,    //defunc
+/*CODELOCK_LOG: 14,*/  null,    //defunc
+/*OPEN_TELEPORT: 15,*/ "Open teleport",
+/*CLOSE_TELEPORT: 16,*/ "Close teleport",
+/*CODELOCK_LOG2: 17,*/ "Logical (invert)",
+/*CODELOCK_LOG3: 18,*/ "Logical (set)"
+
+]
+
+
 function parseActions(iter:BinaryIterator) : TMA_GEN[][] {
     const ret:TMA_GEN[][] = [];
     
@@ -830,7 +876,7 @@ export abstract class AssetConfiguration {
     get_name() : string {
         if (this.name) return this.name;
         const pxms = this.get_pixmaps();
-        const s = pxms[0]?pxms[0][0]:""
+        const s = pxms.map(x=>x.find(y=>y && y.toUpperCase() != "EMPTY.PCX")).find(x=>x);
         if (s) {
             if (pxms.length == 1) return s;
             else return `${s} (${pxms.length})`;
@@ -1087,7 +1133,6 @@ export class MapSector {
     floor: FloorCeilConfiguration | null = null;
     ceil: FloorCeilConfiguration | null = null;
     type: number = SectorType.Empty;
-    flags: number = 0;
     action: number = 0;
     target_side :number = 0;
     target_sector: number = 0;
@@ -1097,6 +1142,10 @@ export class MapSector {
     y: number = 0;
     level : number = 0;
     enemy: EnemyOnSector | null = null;
+    flg_dark_fog = false;
+    flg_secret = false;
+    flg_no_teleport = false;
+    flg_automaped = false;
 }
 
 class ConfigurationSaveMap {
@@ -1181,7 +1230,6 @@ export class MapFile {
                 
             }
             const ml = m.layout[idx];
-            nw.flags = ml.flags;
             nw.target_sector = s.target_sector;
             nw.target_side = s.target_side;
             nw.x = ml.x;
@@ -1190,6 +1238,10 @@ export class MapFile {
             nw.level = ml.layer;
             nw.exit = s.exit.slice();            
             nw.enemy = m.enemies[idx] || null;
+            nw.flg_dark_fog = (ml.flags & SectorFlags2.DarkFog) != 0;
+            nw.flg_no_teleport = (ml.flags & SectorFlags2.NoSummon) != 0;
+            nw.flg_secret = (ml.flags & SectorFlags2.Secret) != 0;
+            nw.flg_automaped = (ml.flags & SectorFlags2.Automapped) != 0;
             return nw;
         });
 
@@ -1272,7 +1324,10 @@ export class MapFile {
             out.x = s.x;
             out.y = s.y;
             out.layer = s.level;
-            out.flags = s.flags;
+            out.flags = (s.flg_automaped?SectorFlags2.Automapped:0) 
+                        |(s.flg_dark_fog?SectorFlags2.DarkFog:0)
+                        |(s.flg_no_teleport?SectorFlags2.NoSummon:0)
+                        |(s.flg_secret?SectorFlags2.Secret:0)
             return out;
         })
 

@@ -2,10 +2,10 @@
 import { onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
-import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, RawMapFile, SectorType, SectorTypeName, SideFlag, WallConfiguration } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, WallConfiguration } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import MissingFiles from '@/components/MissingFiles.vue';
-import {makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
+import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
 import { shallowClone, type Document } from '@/utils/document';
 import  globalState from '@/utils/global';
 
@@ -15,7 +15,8 @@ import svg_eraser from '@/assets/toolbar/eraser.svg'
 import svg_chest from '@/assets/toolbar/chest.svg'
 import svg_enemy from '@/assets/toolbar/enemy.svg'
 import PalleteEditor from '@/components/PalleteEditor.vue';
-import { walk } from 'vue/compiler-sfc';
+import { messageBox } from '@/utils/messageBox';
+const list_assets = ref<string[]>();
 
 const EditMode = {
     Edit:0,
@@ -33,13 +34,38 @@ const settings = reactive(globalState("mapview_settings",{
     edit_mode: EditMode.Edit as number,
     sector_type: SectorType.Normal as number,
     split_mode: 0 as number,
+    wall:null as WallConfiguration | null,
+    floor:null as FloorCeilConfiguration| null,
+    ceil:null as FloorCeilConfiguration | null,
+    arc:null as ArcConfiguration | null
 }));
+
+type FocusItem = {
+    sector: number;
+    side: number;
+    sector_def: MapSector ;
+    side_def: MapSide;    
+}
+type LinkRef = {
+    sector: number;
+    side: number;
+}
+
+const focus = ref<FocusItem>();
+const selection = ref<number[]>();
+const link = ref<LinkRef>();
+
+let warn_empty_tool = true;
 const mapcontainer = globalState("mapcontainer",()=>new MapContainer);
 const layers_opened = ref(false);
 const control_state = reactive({
     can_undo: false,
     can_redo: false
 });
+const editor_models = reactive({
+    side: new MapSide,
+    sector: new MapSector
+})
 
 const mapLoadedPalettes = ref(new MapPalettes);
 
@@ -52,7 +78,6 @@ type PaletteModels = {
 
 
 
-const cur_palettes = reactive(globalState<PaletteModels>("palette", {wall:null,floor:null,ceil:null,arc:null}));
 
 function updateControls() {
     control_state.can_redo = StatusBar.cur_map.can_redo();
@@ -85,7 +110,36 @@ function doRedo() {
     }
 }
 
-function onMapClickXY(pt: DOMPointReadOnly, shift: boolean, control: boolean) {
+function onMapClickXY(pt: DOMPointReadOnly, side:number,  shift: boolean, control: boolean) {
+    if ((settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Items)) {
+        if (!control) {
+            const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
+            if (sect > 0) {
+                const sdef = shallowClone(curmap.value.sectors[sect]);
+                sdef.exit = shallowClone(sdef.exit);
+                const wdef = shallowClone(sdef.side[side]);                
+                focus.value = {sector: sect, 
+                               side: side, 
+                               sector_def: sdef,
+                               side_def: wdef};                
+                               updateFocus();
+            } else {
+                focus.value = undefined;
+            }
+            if (!shift) {
+                selection.value = [];
+            }
+        } else {
+            if (Array.isArray(selection.value)) {
+                const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
+                if (sect) {
+                    const idx = selection.value.findIndex(x=>x==sect);
+                    if (idx != -1) selection.value = [...selection.value.slice(0,idx),...selection.value.slice(idx+1)];
+                    else selection.value = [...selection.value, sect];
+                }
+            }
+        }
+    }
 
 }
 
@@ -146,16 +200,16 @@ function disconnectSectors(sectors: MapSector[], from :number, dir:number, mode:
     sd2.flags &= ~flags_off;
     sd2.flags |= flags_on;
     if (flags_on & SideFlag.PRIM_VIS) {
-        sd1.primary = cur_palettes.wall;
-        sd2.primary = cur_palettes.wall;
+        sd1.primary = settings.wall;
+        sd2.primary = settings.wall;
     }
     if (flags_on & SideFlag.SEC_VIS) {
-        sd1.secondary = cur_palettes.wall;
-        sd2.secondary = cur_palettes.wall;
+        sd1.secondary = settings.wall;
+        sd2.secondary = settings.wall;
     }
     if (flags_on & (SideFlag.LEFT_ARC | SideFlag.RIGHT_ARC)) {
-        sd1.arc = cur_palettes.arc;
-        sd2.arc = cur_palettes.arc;
+        sd1.arc = settings.arc;
+        sd2.arc = settings.arc;
     }
     return true;
 }
@@ -172,7 +226,7 @@ function drawRectArcs(m: MapFile, rc: DOMRectReadOnly) {
                 side.flags &= ~(SideFlag.LEFT_ARC | SideFlag.RIGHT_ARC);
                 const r = (sd + 1) & 0x3;
                 const l = (sd + 3) & 0x3;
-                if (cur_palettes.arc && s.exit[sd]) {
+                if (settings.arc && s.exit[sd]) {
                     const s2 = m.sectors[s.exit[sd]];
                     let setr = false;
                     let setl = false;
@@ -193,7 +247,7 @@ function drawRectArcs(m: MapFile, rc: DOMRectReadOnly) {
                         setr = false;
                     }
                     if (setr || setl) {
-                        side.arc = cur_palettes.arc;
+                        side.arc = settings.arc;
                         if (setl) {
                             side.flags |= SideFlag.LEFT_ARC;
                         }
@@ -208,7 +262,7 @@ function drawRectArcs(m: MapFile, rc: DOMRectReadOnly) {
 
 }
 
-function drawRect(rc: DOMRectReadOnly) {
+async function drawRect(rc: DOMRectReadOnly) {
     const map = begin_edit();
     const free_sectors :number[] =  [];
     const sectormap = map.sectors.reduce((mp, sect, idx)=>{
@@ -235,6 +289,12 @@ function drawRect(rc: DOMRectReadOnly) {
         }
     } else {
         if (map.sectors.length == 0) map.sectors.push(new MapSector()); //sector 0 is always empty
+        if (settings.floor == null && settings.wall == null && warn_empty_tool) {
+            const d = await messageBox("You’re painting a room or a corridor without selecting wall or floor graphics. This is likely a mistake.\n\nDo you want to continue anyway?",
+                ["Proceed - I Know What I’m Doing", "Cancel operation"],1,1);
+            if (d == 1) return;
+            warn_empty_tool = false;
+        }
         for (let x = rc.left; x < rc.right; ++x) {
             for (let y = rc.top; y < rc.bottom; ++y) {
                 done_anything = true;
@@ -260,12 +320,12 @@ function drawRect(rc: DOMRectReadOnly) {
                 sect.side.forEach(x=>{
                     x.flags = SideFlag.PLAY_IMPS | SideFlag.MONST_IMPS| SideFlag.SOUND_IMPS | SideFlag.THING_IMPS
                             | SideFlag.PRIM_VIS | SideFlag.SEC_FORV 
-                    x.primary = cur_palettes.wall;
+                    x.primary = settings.wall;
                     x.secondary = null;
-                    x.arc= cur_palettes.arc;
+                    x.arc= settings.arc;
                 });                         
-                sect.floor = cur_palettes.floor;
-                sect.ceil = cur_palettes.ceil;          
+                sect.floor = settings.floor;
+                sect.ceil = settings.ceil;          
                 [[0,-1],[1,0],[0,1],[-1,0]].forEach((d,dir)=>{
                     const t = sectormap[`${x+d[0]},${y+d[1]}`];
                     if (t) {
@@ -279,10 +339,31 @@ function drawRect(rc: DOMRectReadOnly) {
     if (done_anything) end_edit(map);
 }
 
+function modifySelection(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
+    const sectors = makeSectorSelection(curmap.value, settings.curlevel, rc);
+    if (!selection.value || (!shift && !control)) {
+        if (!control) selection.value = sectors;
+        return;
+    } else {
+        const old_sectors: number[] = selection.value;
+        const s = new Set<number>(old_sectors);
+        if (control) {
+            sectors.forEach(x=>s.delete(x));
+        } else {
+            sectors.forEach(x=>s.add(x));
+        }
+        selection.value = Array.from(s);
+    }
+}
+
+
 function onMapSelectRect(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
     switch (settings.edit_mode) {
         case EditMode.Draw: if (control) eraseRect(rc); else drawRect(rc); break;
         case EditMode.Erase: if (control) drawRect(rc); else eraseRect(rc);break;
+        case EditMode.Edit:
+        case EditMode.Enemies:  modifySelection(rc, shift, control);
+            
     }    
 }
 
@@ -296,8 +377,26 @@ const required_files: FileItem[] = [
     {group:AssetGroup.MAPS,name:"ENEMY.DAT",ovr:true}
 ];
 
+function updateFocus() {
+    if (focus.value && (settings.edit_mode == EditMode.Edit||settings.edit_mode == EditMode.Items)) {
+        mapdraw.drawFocusedWall(curmap.value, settings.curlevel, focus.value.sector, focus.value.side);
+    } else {
+        mapdraw.removeFocusedWall();
+    }
+}
+
+function updateSelection() {
+    if (selection.value && (settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Enemies)) {
+        mapdraw.drawSelectedSectors(curmap.value, settings.curlevel, selection.value);
+    } else {
+        mapdraw.drawSelectedSectors(curmap.value, settings.curlevel, []);
+    }
+}
+
 function redraw() {
     mapdraw.draw(curmap.value,settings.curlevel);
+    updateFocus();
+    updateSelection();
     mapcontainer.set_map(mapdraw);    
 }
 
@@ -305,6 +404,7 @@ const layers= reactive(globalState("layers",{
     grid: true,
     sector_basic: true,
     sector_features: true,
+    sector_connections: true,
     walls: true,
     arcs: true,
     actions: true,
@@ -348,6 +448,7 @@ function onMapLoaded() {
 }
 
 async function init() {
+    server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
     StatusBar.onMapOpen(onMapLoaded);
     if (mapview.value)     {
         mapcontainer.add_to_DOM(mapview.value);        
@@ -388,15 +489,20 @@ const edit_modes = [
 onMounted(init);
 onUnmounted(StatusBar.onFinalSave)
 
-function add_configuration<T extends AssetConfiguration>(conf: AssetConfiguration, target: ConfigurationPalette<T>) {
+watch([()=>settings.edit_mode,focus],()=>{
+    updateFocus();
+});
+watch([()=>settings.edit_mode,selection],()=>{
+    updateSelection();
+})
 
-}
 
 </script>
 
 <template>
 
 <x-workspace>
+<datalist id="listOfWallAssets9875487"><option v-for="v of list_assets" :key="v" :value="v"></option></datalist>
 <div class="toolbar">
     <div :class="{active: layers_opened}" @click = "layers_opened = !layers_opened"><img src="@/assets/toolbar/layers.svg"></div>
     <div v-for="(v,idx) in edit_modes" @click="settings.edit_mode = idx" :class="{active: settings.edit_mode == idx, sep: idx == 0}" :title="v[1]"><img :src="v[0]"></div>
@@ -412,6 +518,7 @@ function add_configuration<T extends AssetConfiguration>(conf: AssetConfiguratio
 <div class="middle">
 <div ref="mapview" class="mapcont" :class="{disable_sector_basic: !layers.sector_basic,
                             disable_sector_features: !layers.sector_features,
+                            disable_sector_connections: !layers.sector_connections,
                             disable_walls: !layers.walls,
                             disable_arc: !layers.arcs,
                             disable_actions: !layers.actions,
@@ -422,13 +529,13 @@ function add_configuration<T extends AssetConfiguration>(conf: AssetConfiguratio
                             disable_grid: !layers.grid
                             }"></div>
 </div>                            
-<div class="right">
-    <div class="palette">
+<div class="right">        
+    <div class="palette" v-if="settings.edit_mode == EditMode.Draw || settings.edit_mode == EditMode.Erase">
         <div><span>Draw settings</span><x-form>
-            <label><span>Sector type</span><select v-model="settings.sector_type" size="1">
+            <label><span class="title">Sector type</span><select v-model="settings.sector_type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
         </select></label>
-            <label><span>Split mode</span><select v-model="settings.split_mode">
+            <label><span class="title">Split mode</span><select v-model="settings.split_mode">
                 <option :value="0">Disconnect</option>
                 <option :value="-1">Thin wall</option>
                 <option :value="SideFlag.PLAY_IMPS">Player barrier</option>
@@ -442,10 +549,42 @@ function add_configuration<T extends AssetConfiguration>(conf: AssetConfiguratio
                 <option :value="SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC">Set arcs</option>                
             </select></label>
         </x-form></div>
-        <div class="h"><span>Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="cur_palettes.wall" type="wall"></PalleteEditor></div>
-        <div class="h"><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="cur_palettes.arc" type="arc"></PalleteEditor></div>
-        <div class="h"><span>Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="cur_palettes.floor" type="floor"></PalleteEditor></div>
-        <div class="h"><span>Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="cur_palettes.ceil"  type="ceil"></PalleteEditor></div>
+        <div class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall"></PalleteEditor></div>
+        <div class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc"></PalleteEditor></div>
+        <div class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor"></PalleteEditor></div>
+        <div class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
+    </div>
+    <div class="palette" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0">
+        <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: -1}"></button> Sector {{ focus.sector }}</span><x-form>
+            <label><span>Type</span><select v-model="focus.sector_def.type" size="1">
+            <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
+            </select></label>
+            <label><span>Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="false" v-model="focus.sector_def.ceil" type="ceil"></PalleteEditor></label>
+            <label><span>Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="false" v-model="focus.sector_def.floor" type="floor"></PalleteEditor></label>
+            <label><input type="checkbox" v-model="focus.sector_def.flg_automaped"><span>Already mapped</span></label>
+            <label><input type="checkbox" v-model="focus.sector_def.flg_secret"><span>Secret</span></label>
+            <label><input type="checkbox" v-model="focus.sector_def.flg_no_teleport"><span>No teleport</span></label>
+            <label><input type="checkbox" v-model="focus.sector_def.flg_dark_fog"><span>Always fog to dark</span></label>
+            <label><span>Action</span><select v-model="focus.sector_def.action">
+                <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
+            </select></label>
+            <label><span>Target</span><button :disabled="(link?.side || 0) == -1" @click="focus.sector_def.target_sector=link?.sector || 0;focus.sector_def.target_side = link?.side || 0"> Side {{ focus.sector_def.target_sector }}:{{focus.sector_def.target_side }} </button></label>
+            <div class="label"><span>Exits</span><div class="exits"><button :disabled="!link" 
+                 v-for="v of [0,1,2,3]" :key="v" @click="focus.sector_def.exit[v] = link?.sector || 0">{{ focus.sector_def.exit[v] }}</button></div></div>
+        </x-form>
+        </div>
+        <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }}</span>
+        <x-form>
+        <label><span>Primary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.primary" type="wall"></PalleteEditor></label>
+        <label><span>Secondary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.secondary" type="wall"></PalleteEditor></label>
+        <label><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="false" v-model="focus.side_def.arc" type="arc"></PalleteEditor></label>
+        <label><span>Basic action</span><select v-model="focus.side_def.action">
+            <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
+        </select></label>
+        <label><span>Target</span><button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button></label>
+        </x-form>
+        </div>
+
     </div>
 </div>
 <div class="layers" v-if="layers_opened">
@@ -454,11 +593,12 @@ function add_configuration<T extends AssetConfiguration>(conf: AssetConfiguratio
         <label><input type="checkbox" v-model="layers.grid"><span>Grid</span></label>
         <label><input type="checkbox" v-model="layers.sector_basic"><span>Sector type</span></label>
         <label><input type="checkbox" v-model="layers.sector_features"><span>Sector features</span></label>
+        <label><input type="checkbox" v-model="layers.sector_connections"><span>Sector exit connections</span></label>
         <label><input type="checkbox" v-model="layers.walls"><span>Walls</span></label>
         <label><input type="checkbox" v-model="layers.arcs"><span>Arcs</span></label>
         <label><input type="checkbox" v-model="layers.actions"><span>Actions</span></label>
-        <label><input type="checkbox" v-model="layers.arrows"><span>Connections</span></label>
-        <label><input type="checkbox" v-model="layers.ext_arrows"><span>External Cnnections</span></label>
+        <label><input type="checkbox" v-model="layers.arrows"><span>Action connections</span></label>
+        <label><input type="checkbox" v-model="layers.ext_arrows"><span>External connections</span></label>
         <label><input type="checkbox" v-model="layers.enemies"><span>Enemies</span></label>
         <label><input type="checkbox" v-model="layers.items"><span>Items</span></label>
     </x-form>
@@ -541,7 +681,7 @@ x-workspace {
 .right .palette div {
     flex-grow: 1;    
 }
-.right .palette div>span {
+.right .palette div>span.title {
     font-weight: bold;
     display: block;
     background: linear-gradient(45deg, #aaa, transparent);
@@ -567,6 +707,53 @@ x-workspace {
 .toolbar {
     user-select: none;
 }
+.palette .exits {
+    position:relative;
+    height: 4rem;
+    max-width: 9rem;
+}
+.palette .exits button {
+    position: absolute;
+    width: fit-content;
+    height: fit-content;
+    width: 3rem;
+}
+.palette .exits button:nth-child(1) {
+    left: 0;right:0;top:0;margin: auto;;
+}
+.palette .exits button:nth-child(2) {
+    right: 0;bottom:0;top:0;margin: auto;;
+}
+.palette .exits button:nth-child(4) {
+    left: 0;bottom:0;top:0;margin: auto;;
+}
+
+.palette .exits button:nth-child(3) {
+    left: 0;right:0;bottom:0;margin: auto;;
+}
+.palette {
+    position: relative;
+}
+.palette  .link {
+    position: relative;
+    width: 1.4rem;
+    height: 1.4rem;
+}
+.palette  .link::after {
+    content: " ";    
+    display: block;
+    position: absolute;
+    left:0;top:0;
+    width: 100%;
+    height: 100%;
+    background: url("@/assets/chain.svg");
+    background-size: 1rem;
+    background-repeat: no-repeat;
+    background-position: center;
+    ;
+
+}
+
 
 
 </style>

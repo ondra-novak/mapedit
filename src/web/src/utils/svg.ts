@@ -154,6 +154,13 @@ export class Transform2D {
         return this;
     }
 
+    translate_in_dir(dx:number, dy:number) {
+        // Apply translation by modifying the matrix
+        this.matrix[4] += dx * this.matrix[0] + dy*this.matrix[2];
+        this.matrix[5] += dx * this.matrix[1] + dy*this.matrix[3];
+        return this;
+    }
+
     rotate(degree:number) {
         const radians = (degree * Math.PI) / 180;
         const cos = Math.cos(radians);

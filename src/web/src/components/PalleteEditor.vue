@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { server, type Config } from '@/core/api';
-import { AssetGroup } from '@/core/asset_groups';
 import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, FloorCeilMode, FloorCeilModeRequiredFrames, GlobalPaletteConfiguration, WallConfiguration } from '@/core/map_structs';
-import { shallowClone } from '@/utils/document';
-import { nextTick, onMounted, reactive, ref, Teleport, watch, type Ref } from 'vue';
-import CanvasView from './CanvasView.vue';
+import { nextTick, onMounted, reactive, ref, Teleport, watch} from 'vue';
 import { PCX, PCXProfile } from '@/core/pcx';
 import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
 import globalState from '@/utils/global';
+import { AssetGroup } from '@/core/asset_groups';
 
 const props = defineProps<{
     palette: ConfigurationPalette<AssetConfiguration>,
@@ -21,56 +19,34 @@ const model_index = ref<number>(-1);
 const global_palette = reactive(
     globalState<GlobalPaletteConfiguration<AssetConfiguration> >(`palette_${props.type}`,new GlobalPaletteConfiguration<AssetConfiguration>)
 );
-const list_assets = ref<string[]>();
 
 const cur_wall = ref<WallConfiguration>();
 const cur_arc = ref<ArcConfiguration>();
 const cur_floorceil = ref<FloorCeilConfiguration>();
 const cur_frame = ref<number>(0);
+const pcx_cache = globalState("palette_wall_cache", new Map<string, PCX>(), true);
 
 
 const preview_place = ref<HTMLElement>();
 
-/*
-watch(edit_item, async () => {
-    cur_wall.value = undefined;
-    cur_arc.value = undefined;
-    cur_floorceil.value = undefined;
-    if (edit_item.value) {
-        if (props.palette.holds(WallConfiguration)) {
-            cur_wall.value = props.palette.map[edit_item.value] as WallConfiguration;
-        } else if (props.palette.holds(ArcConfiguration)) {
-            cur_arc.value = props.palette.map[edit_item.value] as ArcConfiguration;
-        } else if (props.palette.holds(FloorCeilConfiguration)) {
-            cur_floorceil.value = props.palette.map[edit_item.value] as FloorCeilConfiguration;
-        } 
-    } else {
-        if (props.palette.holds(WallConfiguration)) {
-            cur_wall.value = new WallConfiguration();
-            cur_wall.value.graphics = [["","",""]];
-            cur_wall.value.anim_frames = 1;
-        } else if (props.palette.holds(ArcConfiguration)) {
-            cur_arc.value = new ArcConfiguration();
-        } else if (props.palette.holds(FloorCeilConfiguration)) {
-            cur_floorceil.value = new FloorCeilConfiguration();
-            cur_floorceil.value.pixmaps = [""];
-        } 
+async function getImage(image:string) {
+    if (!image) image = "EMPTY.PCX";
+    let img = pcx_cache.get(image);
+    if (!img) {
+        const buff = await server.getDDLFile(image);        
+        img = PCX.fromArrayBuffer(buff);
+        pcx_cache.set(image, img);
     }
-    cur_frame.value = 0;
-    const lst = (await server.getDDLFiles(AssetGroup.WALLS, null)).files.map(x=>x.name);
-    list_assets.value = lst;
-})
-*/
+    return img;
+}
+
 watch([cur_wall, cur_frame, preview_place],async ()=>{
     const cw = cur_wall.value;
     const pp = preview_place.value;
     const cf = cur_frame.value;
     if (cw && pp && cf !== undefined) {
         const rs = cw.graphics[cf].map(n=>{
-            if (!n) n = "EMPTY.PCX";
-            return server.getDDLFile(n).then((buff)=>{
-                return PCX.fromArrayBuffer(buff).createCanvas(PCXProfile.wall);
-            },()=>document.createElement("canvas"));
+            return getImage(n).then(pcx=>pcx.createCanvas(PCXProfile.wall), ()=>document.createElement("canvas"));
         })
         const [main,left,right] = await Promise.all(rs);
         pp.innerHTML = "";
@@ -85,10 +61,7 @@ watch([cur_arc, preview_place],async ()=>{
     const pp = preview_place.value;
     if (cw && pp) {
         const rs = [cw.left, cw.right].map(n=>{
-            if (!n) n = "EMPTY.PCX";
-            return server.getDDLFile(n).then((buff)=>{
-                return PCX.fromArrayBuffer(buff).createCanvas(PCXProfile.wall);
-            },()=>document.createElement("canvas"));
+            return getImage(n).then(pcx=>pcx.createCanvas(PCXProfile.wall), ()=>document.createElement("canvas"));
         })
         const [left,right] = await Promise.all(rs);
         pp.innerHTML = "";
@@ -102,10 +75,7 @@ watch([cur_floorceil, cur_frame, preview_place],async ()=>{
     const cw = cur_floorceil.value;
     const pp = preview_place.value;
     if (cw && pp) {
-        const prom = server.getDDLFile(cw.pixmaps[cur_frame.value]).then((buff)=>{
-            return PCX.fromArrayBuffer(buff).createCanvas(PCXProfile.default);
-        })
-        const c = await prom;
+        const c = await (getImage(cw.pixmaps[cur_frame.value]).then(pcx=>pcx.createCanvas(PCXProfile.default), ()=>document.createElement("canvas")));
         pp.innerHTML = "";
         pp.appendChild(c);
     }
@@ -229,12 +199,19 @@ function delFrame() {
 }
 
 function paletteUpdate() {
-global_palette.merge(props.palette);
-model_index.value = -1;
+    global_palette.merge(props.palette);
+    if (model.value) {
+        model_index.value = global_palette.list.findIndex(x=>x.get_key() == model.value?.get_key());
+        if (model_index.value == -1) {
+            model_index.value = global_palette.list.length;
+            global_palette.list.push(model.value);
+        }
+    }
 }
 
 function init() {
     paletteUpdate();
+    
 }
 
 watch(()=>props.palette, ()=>{
@@ -252,7 +229,6 @@ onMounted(init);
 <Teleport to="body">
 <div class="popup-lb" v-if="cur_wall || cur_floorceil || cur_arc">
     <div class="edit-window">
-        <datalist id="palette5578"><option v-for="v of list_assets" :key="v" :value="v"></option></datalist>
         <div class="content">
             <div v-if="cur_wall">
                 <div class="wall-preview checkerboard" ref="preview_place">
@@ -268,9 +244,9 @@ onMounted(init);
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
                         <label><span>Name:</span><input  type="text" v-model="cur_wall.name"></label>
-                        <label><span>Front (main):</span><input  type="text" v-model="cur_wall.graphics[cur_frame][0]" list="palette5578"></label>
-                        <label><span>Left :</span><input type="text" v-model="cur_wall.graphics[cur_frame][1]" list="palette5578"></label>
-                        <label><span>Right :</span><input type="text" v-model="cur_wall.graphics[cur_frame][2]" list="palette5578"></label>
+                        <label><span>Front (main):</span><input  type="text" v-model="cur_wall.graphics[cur_frame][0]" list="listOfWallAssets9875487"></label>
+                        <label><span>Left :</span><input type="text" v-model="cur_wall.graphics[cur_frame][1]" list="listOfWallAssets9875487"></label>
+                        <label><span>Right :</span><input type="text" v-model="cur_wall.graphics[cur_frame][2]" list="listOfWallAssets9875487"></label>
                         <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input  type="text" v-model="cur_wall.lclip" v-watch-range min="1" max="16"></label>
                         <label><input  type="checkbox" v-model="cur_wall.alternate"><span>Alternating</span></label>
                         <label><input  type="checkbox" v-model="cur_wall.repeat_anim"><span>Repeat animation</span></label>
@@ -296,8 +272,8 @@ onMounted(init);
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
                         <label><span>Name:</span><input  type="text" v-model="cur_arc.name"></label>
-                        <label><span>Left :</span><input type="text" v-model="cur_arc.left" list="palette5578"></label>
-                        <label><span>Right :</span><input type="text" v-model="cur_arc.right" list="palette5578"></label>
+                        <label><span>Left :</span><input type="text" v-model="cur_arc.left" list="listOfWallAssets9875487"></label>
+                        <label><span>Right :</span><input type="text" v-model="cur_arc.right" list="listOfWallAssets9875487"></label>
                     </x-form>
                 </x-section>
             </div>
@@ -315,7 +291,7 @@ onMounted(init);
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
                         <label><span>Name:</span><input  type="text" v-model="cur_floorceil.name"></label>
-                        <label><span>Bitmap :</span><input type="text" v-model="cur_floorceil.pixmaps[cur_frame]" list="palette5578"></label>
+                        <label><span>Bitmap :</span><input type="text" v-model="cur_floorceil.pixmaps[cur_frame]" list="listOfWallAssets9875487"></label>
                         <label><span>Mode: </span><select v-model="cur_floorceil.mode">
                             <option :value="-1">Animated</option>
                             <option :value="0">Single (1 frame)</option>

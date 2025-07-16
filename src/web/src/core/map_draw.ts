@@ -72,7 +72,8 @@ export class MapDraw {
             action :{
                 wall: new SVGPath("action wall"),
                 script: new SVGPath("action script"),                
-                button: new SVGPath("action button"),                
+                button: new SVGPath("action button"),    
+                sectorconn: new SVGPath("sector-conn")            
             },
             arrow :{
                 same: new SVGPath("arrow same"),
@@ -223,15 +224,29 @@ export class MapDraw {
                         this.drawActionFromSector(ts.level == level?set.arrow.same:set.arrow.to_other,s.x,s.y,tmx);
                     }
                 }
-            }
+            }            
             s.exit.forEach((ex, dir)=> {
                 const mx = this.transformByDir(s.x,s.y, dir);
                 const sd = s.side[dir];
                 const flgs = sd.flags;
                 if (!mx) return;
-                if (!ex) {
+                if (!ex || !m.sectors[ex]) {
                     this.drawWall(set.walls.edge, mx);
                 } else {
+             
+                    const sib_x = s.x + [0,1,0,-1][dir];
+                    const sib_y = s.y + [-1,0,1,0][dir];
+                    const exsect = m.sectors[ex];
+                    if (sib_x != exsect.x || sib_y != exsect.y) {
+                        const mx2 = this.transformByDir(exsect.x, exsect.y, dir);
+                        if (mx2) {
+                            const angle = (dir-1)*Math.PI/2;
+                            this.drawBezierArrow(set.action.sectorconn, ...mx.xyof(0.5,0),...mx2.xyof(0.25,1),angle,angle);                            
+                            mx2.translate_in_dir(-0.25,1);
+                            this.drawArrowOnAction(set.action.sectorconn, mx2)
+                        }
+                    }
+
                     if (sd.secondary && (flgs & SideFlag.SEC_VIS)) {                        
                         const iscolumn = s.type == SectorType.Column
                                     || s.type == SectorType.DeathColumn
@@ -376,10 +391,10 @@ export class MapDraw {
         if (this.svg && side >= 0 && side < 4) { 
             if (this.focus) {
                 this.svg.removeChild(this.focus);                
+                this.focus = null;
             }
             const p = new SVGPath("focus");
             const q = new SVGPath("focus-bgr");
-            const w = new SVGPath("focus-itm");
             const scl = this.scale;
             const sect = m.sectors[sector];
             if (sect && sect.level == level) {
@@ -397,15 +412,20 @@ export class MapDraw {
                      .lt(...trn.xyof(0.6,0.5))
                      .close();
                     q.rctc(...trn.xyof(0.5,0.5),this.scale,this.scale);
-                    w.mt(...trn.xyof(0.25,0.25)).circle(0.2*this.scale);
                     this.focus = SVGDrawing.createElement("g");                    
                     this.svg.appendChild(this.focus);
                     this.focus.appendChild(q.build());
-                    this.focus.appendChild(w.build());
                     this.focus.appendChild(p.build());
                     
                 }
             }
+        }
+    }
+
+    removeFocusedWall() {
+        if (this.focus && this.svg) {
+            this.svg.removeChild(this.focus);     
+            this.focus = null;           
         }
     }
 
@@ -585,35 +605,35 @@ export class MapDraw {
     }
 
     private drawArrowOnAction(path: SVGPath, amx:Transform2D) {
-        path.mt(...amx.xyof(0.35,0.5))
+        path.mt(...amx.xyof(0.4,0.3))
             .lt(...amx.xyof(0.5,0))
-            .lt(...amx.xyof(0.65,0.5))
+            .lt(...amx.xyof(0.6,0.3))
             .close();
     }
 
     private drawActionFromWall(path: SVGPath, from: Transform2D, to:Transform2D) {
         const [xf,yf] = from.xyof(0.5,0.05);
         const [xft,yft] = from.xyof(0.5,0.5);
-        const [xt,yt] = to.xyof(0.5,0.05);
-        const [xtt,ytt] = to.xyof(0.5,0.5);
+        const [xt,yt] = to.xyof(0.3,0.05);
+        const [xtt,ytt] = to.xyof(0.3,0.5);
 
         const startRad = Math.atan2(yft-yf,xft-xf);
         const endRad = Math.atan2(yt-ytt, xt-xtt);
         this.drawBezierArrow(path, xf,yf,xt,yt, startRad,endRad,0.5);
-        this.drawArrowOnAction(path, to.rotate(endRad))
+        this.drawArrowOnAction(path, to.rotate(endRad).translate_in_dir(-0.2,0))
         
     }
 
     private drawActionFromSector(path: SVGPath, x:number, y:number, to:Transform2D) {
-        const [xt,yt] = to.xyof(0.5,0.05);
-        const [xtt,ytt] = to.xyof(0.5,0.5);
+        const [xt,yt] = to.xyof(0.3,0.05);
+        const [xtt,ytt] = to.xyof(0.3,0.5);
         x*=this.scale;
         y*=this.scale;
 
         const startRad = Math.atan2(yt-y,xt-x);
         const endRad = Math.atan2( yt-ytt ,xt-xtt);
         this.drawBezierArrow(path, x,y,xt,yt, startRad,endRad);
-        this.drawArrowOnAction(path, to.rotate(endRad))
+        this.drawArrowOnAction(path, to.rotate(endRad).translate_in_dir(-0.2,0))
 
         
     }
@@ -630,8 +650,8 @@ export class MapContainer {
     scrollTop = 0;
     cursor = "default";
 
-    onClickXY = (pt: DOMPointReadOnly, shift: boolean, control: boolean) => {
-        console.log("Clicked at:" , pt, shift,control);
+    onClickXY = (pt: DOMPointReadOnly, side:number, shift: boolean, control: boolean) => {
+        console.log("Clicked at:" , pt, side, shift,control);
     };
     onSelectRect = (rc: DOMRectReadOnly,shift:boolean, control:boolean) => {
         console.log("Selected:", rc, shift, control);
@@ -801,8 +821,14 @@ export class MapContainer {
                 event.preventDefault(); 
                 if (dragButton == 0) {
                     if (!dragStart[4]) {
-                        const pt = this.clientToMap([dragStart[0], dragStart[1]], false);
-                        this.onClickXY(new DOMPointReadOnly(...pt), event.shiftKey, event.ctrlKey);
+                        const insector_pos : [number,number] = [0,0];
+                        const pt = this.clientToMap([dragStart[0], dragStart[1]], false, insector_pos);
+                        let side = 0;
+                        if (insector_pos[0]<0 && Math.abs(insector_pos[1])<-insector_pos[0]) side = 3;
+                        else if (insector_pos[0]>0 && Math.abs(insector_pos[1])<insector_pos[0]) side = 1;
+                        else if (insector_pos[1]<0) side = 0;
+                        else side = 2;
+                        this.onClickXY(new DOMPointReadOnly(...pt), side, event.shiftKey, event.ctrlKey);
                     } else {
                         const pt1 = this.clientToMap([dragStart[0], dragStart[1]], true);
                         const pt2 = this.clientToMap([event.clientX,event.clientY], true);
@@ -840,7 +866,7 @@ export class MapContainer {
 
 
 
-    clientToMap(point :[number, number], vertex?: boolean) : [number,number]{
+    clientToMap(point :[number, number], vertex?: boolean, insector_pos?:[number, number]) : [number,number]{
         if (this.map?.svg) {
 
 
@@ -849,7 +875,15 @@ export class MapContainer {
             const ptt = pt.matrixTransform(mx?.inverse());
             const scale = this.map.scale;
             const shft = vertex?scale/2:0;
-            return [Math.round((ptt.x+shft)/this.map.scale), Math.round((ptt.y+shft)/this.map.scale)];
+            const x = ptt.x+shft;
+            const y = ptt.y+shft;         
+            const xf = Math.round(x/scale)   ;
+            const yf = Math.round(y/scale);
+            if (insector_pos) {
+                insector_pos[0] = x/scale - xf;
+                insector_pos[1] = y/scale - yf;
+            }
+            return [xf,yf];
         } else {
             return point
         }
@@ -859,7 +893,7 @@ export class MapContainer {
 
 export function findSectorAtPos(m: MapFile, level: number , pt: DOMPointReadOnly) : number  {
     return m.sectors.findIndex(s=>{
-        return Math.abs(s.x - pt.x) < 0.5 && Math.abs(s.y - pt.y) < 0.5 && s.level == level;
+        return Math.abs(s.x - pt.x) < 0.5 && Math.abs(s.y - pt.y) < 0.5 && s.level == level && s.type != SectorType.Empty;
     })
 }
 

@@ -56,7 +56,7 @@ watch(dlg, (new_val, old_val)=>{
     <div class="dark">
     <div class="popup">
         <div>
-            <div class="msg"> {{ dlg.message }}</div>
+            <div class="msg"><div v-for="ln of dlg.message.split('\n')"> {{ ln  }}</div></div>
             <div class="buttons"><button v-for="(v,idx) of dlg.buttons" :key="idx" @click="on_button_click(idx)">{{ v }}</button></div>
         </div>
     </div>
@@ -88,7 +88,12 @@ watch(dlg, (new_val, old_val)=>{
 }
 
 .popup .msg {
+    text-align: left;
     padding: 1rem;
+}
+
+.popup .msg > div{
+    min-height: 1rem;
 }
 
 .buttons {
