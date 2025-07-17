@@ -66,7 +66,7 @@ export const SideFlag = {
     SOUND_IMPS: 0x10,
     ALARM: 0x20,
     PASS_ACTION: 0x40,
-    TRANSPARENT: 0x80,
+    NOT_TRANSPARENT: 0x80,  //this flag is reversed in editor
     PRIM_ANIM: 0x100,
     PRIM_VIS: 0x200,
     PRIM_GAB: 0x400,
@@ -894,6 +894,7 @@ export class WallConfiguration extends AssetConfiguration{
     graphics: string[][] = [["","",""]];
     anim_frames: number = 0;
     position: number=0;
+    transparent: boolean = false;
     alternate: boolean = false;
     forward_dir: boolean = false;
     repeat_anim: boolean = false;
@@ -912,6 +913,7 @@ export class WallConfiguration extends AssetConfiguration{
         if (side_id == 0) return null;
 
         r.alternate = sec?false:((side.flags & SideFlag.DOUBLE_SIDE) != 0);
+        r.transparent = (side.flags & SideFlag.NOT_TRANSPARENT) == 0;
         r.anim_frames = ((sec?side.sec_anim:side.prim_anim) & 0xF)+1;
         r.forward_dir = sec?((side.flags & SideFlag.SEC_FORV) != 0):((side.flags & SideFlag.PRIM_FORV) != 0);
         r.ping_pong = sec?((side.flags & SideFlag.SEC_GAB) != 0):((side.flags & SideFlag.PRIM_GAB) != 0);
@@ -943,6 +945,7 @@ export class WallConfiguration extends AssetConfiguration{
             this.alternate?"X":"S",
             this.repeat_anim?"R":"N",
             this.ping_pong?"P":"N",
+            this.transparent?"T":"N",
             this.allow_offset?"O":"S",                      
             this.position,
             this.secondary_front?"F":"B",
@@ -964,6 +967,7 @@ export class WallConfiguration extends AssetConfiguration{
         if (this.repeat_anim) side.flags |=SideFlag.PRIM_ANIM;
         if (this.forward_dir) side.flags |= SideFlag.PRIM_FORV;
         if (this.ping_pong) side.flags |= SideFlag.PRIM_GAB;
+        if (!this.transparent) side.flags |=SideFlag.NOT_TRANSPARENT;
     }
     adjust_flags_sec(side: TSIDE){
         side.flags &= ~(SideFlag.SEC_ANIM|SideFlag.SEC_FORV|SideFlag.SEC_GAB|SideFlag.SPEC);
@@ -971,6 +975,7 @@ export class WallConfiguration extends AssetConfiguration{
         if (this.repeat_anim) side.flags |=SideFlag.SEC_ANIM;
         if (this.forward_dir) side.flags |= SideFlag.SEC_FORV;
         if (this.ping_pong) side.flags |= SideFlag.SEC_GAB;
+        if (!this.transparent) side.flags |=SideFlag.NOT_TRANSPARENT;
         return side.flags;
     }
     get_anim() : number {
@@ -1216,7 +1221,7 @@ export class MapFile {
                 n.secondary = w.add(WallConfiguration.from(side, m.pixmap_front,m.pixmap_left,m.pixmap_right, true));
                 n.arc = a.add(ArcConfiguration.from(side, m.pixmap_arc_left,m.pixmap_arc_right));
                 n.action = side.action;
-                n.flags = side.flags ^ SideFlag.NOT_AUTOMAP;
+                n.flags = side.flags ^ (SideFlag.NOT_AUTOMAP|SideFlag.NOT_TRANSPARENT);
                 n.target_sector = side.target_sector;
                 n.target_side = side.target_side & 0x3;                
                 n.niche = m.niches[place] || null;
@@ -1286,7 +1291,7 @@ export class MapFile {
             return sect.side.map((s,side)=>{
                 const out = new TSIDE;
                 out.action = s.action;
-                out.flags = s.flags ^ SideFlag.NOT_AUTOMAP;
+                out.flags = s.flags;
                 out.prim = walls.to_id(s.primary);
                 out.sec = walls.to_id(s.secondary);
                 out.oblouk = arc.to_id(s.arc) | ((s.primary?.position || 0) << 5) | (s.item_can_be_placed_behind?0x80:0);
@@ -1309,6 +1314,7 @@ export class MapFile {
                         out.ysec = s.secondary.offset_y>>1;                        
                     }                    
                 }
+                out.flags ^= SideFlag.NOT_AUTOMAP| SideFlag.NOT_TRANSPARENT
                 return out;
 
             });

@@ -248,6 +248,7 @@ onMounted(init);
                         <label><span>Left :</span><input type="text" v-model="cur_wall.graphics[cur_frame][1]" list="listOfWallAssets9875487"></label>
                         <label><span>Right :</span><input type="text" v-model="cur_wall.graphics[cur_frame][2]" list="listOfWallAssets9875487"></label>
                         <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input  type="text" v-model="cur_wall.lclip" v-watch-range min="1" max="16"></label>
+                        <label><input  type="checkbox" v-model="cur_wall.transparent"><span>Transparent (can see through)</span></label>
                         <label><input  type="checkbox" v-model="cur_wall.alternate"><span>Alternating</span></label>
                         <label><input  type="checkbox" v-model="cur_wall.repeat_anim"><span>Repeat animation</span></label>
                         <label><input  type="checkbox" v-model="cur_wall.ping_pong"><span>Ping ping animation</span></label>
