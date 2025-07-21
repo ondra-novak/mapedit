@@ -37,8 +37,40 @@ const settings = reactive(globalState("mapview_settings",{
     wall:null as WallConfiguration | null,
     floor:null as FloorCeilConfiguration| null,
     ceil:null as FloorCeilConfiguration | null,
-    arc:null as ArcConfiguration | null
+    arc:null as ArcConfiguration | null,
 }));
+
+const expanded_tabs = globalState("mapview_tab_expand", {
+    draw_settings : true,
+    wall_palette : true,
+    arc_palette: true,
+    floor_palette: true,
+    ceil_palette : true,
+    sector_detail: true,
+    side_detail: true
+
+});
+
+const expand_control = Object.fromEntries(Object.keys(expanded_tabs).map(x=>[x,ref<HTMLElement>()]));
+    
+watch(()=>expand_control,()=>{
+    for (const v in expand_control) {
+        const r = expand_control[v];
+        const k = v as keyof typeof expanded_tabs;
+        if (r.value) {
+            const parent = r.value;
+            const fchild = parent.firstChild as HTMLSpanElement
+            if (fchild && fchild.style.cursor != "pointer") {
+                fchild.style.cursor = "pointer";                
+                parent.classList.toggle("expanded", expanded_tabs[k]);
+                fchild.addEventListener("click",()=>{
+                    expanded_tabs[k] =  !expanded_tabs[k];
+                    parent.classList.toggle("expanded", expanded_tabs[k]);
+                });
+            }
+        }
+    }
+},{deep:true})
 
 type FocusItem = {
     sector: number;
@@ -83,6 +115,41 @@ const SectorFlagsNames = {
     Automapped: "Already automapped"
 }
 
+const SideFlagsNames_Map = {
+    NOT_AUTOMAP: "No automap",
+    INVIS: "Invisible on map",
+    SECRET: "Secret wall",
+}
+const SideFlagsNames_Barriers = {
+    PLAY_IMPS: "Player barrier",
+    MONST_IMPS: "Monster barrier",
+    THING_IMPS: "Item barrier",
+    SOUND_IMPS: "Sound barrier",
+}
+const SideFlagsNames_Visibility= {
+    PRIM_VIS: "Primary visible",
+    SEC_VIS: "Secondary visible",
+    LEFT_ARC: "Left arc",
+    RIGHT_ARC: "Right arc",
+    TRUESEE: "Transparent when true seeing",
+}
+const SideFlagsNames_Behavior= {
+    PASS_ACTION: "Pass triggers action",
+    ALARM: "Alarm",
+    COPY_ACTION: "Copy action",
+    SEND_ACTION: "Forward action",
+    APPLY_2ND: "Apply action from other side",
+    AUTOANIM: "Touch animates secondary (lever)",
+}
+
+const SideFlagsNames_All = {
+    "Visibility": SideFlagsNames_Visibility,
+    "Barriers": SideFlagsNames_Barriers,
+    "Behavior": SideFlagsNames_Behavior,
+    "Automapping": SideFlagsNames_Map,
+}
+ 
+
 
 function updateControls() {
     control_state.can_redo = StatusBar.cur_map.can_redo();
@@ -104,6 +171,7 @@ function doUndo() {
         StatusBar.cur_map.do_undo();
         curmap.value = StatusBar.cur_map.get_current();
         updateControls();
+        if (focus.value) updateFocusData(focus.value.sector, focus.value.side);
     }
 }
 
@@ -112,6 +180,7 @@ function doRedo() {
         StatusBar.cur_map.do_redo();
         curmap.value = StatusBar.cur_map.get_current();
         updateControls();
+        if (focus.value) updateFocusData(focus.value.sector, focus.value.side);
     }
 }
 
@@ -531,6 +600,13 @@ function applySector() {
                 s.target_sector = nw.target_sector;
                 s.target_side = nw.target_side;
             }); 
+            if (old.exit.findIndex((x,idx)=>x != nw.exit[idx]) != -1) {
+                changes.push((s:MapSector)=>{
+                    s.exit = shallowClone(s.exit);
+                    nw.exit.forEach((x,idx)=>{if (x != old.exit[idx]) s.exit[idx] = x;});                    
+                });
+            }
+
             if (old.type != nw.type) changes.push((s:MapSector)=>s.type =nw.type);
             if (changes.length) {
                 const m  = begin_edit();
@@ -541,7 +617,6 @@ function applySector() {
                 });
                 end_edit(m);
             }
-            updateFocusData(focus.value.sector, focus.value.side);
         } else {
             const m = begin_edit();
             m.sectors = shallowClone(m.sectors);
@@ -551,6 +626,8 @@ function applySector() {
         }
     }
 }
+
+
 </script>
 
 <template>
@@ -583,9 +660,9 @@ function applySector() {
                             disable_grid: !layers.grid
                             }"></div>
 </div>                            
-<div class="right">        
-    <div class="palette" v-if="settings.edit_mode == EditMode.Draw || settings.edit_mode == EditMode.Erase">
-        <div><span>Draw settings</span><x-form>
+<div class="right draw"  v-if="settings.edit_mode == EditMode.Draw || settings.edit_mode == EditMode.Erase">        
+    <div class="palette">
+        <div :ref="expand_control.draw_settings"><span class="title">Draw settings</span><x-form>
             <label><span class="title">Sector type</span><select v-model="settings.sector_type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
         </select></label>
@@ -603,12 +680,14 @@ function applySector() {
                 <option :value="SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC">Set arcs</option>                
             </select></label>
         </x-form></div>
-        <div class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall"></PalleteEditor></div>
-        <div class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc"></PalleteEditor></div>
-        <div class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor"></PalleteEditor></div>
-        <div class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
+        <div :ref="expand_control.wall_palette" class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall"></PalleteEditor></div>
+        <div :ref="expand_control.arc_palette" class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc"></PalleteEditor></div>
+        <div :ref="expand_control.floor_palette" class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor"></PalleteEditor></div>
+        <div :ref="expand_control.ceil_palette" class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
     </div>
-    <div class="palette" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0">
+</div>
+<div class="right edit" v-if="settings.edit_mode == EditMode.Edit">
+    <div class="palette" v-if="focus && focus.sector > 0" >
         <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: -1}"></button> Sector {{ focus.sector }}</span><x-form>
             <label><span>Type</span><select v-model="focus.sector_def.type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
@@ -636,10 +715,24 @@ function applySector() {
         <label><span>Primary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.primary" type="wall"></PalleteEditor></label>
         <label><span>Secondary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.secondary" type="wall"></PalleteEditor></label>
         <label><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="false" v-model="focus.side_def.arc" type="arc"></PalleteEditor></label>
+        </x-form>
+        <x-section v-for="(s,n) of SideFlagsNames_All" :key="n">
+            <x-section-title>{{ n }}</x-section-title>
+            <x-form>
+                <label v-for="(v,k) of s" :key="k">
+                    <input type="checkbox" @change="focus.side_def.flags^=SectorFlags2[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                    <span> {{ v }}</span>
+                </label>
+            </x-form>
+        </x-section>
+        <x-form>
         <label><span>Basic action</span><select v-model="focus.side_def.action">
             <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
         </select></label>
-        <label><span>Target</span><button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button></label>
+        <label><span>Target</span><div class="target">            
+            <button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button>
+            <button :disabled="focus.side_def.target_sector == 0" @click="focus.side_def.target_sector = focus.side_def.target_side = 0">X</button>
+        </div></label>
         </x-form>
         </div>
 
@@ -724,21 +817,27 @@ x-workspace {
 
 .right {
     width: 20rem;
-
+    height: 100%;
+    overflow: auto;
 }
 
 .right .palette {
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
     height: 100%;
+    gap: 0.4rem;
     padding: 0.5rem;
     box-sizing: border-box;
 }
 
+
 .right .palette div {
     flex-grow: 1;    
 }
+.right .palette div:first-child {
+    flex-grow: 0;    
+}
+
 .right .palette div>span.title {
     font-weight: bold;
     display: block;
@@ -819,6 +918,13 @@ x-workspace {
 .target {display: flex;width: 30%;}
 .target > *:first-child {flex-grow: 1;}
 
+.palette > div {
+    max-height: 1rem;;
+    overflow: hidden;;
+}
+.palette > div.expanded {
+    max-height: 100%;
+}
 
 
 </style>
