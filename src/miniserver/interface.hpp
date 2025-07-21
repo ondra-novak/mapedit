@@ -4,6 +4,7 @@
 #include "ddlman.hpp"
 #include "server.hpp"
 #include "mgifcomp.hpp"
+#include "skeldal_exe.hpp"
 #include <shared_mutex>
 #include <thread>
 
@@ -32,6 +33,7 @@ protected:
     std::stop_source _stop;
     bool _check_active = false;
     bool _last_seen = true;
+    bool _ddl_dirty = false;
 
     MGifComp _mgfcomp;
     std::mutex _mgfcomp_mx;
@@ -57,9 +59,14 @@ protected:
     bool config_get(Request &req);
     bool config_put(Request &req);
     bool keep_alive(Request &req);
+    bool preview_start(Request &req);
+    bool preview_stop(Request &req);
+    bool preview_teleport(Request &req);
+
 
     bool command(Request &req);
     bool control(Request &req);
+    void control(std::string_view cmd);
 
     void basic_timer_worker(std::stop_token stp);
     void on_timer_tick();
@@ -70,6 +77,8 @@ protected:
     void broadcast(std::string_view data);
  
     std::jthread _basic_timer;
+
+    SkeldalExeControl _game_control;
  
     DDLManager getUserDDL(const std::string &name) const;
 

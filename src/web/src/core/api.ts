@@ -270,6 +270,52 @@ export class ApiClient {
         }
     }
 
+    async game_client_start() : Promise<void>  {
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/preview_start`, {
+            method: "POST",
+            body: JSON.stringify({ddl: ddl}),
+            headers: {
+                "Content-Type":"application/json"
+            }
+        });
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed start game client")
+        }
+    }
+
+    async game_client_stop() : Promise<void>  {
+        const response = await fetch(`api/preview_stop`, {
+            method: "POST",
+        });
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed stop game client")
+        }
+    }
+
+    async game_client_teleport(map: string, sector: number, side: number) : Promise<boolean> {
+        const ddl = await this.get_current_ddl();
+        const response = await fetch(`api/teleport`, {
+            method: "POST",
+            body: JSON.stringify({
+                ddl: ddl,
+                map: map,
+                sector: sector,
+                side: side
+            }),
+            headers: {
+                "Content-Type":"application/json"
+            }
+        });
+        if (response.status === 409) {
+            return false;
+        } else if (response.status !== 202) {
+            await this.handle_error(response, "Failed stop game client")
+            return false;
+        }
+        return true;
+    }
+
 }
 
 export const server = new ApiClient();

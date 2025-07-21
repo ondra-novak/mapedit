@@ -17,6 +17,7 @@ WebInterface::WebInterface(Config cfg, std::stop_source stp)
     ,_stop(std::move(stp))
     ,_check_active(cfg.check_active)    
     ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
+    ,_game_control(cfg.game_folder, cfg.game_ini, cfg.addr_port,[this](std::string_view cmd){this->control(cmd);})
 {
 
 }
@@ -42,6 +43,9 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::PUT, "/api/config", &WebInterface::config_put},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
+    {Method::POST, "/api/preview_start", &WebInterface::preview_start},
+    {Method::POST, "/api/preview_stop", &WebInterface::preview_stop},
+    {Method::POST, "/api/teleport", &WebInterface::preview_teleport},
     {Method::GET, "/command", &WebInterface::command},
     {Method::GET, "/{}", &WebInterface::webserver},
     {Method::GET, "/", &WebInterface::webserver_index}
@@ -239,6 +243,7 @@ bool WebInterface::ddl_put(Request &req)
         return req.response({409,"Conflict"},{},"");
     } else {
         user.put(req.path_vars[1], req.body,group);
+        _ddl_dirty = true;
         return req.response({202,"Accepted"},{},"");
     }
 }
@@ -257,7 +262,7 @@ bool WebInterface::ddl_compact(Request &req)
 {   
     std::lock_guard _(_mx);
     auto user = getUserDDL(req.path_vars[0]);
-    user.compact();
+    user.compact();    
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -339,6 +344,7 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
          std::lock_guard __(_mx);
          const auto &data = r.creator->get_data();
          user.put(r.name, {reinterpret_cast<const char *>(data.data()),data.size()},r.group);
+         _ddl_dirty = true;
         return req.response({201},{{"Location","/api/ddl/"+r.name}},r.name);
 
     }
@@ -392,6 +398,44 @@ bool WebInterface::keep_alive(Request &req)
     return true;
 }
 
+bool WebInterface::preview_start(Request &req)
+{
+    std::lock_guard _(_mx);
+    json::value jr = json::value::from_json(req.body);
+    std::u8string ddl = jr["ddl"].as<std::u8string>();            
+    _game_control.start(_user_dir/ddl);
+    _ddl_dirty = false;
+    return req.response({202,"Accepted"},{},"");
+}
+
+bool WebInterface::preview_stop(Request &req)
+{
+    if (_game_control.stop()) {
+        return req.response({202,"Accepted"},{},"");
+    } else {
+        return req.response({504,"Timeout"},{},"");
+    }
+}
+
+bool WebInterface::preview_teleport(Request &req)
+{
+    std::lock_guard _(_mx);
+    json::value jr = json::value::from_json(req.body);
+    std::u8string ddl = jr["ddl"].as<std::u8string>();            
+    std::string map = jr["map"].as<std::string>();
+    unsigned int sect = jr["sector"].as<unsigned int>();
+    unsigned int side = jr["side"].as<unsigned int>();
+
+    std::filesystem::path ddlpath(_user_dir/ddl);
+    if (ddlpath != _game_control.get_current_ddlpath()) {
+        return req.response({409,"Conflict"},{},"");
+    }
+
+    _game_control.teleport_to(map,sect,side,_ddl_dirty);
+    _ddl_dirty = false;
+    return req.response({202,"Accepted"},{},"");
+}
+
 bool WebInterface::command(Request &req)
 {
     Stream s;
@@ -426,15 +470,21 @@ DDLManager WebInterface::getUserDDL(const std::string &name) const
 bool WebInterface::control(Request &req)
 {
     auto b = req.body;
+    control(b);
+    return req.response({202,"Accepted"},{},"");
+}
+
+void WebInterface::control(std::string_view cmd) {
     std::string buff;
-    while (!b.empty()) {
-        auto ln = utils::trim(utils::split_at(b,"\n"));
-        buff = std::format("data: {} \r\n", ln);
+    while (!cmd.empty()) {
+        auto ln = utils::trim(utils::split_at(cmd,"\n"));
+        buff = std::format("data: {}\r\n", ln);
         broadcast(buff);
     }
     broadcast("\r\n");
-    return req.response({202,"Accepted"},{},"");
+
 }
+
 void WebInterface::basic_timer_worker(std::stop_token stp)
 {
     std::mutex mx;

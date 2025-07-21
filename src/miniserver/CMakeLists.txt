@@ -4,6 +4,7 @@ add_executable(mapedit_server
     handler_map.cpp 
     ddlman.cpp 
     interface.cpp
+    skeldal_exe.cpp
     mgifdecomp.cpp
     mgifcomp.cpp
     utils/mgifmem.c

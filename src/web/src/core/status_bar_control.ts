@@ -13,6 +13,9 @@ class StatusBar {
     fnRevert = ref<RevertFn | null>(null)
     changed = ref(false);
     inprogress = ref(false);
+    cur_sector_side = ref({
+        sector: 0, side:0
+    });
 
     cur_map_name = ref<string>();
     cur_map = new Document<MapFile>(new MapFile);
@@ -101,6 +104,7 @@ class StatusBar {
             this.cur_map.reset(new MapFile);
             this.cur_map_name.value = mapname;            
         }
+        this.cur_sector_side.value.sector = 0;
         this.on_map_open();
         return this.cur_map;
     };
@@ -142,6 +146,12 @@ class StatusBar {
     }
     onMapOpen(event: ()=>void) {
         this.on_map_open = event;
+    }
+    setCurSectorSide(sector:number, side:number) {
+        this.cur_sector_side.value = {sector,side};
+    }
+    getCurSectorSide() {
+        return this.cur_sector_side;
     }
 }
 

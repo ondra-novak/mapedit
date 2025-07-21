@@ -23,6 +23,7 @@ const new_object_name = ref<string>("");
 const focused_element = ref<HTMLInputElement>();
 const router = useRouter();
 const config = ref<Config>(new Config());
+const cur_sector = StatusBar.cur_sector_side;
 
 
 
@@ -189,6 +190,20 @@ function importMap() {
     input.click();    
 }
 
+function start_client() {
+    server.game_client_start();
+}
+
+function stop_client() {
+    server.game_client_stop();
+}
+
+function teleport_to() {
+    if (cur_sector.value?.sector && StatusBar.cur_map_name.value) {
+        server.game_client_teleport(StatusBar.cur_map_name.value, cur_sector.value.sector, cur_sector.value.side);
+    }
+}
+
 </script>
 <template>
     <div class="bar">
@@ -196,11 +211,11 @@ function importMap() {
             <div class="indicator" :class="{connected: connected}" @click="check_connection"></div>
             <div @click="selectProject"> {{ current_ddl }}</div>
             <div @click="openMapPopup"> {{ cur_map }}</div>
-            <div><button v-if="game_connected == 0">Start game client</button>
+            <div><button v-if="game_connected == 0" @click="start_client">Start game client</button>
                  <span v-if="game_connected > 0"> Game client running: {{ game_connected }}</span>        
             </div>            
-            <div v-if="game_connected > 0"><button>Stop</button></div>
-            <div v-if="game_connected > 0"><button>Teleport to sector</button></div>
+            <div v-if="game_connected > 0"><button @click="stop_client">Stop</button></div>
+            <div v-if="game_connected > 0"><button :disabled="!cur_sector || cur_sector.sector == 0" @click="teleport_to">Teleport to sector</button></div>
         </div>
         <div class="right">
             <button v-if="vis" :disabled="!en" @click="show_confirm">Revert</button>

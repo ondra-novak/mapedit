@@ -58,8 +58,10 @@ int entry_point(std::filesystem::path root_config) {
 
     server::Config cfg;
     auto parent = root_config.parent_path();
+    cfg.addr_port = addrport;
     cfg.app_dir = parent/"web";
     cfg.asset_dir = parent/"web"/"assets";
+    cfg.game_ini = parent/"skeldal.ini";
     cfg.game_folder = game_folder.empty()?parent.parent_path():parent/game_folder;
     cfg.user_folder = user_folder.empty()
             ?getUserDocumentsPath() / u8"Skeldal_Adventure":std::filesystem::current_path()/user_folder;

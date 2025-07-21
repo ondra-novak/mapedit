@@ -10,6 +10,7 @@ struct Config {
     std::filesystem::path asset_dir;
     std::filesystem::path game_folder;
     std::filesystem::path user_folder;
+    std::filesystem::path game_ini;
     bool check_active;
 };
 

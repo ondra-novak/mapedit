@@ -125,7 +125,9 @@ function updateFocusData(sect: number, side: number) {
                                sector_def: sdef,
                                side_def: wdef};                
                                updateFocus();
+                StatusBar.setCurSectorSide(sect, side);
             } else {
+                StatusBar.setCurSectorSide(0, 0);
                 focus.value = undefined;
             }
 
@@ -430,8 +432,12 @@ watch([()=>settings.curlevel, curmap], ()=>{
 watch([()=>settings.edit_mode, curmap], ()=>{
     switch (settings.edit_mode) {
         case EditMode.Draw:
-        case EditMode.Erase: mapcontainer.set_cursor("crosshair");break;
-        default: mapcontainer.set_cursor("default");break;
+        case EditMode.Erase: mapcontainer.set_cursor("crosshair");
+             StatusBar.setCurSectorSide(0, 0);
+            break;
+        default: 
+            mapcontainer.set_cursor("default");
+            break;
 
     }
 });
