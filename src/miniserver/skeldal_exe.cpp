@@ -122,7 +122,8 @@ void SkeldalExeControl::start(std::filesystem::path ddlpath)
 {
     stop();
     _curddl_path = ddlpath;    
-    auto token = _instance.start(_root_dir, _cfgpath, _addr_port, SwapAndCopy(_curddl_path));
+    auto ddlpath2 = /*SwapAndCopy(_curddl_path);*/ std::move(ddlpath);
+    auto token = _instance.start(_root_dir, _cfgpath, _addr_port, ddlpath2);
     _stop_cb.emplace(token, Stopper{this});
 }
 
@@ -137,10 +138,11 @@ bool SkeldalExeControl::stop() {
 
 void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir, bool dirty_ddl)
 {
-    std::optional<SwapAndCopy> _sc;
+/*    std::optional<SwapAndCopy> _sc;
     if (dirty_ddl) {
         _sc.emplace(_curddl_path);
     }
+        */
     _command_callback(std::format("RELOAD {} {} {}", map, sector,dir));
 }
 

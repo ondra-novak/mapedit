@@ -233,7 +233,7 @@ void DDLManager::prepare_directory(std::span<const PreparedDirItem> src, std::sp
     for(const PreparedDirItem &sitem: src) {
         DirItem &item = list[idx++];
         auto cropped = sitem.name.substr(0,12);
-        std::transform(cropped.begin(), cropped.end(), item.name, [](char c){return std::toupper(c);});
+        std::transform(cropped.begin(), cropped.end(), item.name, [](char c){return static_cast<char>(std::toupper(c));});
         item.offset = offset;
         offset += sitem.size+ 4;
     }
@@ -372,8 +372,9 @@ uint32_t DDLManager::find_free_space(std::iostream &f, std::size_t sz) {
 void DDLManager::replace_entry(std::iostream &f, unsigned int index, std::string_view name, std::string_view payload, uint32_t group) 
 {
     DirItem entry;
-    entry.offset = payload.empty()?static_cast<uint32_t>(0):find_free_space(f,payload.size()+4);   
+    f.seekg(0, std::ios::end);
     entry.set_name(name);
+    entry.offset = payload.empty()?static_cast<uint32_t>(0):static_cast<uint32_t>(f.tellg());
 
     // Skip first 4 bytes
     f.seekg(4);
