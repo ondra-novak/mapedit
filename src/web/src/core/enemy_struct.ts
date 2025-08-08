@@ -133,12 +133,11 @@ export function enemySoundsFromArrayBuffer(buffer: ArrayBuffer):  EnemySounds {
 export function enemySoundsToArrayBuffer(sounds: EnemySounds):  ArrayBuffer {
     const enc = new TextEncoder();
     const strs  = sounds.map(x=>enc.encode(x || ".").buffer);
-    const bcount = new Uint8Array(4);
+    const bcount = new Uint8Array(3);
     const count = sounds.length;
     bcount[0] = count & 0xFF;    
     bcount[1] = (count>>8) & 0xFF;
     bcount[2] = (count>>16) & 0xFF;
-    bcount[3] = (count>>24) & 0xFF;
     strs.unshift(bcount);
     strs.push(new ArrayBuffer(0));
     strs.push(new ArrayBuffer(0));

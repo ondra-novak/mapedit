@@ -2,7 +2,14 @@
 #include "utils/fast_copy_file.h"
 #ifdef _WIN32
 #include <windows.h>
+#else 
+#include <unistd.h>
+#include <fcntl.h>
+#include <wait.h>
+extern char **environ;
 #endif
+#include <cstring>
+#include <format>
 
 
 SkeldalExeInstance::~SkeldalExeInstance()
@@ -53,6 +60,37 @@ std::wstring ansiiToUnicode(std::string_view str) {
 }
 
 
+class PosixArgs {
+public:
+    template<int N>
+    PosixArgs(const char * const  (&args)[N]):PosixArgs(args, N) {}
+    PosixArgs(const char *const  *args, int n) {
+        std::size_t needsz = sizeof(char *) * (n+1);
+        for (int i = 0; i < n; ++i) needsz += std::strlen(args[i]);
+        buffer = static_cast<char **>(malloc(needsz));
+        char **ptriter = buffer;
+        char *striter = reinterpret_cast<char *>(buffer+n+1);
+        for (int i = 0; i < n; ++i) {
+            *ptriter++ = striter;
+            std::size_t l = std::strlen(args[i])+1;
+            std::strncpy(striter, args[i], l);
+            striter += l;
+        }        
+        *ptriter = nullptr;
+    }
+
+    operator char * const * () const {return buffer;}
+
+    PosixArgs(const PosixArgs &) =delete;
+    PosixArgs &operator=(const PosixArgs &) =delete;
+    PosixArgs(PosixArgs &&other):buffer(other.buffer) {other.buffer = nullptr;}
+    ~PosixArgs() {free(buffer);}
+
+protected:
+    char **buffer;
+};
+
+
 static void start_game(std::filesystem::path root_dir, std::filesystem::path cfgpath, std::string addr_port, std::filesystem::path ddlpath, std::atomic<long> *status) {
     
 
@@ -86,10 +124,50 @@ static void start_game(std::filesystem::path root_dir, std::filesystem::path cfg
         status->store(static_cast<long>(GetLastError()));
         status->notify_all();
     }
+#else
 
+    auto ntf_error = [&]{
+        long e = errno;
+        if (e == 0) e = EFAULT;
+        status->store(e);
+        status->notify_all();
+    };
+
+    auto exe_path = root_dir / "skeldal.sh";
+    PosixArgs args({exe_path.c_str(), "-f", cfgpath.c_str(), "-p", ddlpath.c_str(), "-c", addr_port.c_str()});
+    int fds[2];
+    if (::pipe2(fds, O_CLOEXEC) != 0) {
+        ntf_error();return;
+    }   
+    pid_t pid = fork();
+    if (pid < 0) {
+        ntf_error();return;
+    }
+
+    if (pid == 0) {//child
+        std::filesystem::current_path(root_dir);
+        execve(exe_path.c_str(), args, environ);
+        long e = errno;
+        write(fds[1], &e, sizeof(e));
+        _exit(0);    
+    } else {    //parent
+        close(fds[1]);
+        long e = 0;
+        int r = read(fds[0], &e, sizeof(e));
+        if (r < 0) {
+            ntf_error(); return;
+        } else if (r > 0) {
+            if (e == 0) e = EFAULT;
+            status->store(e);
+            status->notify_all();
+        } else {
+            status->store(0);
+            status->notify_all();
+        }        
+        waitpid(pid,  &r, 0);
+    }
 
 #endif
-
 
 }
 
@@ -136,7 +214,7 @@ bool SkeldalExeControl::stop() {
     return _instance.stop();
 }
 
-void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir, bool dirty_ddl)
+void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir, bool )
 {
 /*    std::optional<SwapAndCopy> _sc;
     if (dirty_ddl) {

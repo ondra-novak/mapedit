@@ -1,6 +1,7 @@
 #pragma once
 #include <future>
 #include <stop_token>
+#include <optional>
 #include <filesystem>
 
 

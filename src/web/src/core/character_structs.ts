@@ -248,7 +248,7 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
         else {
             return `${x}`;
         }
-    }).join("\r\n");
+    }).join("\r\n")+"\r\n";
 
     return Uint8Array.from(keybcs2_from_string(whole_str)).buffer;
 }

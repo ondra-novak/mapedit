@@ -105,7 +105,7 @@ function create_soundmap () {
         enemies.value.forEach(e=>{
             if (e.sound_files) {
                 e.sounds = e.sound_files.map(name=>{
-                    if (!m || m.length == 0) return 0;
+                    if (!name) return 0;
                     if (m[name]) return m[name];
                     else {
                         l.push(name);
