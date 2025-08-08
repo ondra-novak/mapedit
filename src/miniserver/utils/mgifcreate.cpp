@@ -39,11 +39,11 @@ void MGIFCreator::init(unsigned int frames, Sound s, unsigned int fps, unsigned 
 
     AmplTable ampl_table;;
     for(int a=0;a<128;a++) {
-        int b=(a/128.0);
-        b=(b*b*b*b*32768.0);
+        double db=(a/128.0);
+        int b=static_cast<int>(db*db*db*db*32768.0);
         int c= std::max(b, a);
-        ampl_table.table[128+a] = c;
-        ampl_table.table[128-a] = -c;
+        ampl_table.table[128+a] = static_cast<int16_t>(c);
+        ampl_table.table[128-a] = static_cast<int16_t>(-c);
      }
     push_data(ampl_table);
     Reserved32 res= {};
@@ -124,7 +124,7 @@ struct HdrTracker {
     int chunks = 0;
     int size = 0;
 
-    void add_chunk(int size) {this->chunks++; this->size += size+4;}
+    void add_chunk(int s) {this->chunks++; this->size += s+4;}
 };
 
 void MGIFCreator::create_lzw_copy(bool transp, const std::uint16_t *pal, unsigned int colcount, const uint8_t *pixdata)
@@ -144,7 +144,7 @@ void MGIFCreator::create_lzw_copy(bool transp, const std::uint16_t *pal, unsigne
     } else {
         trk.add_chunk(sz);
     }
-    push_chunk(trk.chunks, trk.size);
+    push_chunk(static_cast<uint8_t>(trk.chunks), trk.size);
     push_palette(pal, colcount);
     if (sz > total_sz) {
         push_chunk(MGIF_COPY, total_sz);
@@ -292,7 +292,7 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
             _delta_data.push_back(0xC0);
         }
     }
-    std::uint32_t n = _delta_data.size() - 4;
+    std::uint32_t n = static_cast<uint32_t>(_delta_data.size() - 4);
     _delta_data[0] = n & 0xFF;
     _delta_data[1] = (n>>8) & 0xFF;
     _delta_data[2] = (n>>16) & 0xFF;
@@ -301,9 +301,9 @@ void MGIFCreator::create_lzw_delta(bool transp, const std::uint16_t *pal, unsign
     _color_data.clear();
     _color_data.resize(_delta_data.size() *2);
     LZW_t lzw(true);
-    long len = lzw.encode(_delta_data.data(),_delta_data.size(), _color_data.data());
+    long len = lzw.encode(_delta_data.data(),static_cast<int>(_delta_data.size()), _color_data.data());
     trk.add_chunk(len);;
-    push_chunk(trk.chunks, trk.size);
+    push_chunk(static_cast<uint8_t>(trk.chunks), trk.size);
     push_palette(pal, colcount);
     push_chunk(MGIF_DELTA, len);
     push_data(std::string_view(reinterpret_cast<const char *>(_color_data.data()), len));
