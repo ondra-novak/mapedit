@@ -47,11 +47,12 @@ const expanded_tabs = globalState("mapview_tab_expand", {
     floor_palette: true,
     ceil_palette : true,
     sector_detail: true,
-    side_detail: true
+    side_detail: true,
+    side_script: false
 
 });
 
-const expand_control = Object.fromEntries(Object.keys(expanded_tabs).map(x=>[x,ref<HTMLElement>()]));
+const expand_control = Object.fromEntries(Object.keys(expanded_tabs).map(x=>[x,ref<HTMLElement| null>()]));
     
 watch(()=>expand_control,()=>{
     for (const v in expand_control) {
@@ -131,22 +132,26 @@ const SideFlagsNames_Visibility= {
     SEC_VIS: "Secondary visible",
     LEFT_ARC: "Left arc",
     RIGHT_ARC: "Right arc",
-    TRUESEE: "Transparent when true seeing",
+    TRUESEE: "True Seeing transp.",
 }
+const SideFlagsNames_ActionBehavior= {
+    COPY_ACTION: "Forward action",
+    SEND_ACTION: "Chain action",
+    APPLY_2ND: "Apply both sides",
+}
+
 const SideFlagsNames_Behavior= {
     PASS_ACTION: "Pass triggers action",
     ALARM: "Alarm",
-    COPY_ACTION: "Copy action",
-    SEND_ACTION: "Forward action",
-    APPLY_2ND: "Apply action from other side",
-    AUTOANIM: "Touch animates secondary (lever)",
+    AUTOANIM: "Lever (secondary)",
 }
 
 const SideFlagsNames_All = {
-    "Visibility": SideFlagsNames_Visibility,
-    "Barriers": SideFlagsNames_Barriers,
-    "Behavior": SideFlagsNames_Behavior,
-    "Automapping": SideFlagsNames_Map,
+    "side_visibility": {t:"Visibility",f:SideFlagsNames_Visibility},
+    "side_barriers": {t:"Barriers",f:SideFlagsNames_Barriers},
+    "side_behavior": {t:"Behavior",f:SideFlagsNames_Behavior},
+    "side_automapping": {t:"Map appearence",f:SideFlagsNames_Map},
+    "side_action_behavior": {t:"Action reaction",f:SideFlagsNames_ActionBehavior},
 }
  
 
@@ -633,7 +638,6 @@ function applySector() {
 <template>
 
 <x-workspace>
-<datalist id="listOfWallAssets9875487"><option v-for="v of list_assets" :key="v" :value="v"></option></datalist>
 <div class="toolbar">
     <div :class="{active: layers_opened}" @click = "layers_opened = !layers_opened"><img src="@/assets/toolbar/layers.svg"></div>
     <div v-for="(v,idx) in edit_modes" @click="settings.edit_mode = idx" :class="{active: settings.edit_mode == idx, sep: idx == 0}" :title="v[1]"><img :src="v[0]"></div>
@@ -647,6 +651,7 @@ function applySector() {
     <div :class="{disabled: !control_state.can_redo}" @click="doRedo"><img src="@/assets/toolbar/redo.svg"></div>
 </div>
 <div class="middle">
+    <div class="middle-split">
 <div ref="mapview" class="mapcont" :class="{disable_sector_basic: !layers.sector_basic,
                             disable_sector_features: !layers.sector_features,
                             disable_sector_connections: !layers.sector_connections,
@@ -659,7 +664,19 @@ function applySector() {
                             disable_items:!layers.items,
                             disable_grid: !layers.grid
                             }"></div>
-</div>                            
+<div class="bottom" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0">
+        <div v-for="(s,n) of SideFlagsNames_All" :key="n"><span class="title">{{ s.t }}</span>
+        <x-form>
+            <label v-for="(v,k) of s.f" :key="k">
+                <input type="checkbox" @change="focus.side_def.flags^=SectorFlags2[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                <span> {{ v }}</span>
+            </label>
+        </x-form>
+        </div>
+
+</div>                        
+</div>
+</div>    
 <div class="right draw"  v-if="settings.edit_mode == EditMode.Draw || settings.edit_mode == EditMode.Erase">        
     <div class="palette">
         <div :ref="expand_control.draw_settings"><span class="title">Draw settings</span><x-form>
@@ -688,7 +705,7 @@ function applySector() {
 </div>
 <div class="right edit" v-if="settings.edit_mode == EditMode.Edit">
     <div class="palette" v-if="focus && focus.sector > 0" >
-        <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: -1}"></button> Sector {{ focus.sector }}</span><x-form>
+        <div :ref="expand_control.sector_detail" class="h"><span class="title"><button class="link" @click="link = {sector: focus.sector, side: -1}"></button> Sector {{ focus.sector }}</span><x-form>
             <label><span>Type</span><select v-model="focus.sector_def.type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
             </select></label>
@@ -710,21 +727,13 @@ function applySector() {
         </x-form>
         <div class="buttons"><button @click="applySector">Apply changes</button></div>
         </div>
-        <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }}</span>
+        <div :ref="expand_control.side_detail" class="h"><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }}</span>
         <x-form>
         <label><span>Primary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.primary" type="wall"></PalleteEditor></label>
         <label><span>Secondary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.secondary" type="wall"></PalleteEditor></label>
         <label><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="false" v-model="focus.side_def.arc" type="arc"></PalleteEditor></label>
         </x-form>
-        <x-section v-for="(s,n) of SideFlagsNames_All" :key="n">
-            <x-section-title>{{ n }}</x-section-title>
-            <x-form>
-                <label v-for="(v,k) of s" :key="k">
-                    <input type="checkbox" @change="focus.side_def.flags^=SectorFlags2[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
-                    <span> {{ v }}</span>
-                </label>
-            </x-form>
-        </x-section>
+        </div>
         <x-form>
         <label><span>Basic action</span><select v-model="focus.side_def.action">
             <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
@@ -734,7 +743,7 @@ function applySector() {
             <button :disabled="focus.side_def.target_sector == 0" @click="focus.side_def.target_sector = focus.side_def.target_side = 0">X</button>
         </div></label>
         </x-form>
-        </div>
+        
 
     </div>
 </div>
@@ -838,11 +847,6 @@ x-workspace {
     flex-grow: 0;    
 }
 
-.right .palette div>span.title {
-    font-weight: bold;
-    display: block;
-    background: linear-gradient(45deg, #aaa, transparent);
-}
 
 .right .palette > div.h {
     display: flex;
@@ -919,11 +923,34 @@ x-workspace {
 .target > *:first-child {flex-grow: 1;}
 
 .palette > div {
-    max-height: 1rem;;
+    max-height: 1.5rem;;
     overflow: hidden;;
+}
+
+.palette > div > span.title {
+    height: 1.4rem;
+    line-height: 1.4rem;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-weight: bold;
+    display: block;
+    background-color: #aaa;
+
 }
 .palette > div.expanded {
     max-height: 100%;
+      overflow: auto;;
+}
+.middle-split {
+    display:flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.bottom {
+    height: 10em;;
+    display:flex;
 }
 
 
