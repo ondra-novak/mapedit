@@ -40,38 +40,6 @@ const settings = reactive(globalState("mapview_settings",{
     arc:null as ArcConfiguration | null,
 }));
 
-const expanded_tabs = globalState("mapview_tab_expand", {
-    draw_settings : true,
-    wall_palette : true,
-    arc_palette: true,
-    floor_palette: true,
-    ceil_palette : true,
-    sector_detail: true,
-    side_detail: true,
-    side_script: false
-
-});
-
-const expand_control = Object.fromEntries(Object.keys(expanded_tabs).map(x=>[x,ref<HTMLElement| null>()]));
-    
-watch(()=>expand_control,()=>{
-    for (const v in expand_control) {
-        const r = expand_control[v];
-        const k = v as keyof typeof expanded_tabs;
-        if (r.value) {
-            const parent = r.value;
-            const fchild = parent.firstChild as HTMLSpanElement
-            if (fchild && fchild.style.cursor != "pointer") {
-                fchild.style.cursor = "pointer";                
-                parent.classList.toggle("expanded", expanded_tabs[k]);
-                fchild.addEventListener("click",()=>{
-                    expanded_tabs[k] =  !expanded_tabs[k];
-                    parent.classList.toggle("expanded", expanded_tabs[k]);
-                });
-            }
-        }
-    }
-},{deep:true})
 
 type FocusItem = {
     sector: number;
@@ -95,61 +63,58 @@ const control_state = reactive({
     can_undo: false,
     can_redo: false
 });
-const editor_models = reactive({
-    side: new MapSide,
-    sector: new MapSector
-})
 
 const mapLoadedPalettes = ref(new MapPalettes);
 
-type PaletteModels = {
-    wall: WallConfiguration|null;
-    arc: ArcConfiguration|null;
-    floor: FloorCeilConfiguration|null;   
-    ceil: FloorCeilConfiguration|null;
-};
 
 const SectorFlagsNames = {
     DarkFog: "Always fog to black",
     Secret: "Secret",
     NoSummon: "No Teleport",
     Automapped: "Already automapped"
-}
+};
 
 const SideFlagsNames_Map = {
     NOT_AUTOMAP: "No automap",
     INVIS: "Invisible on map",
     SECRET: "Secret wall",
-}
+};
 const SideFlagsNames_Barriers = {
     PLAY_IMPS: "Player barrier",
     MONST_IMPS: "Monster barrier",
     THING_IMPS: "Item barrier",
     SOUND_IMPS: "Sound barrier",
-}
+    ALARM: "Alarm",
+};
 const SideFlagsNames_Visibility= {
     PRIM_VIS: "Primary visible",
     SEC_VIS: "Secondary visible",
     LEFT_ARC: "Left arc",
     RIGHT_ARC: "Right arc",
     TRUESEE: "True Seeing transp.",
-}
+};
 const SideFlagsNames_ActionBehavior= {
     COPY_ACTION: "Forward action",
     SEND_ACTION: "Chain action",
     APPLY_2ND: "Apply both sides",
-}
+};
 
-const SideFlagsNames_Behavior= {
-    PASS_ACTION: "Pass triggers action",
-    ALARM: "Alarm",
-    AUTOANIM: "Lever (secondary)",
-}
+const SideFlagsNames_Actions = {
+    PASS_ACTION: "Activate by pass",
+    AUTOANIM: "Animate Lever"
+};
+
+const SideFlagsNames_Changes = {
+    CHANGE_AUTOMAP: "Automapping",
+    CHANGE_PLAY_IMPS: "Player barrier",
+    CHANGE_MONST_IMPS: "Monster barrier",
+    CHANGE_THING_IMPS: "Item barrier",
+    CHANGE_SOUND_IMPS: "Sound barrier",
+};
 
 const SideFlagsNames_All = {
     "side_visibility": {t:"Visibility",f:SideFlagsNames_Visibility},
     "side_barriers": {t:"Barriers",f:SideFlagsNames_Barriers},
-    "side_behavior": {t:"Behavior",f:SideFlagsNames_Behavior},
     "side_automapping": {t:"Map appearence",f:SideFlagsNames_Map},
     "side_action_behavior": {t:"Action reaction",f:SideFlagsNames_ActionBehavior},
 }
@@ -668,10 +633,34 @@ function applySector() {
         <div v-for="(s,n) of SideFlagsNames_All" :key="n"><span class="title">{{ s.t }}</span>
         <x-form>
             <label v-for="(v,k) of s.f" :key="k">
-                <input type="checkbox" @change="focus.side_def.flags^=SectorFlags2[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
                 <span> {{ v }}</span>
             </label>
         </x-form>
+        </div>
+        <div><span class="title">Action</span>
+        <x-form>
+            <div class="label"><span>Target</span><div>            
+                <button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button>
+                <button :disabled="focus.side_def.target_sector == 0" @click="focus.side_def.target_sector = focus.side_def.target_side = 0">X</button>
+            </div></div>
+            <label><span>Type</span><select v-model="focus.side_def.action">
+                <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
+            </select></label>
+            <label v-for="(v,k) of SideFlagsNames_Actions" :key="k">
+                <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                <span> {{ v }}</span>
+            </label>
+        </x-form>
+        </div>
+        <div  v-if="focus.side_def.action"><span class="title">Action changes:</span>
+            <x-form>
+                <label v-for="(v,k) of SideFlagsNames_Changes" :key="k">
+                    <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                    <span> {{ v }}</span>
+                </label>
+            </x-form>
+
         </div>
 
 </div>                        
@@ -679,7 +668,7 @@ function applySector() {
 </div>    
 <div class="right draw"  v-if="settings.edit_mode == EditMode.Draw || settings.edit_mode == EditMode.Erase">        
     <div class="palette">
-        <div :ref="expand_control.draw_settings"><span class="title">Draw settings</span><x-form>
+        <div><span class="title">Draw settings</span><x-form>
             <label><span class="title">Sector type</span><select v-model="settings.sector_type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
         </select></label>
@@ -697,15 +686,15 @@ function applySector() {
                 <option :value="SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC">Set arcs</option>                
             </select></label>
         </x-form></div>
-        <div :ref="expand_control.wall_palette" class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall"></PalleteEditor></div>
-        <div :ref="expand_control.arc_palette" class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc"></PalleteEditor></div>
-        <div :ref="expand_control.floor_palette" class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor"></PalleteEditor></div>
-        <div :ref="expand_control.ceil_palette" class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
+        <div class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall"></PalleteEditor></div>
+        <div class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc"></PalleteEditor></div>
+        <div class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor"></PalleteEditor></div>
+        <div><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
     </div>
 </div>
 <div class="right edit" v-if="settings.edit_mode == EditMode.Edit">
     <div class="palette" v-if="focus && focus.sector > 0" >
-        <div :ref="expand_control.sector_detail" class="h"><span class="title"><button class="link" @click="link = {sector: focus.sector, side: -1}"></button> Sector {{ focus.sector }}</span><x-form>
+        <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: -1}"></button> Sector {{ focus.sector }}</span><x-form>
             <label><span>Type</span><select v-model="focus.sector_def.type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
             </select></label>
@@ -722,27 +711,21 @@ function applySector() {
                     <button :disabled="(link?.side || 0) == -1" @click="focus.sector_def.target_sector=link?.sector || 0;focus.sector_def.target_side = link?.side || 0"> Side {{ focus.sector_def.target_sector }}:{{focus.sector_def.target_side }} </button>
                     <button :disabled="focus.sector_def.target_sector == 0" @click="focus.sector_def.target_sector = focus.sector_def.target_side = 0">X</button></div>
             </div>
-            <div class="label"><span>Exits</span><div class="exits"><button :disabled="!link" 
-                 v-for="v of [0,1,2,3]" :key="v" @click="focus.sector_def.exit[v] = link?.sector || 0">{{ focus.sector_def.exit[v] }}</button></div></div>
         </x-form>
         <div class="buttons"><button @click="applySector">Apply changes</button></div>
         </div>
-        <div :ref="expand_control.side_detail" class="h"><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }}</span>
+        <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }} [{{ focus.sector * 4 + focus.side }}]</span>
         <x-form>
         <label><span>Primary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.primary" type="wall"></PalleteEditor></label>
         <label><span>Secondary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.secondary" type="wall"></PalleteEditor></label>
         <label><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="false" v-model="focus.side_def.arc" type="arc"></PalleteEditor></label>
+        <div class="label"><span>Exit</span><div>
+            <button :disabled="!link" @click="focus.sector_def.exit[focus.side] = link?.sector || 0">Sector {{ focus.sector_def.exit[focus.side] }}</button>
+            <button :disabled="focus.sector_def.exit[focus.side] == 0" @click="focus.sector_def.exit[focus.side] = 0">X</button>
+        </div>
+    </div>
         </x-form>
         </div>
-        <x-form>
-        <label><span>Basic action</span><select v-model="focus.side_def.action">
-            <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
-        </select></label>
-        <label><span>Target</span><div class="target">            
-            <button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button>
-            <button :disabled="focus.side_def.target_sector == 0" @click="focus.side_def.target_sector = focus.side_def.target_side = 0">X</button>
-        </div></label>
-        </x-form>
         
 
     </div>
@@ -868,30 +851,6 @@ x-workspace {
 .toolbar {
     user-select: none;
 }
-.palette .exits {
-    position:relative;
-    height: 4rem;
-    max-width: 9rem;
-}
-.palette .exits button {
-    position: absolute;
-    width: fit-content;
-    height: fit-content;
-    width: 3rem;
-}
-.palette .exits button:nth-child(1) {
-    left: 0;right:0;top:0;margin: auto;;
-}
-.palette .exits button:nth-child(2) {
-    right: 0;bottom:0;top:0;margin: auto;;
-}
-.palette .exits button:nth-child(4) {
-    left: 0;bottom:0;top:0;margin: auto;;
-}
-
-.palette .exits button:nth-child(3) {
-    left: 0;right:0;bottom:0;margin: auto;;
-}
 .palette {
     position: relative;
 }
@@ -923,8 +882,9 @@ x-workspace {
 .target > *:first-child {flex-grow: 1;}
 
 .palette > div {
-    max-height: 1.5rem;;
-    overflow: hidden;;
+    overflow: auto;
+    position: relative;
+    height: 100%;
 }
 
 .palette > div > span.title {
@@ -932,15 +892,13 @@ x-workspace {
     line-height: 1.4rem;
     position: sticky;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 2;
     font-weight: bold;
     display: block;
     background-color: #aaa;
 
-}
-.palette > div.expanded {
-    max-height: 100%;
-      overflow: auto;;
 }
 .middle-split {
     display:flex;
@@ -951,6 +909,31 @@ x-workspace {
 .bottom {
     height: 10em;;
     display:flex;
+    background-color: #aaa;
+    gap: 1px;
+}
+.bottom > * {
+    position:relative;
+    background-color: #ccc;
+    margin-top: 1px;
+    flex-grow: 1;
+}
+
+.bottom > * > span.title {
+    padding-left: 1rem;
+    background-color: #eee;
+    font-weight: bold;
+    display:block;
+}
+
+.change-flags {
+    position: absolute;
+    right: 0rem;
+    bottom: 90%;
+    background-color: #ddd;
+    padding: 2rem 0.5rem 0.5rem 0.5rem;
+    border: 1px solid;
+    box-shadow: 3px 3px 5px black;
 }
 
 
