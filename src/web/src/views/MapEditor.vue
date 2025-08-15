@@ -52,9 +52,23 @@ type LinkRef = {
     side: number;
 }
 
+const ApplyMode = {
+    ACTIVE:{t:"Active wall",v:-1},
+    BOTH_SIDES:{t:"Active wall both sides",v:-2},
+    PERIMETER:{t:"Perimeter walls ☐",v:4},
+    INNER_SIDES:{t:"Inner walls ",v:5},
+    EDGE_SIDES:{t:"Edge walls",v:6},
+    ALL_SIDES:{t:"All walls",v:7},
+    NORTH:{t:"North ↑",v:0},
+    EAST:{t:"East →",v:1},
+    SOUTH:{t:"South ↓",v:2},
+    WEST:{t:"West ←",v:3},
+};
+
 const focus = ref<FocusItem>();
 const selection = ref<number[]>();
 const link = ref<LinkRef>();
+const applyMode = ref<number>(ApplyMode.ACTIVE.v);
 
 let warn_empty_tool = true;
 const mapcontainer = globalState("mapcontainer",()=>new MapContainer);
@@ -370,7 +384,9 @@ async function drawRect(rc: DOMRectReadOnly) {
                 sect.type = settings.sector_type;
                 sect.side.forEach(x=>{
                     x.flags = SideFlag.PLAY_IMPS | SideFlag.MONST_IMPS| SideFlag.SOUND_IMPS | SideFlag.THING_IMPS
-                            | SideFlag.PRIM_VIS | SideFlag.SEC_FORV 
+                            | SideFlag.PRIM_VIS | SideFlag.SEC_FORV | SideFlag.CHANGE_AUTOMAP
+                            | SideFlag.CHANGE_MONST_IMPS | SideFlag.CHANGE_PLAY_IMPS | SideFlag.CHANGE_SOUND_IMPS
+                            | SideFlag.CHANGE_THING_IMPS;
                     x.primary = settings.wall;
                     x.secondary = null;
                     x.arc= settings.arc;
@@ -439,9 +455,13 @@ function updateFocus() {
 function updateSelection() {
     if (selection.value && (settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Enemies)) {
         mapdraw.drawSelectedSectors(curmap.value, settings.curlevel, selection.value);
+        if (selection.value.length == 0 && applyMode.value >= 0) applyMode.value = -1;
     } else {
         mapdraw.drawSelectedSectors(curmap.value, settings.curlevel, []);
+        if (applyMode.value >= 0) applyMode.value = -1;
+
     }
+
 }
 
 function redraw() {
@@ -552,47 +572,114 @@ watch([()=>settings.edit_mode,selection],()=>{
 })
 
 
-function applySector() {
+function applyChanges() {
     if (focus.value) {
-        if (selection.value && selection.value.length) {
-            const changes : ((s:MapSector)=>void)[] = [];
+        const changesSector : ((s:MapSector)=>void)[] = [];
+        const changesSide : ((s:MapSide)=>void)[] = [];
 
-            const old = curmap.value.sectors[focus.value.sector];
-            const nw = focus.value.sector_def;
-            if (old.action != nw.action) changes.push((s:MapSector)=>s.action = nw.action);
-            if (old.ceil != nw.ceil) changes.push((s:MapSector)=>s.ceil = nw.ceil);
-            if (old.flags != nw.flags) changes.push((s:MapSector)=>{
-                s.flags &= old.flags & ~nw.flags;
-                s.flags |= nw.flags & ~old.flags;
+        const old_sec = curmap.value.sectors[focus.value.sector];
+        const nw_sec = focus.value.sector_def;
+        const old_sid = curmap.value.sectors[focus.value.sector].side[focus.value.side]
+        const nw_sid = focus.value.side_def;
+        let update_focus = false;
+        if (old_sec.action != nw_sec.action) changesSector.push((s:MapSector)=>s.action = nw_sec.action);
+        if (old_sec.ceil != nw_sec.ceil) changesSector.push((s:MapSector)=>s.ceil = nw_sec.ceil);
+        if (old_sec.flags != nw_sec.flags) changesSector.push((s:MapSector)=>{
+            s.flags &= old_sec.flags & ~nw_sec.flags;
+            s.flags |= nw_sec.flags & ~old_sec.flags;
+        });
+        if (old_sec.floor != nw_sec.floor) changesSector.push((s:MapSector)=>s.floor =nw_sec.floor);
+        if (old_sec.target_sector != nw_sec.target_sector || old_sec.target_side != nw_sec.target_side) changesSector.push((s:MapSector)=>{
+            s.target_sector = nw_sec.target_sector;
+            s.target_side = nw_sec.target_side;
+        }); 
+        if (old_sec.exit.findIndex((x,idx)=>x != nw_sec.exit[idx]) != -1) {
+            changesSector.push((s:MapSector)=>{
+                s.exit = shallowClone(s.exit);
+                nw_sec.exit.forEach((x,idx)=>{if (x != old_sec.exit[idx]) s.exit[idx] = x;});                    
             });
-            if (old.floor != nw.floor) changes.push((s:MapSector)=>s.floor =nw.floor);
-            if (old.target_sector != nw.target_sector || old.target_side != nw.target_side) changes.push((s:MapSector)=>{
-                s.target_sector = nw.target_sector;
-                s.target_side = nw.target_side;
-            }); 
-            if (old.exit.findIndex((x,idx)=>x != nw.exit[idx]) != -1) {
-                changes.push((s:MapSector)=>{
-                    s.exit = shallowClone(s.exit);
-                    nw.exit.forEach((x,idx)=>{if (x != old.exit[idx]) s.exit[idx] = x;});                    
-                });
+        }
+
+        if (old_sec.type != nw_sec.type) changesSector.push((s:MapSector)=>s.type =nw_sec.type);
+
+        if (old_sid.primary != nw_sid.primary) changesSide.push((s:MapSide)=>s.primary = nw_sid.primary);
+        if (old_sid.secondary != nw_sid.secondary) changesSide.push((s:MapSide)=>s.secondary = nw_sid.secondary);
+        if (old_sid.arc != nw_sid.arc) changesSide.push((s:MapSide)=>s.arc = nw_sid.arc);
+        if (old_sid.target_sector != nw_sid.target_sector) changesSide.push((s:MapSide)=>s.target_sector = nw_sid.target_sector);
+        if (old_sid.target_side != nw_sid.target_side) changesSide.push((s:MapSide)=>s.target_side = nw_sid.target_side);
+        if (old_sid.action != nw_sid.action) changesSide.push((s:MapSide)=>s.action = nw_sid.action);
+        if (old_sid.flags != nw_sid.flags) {
+            const f_add = ~old_sid.flags & nw_sid.flags;
+            const f_rem = ~old_sid.flags | nw_sid.flags;
+            changesSide.push((s:MapSide)=>s.flags = (s.flags & f_rem)|f_add);
+        }
+
+        if (changesSector.length || changesSide.length) {
+            const m  = begin_edit();
+            m.sectors = shallowClone(m.sectors)
+            if (changesSector.length) {
+                if (selection.value?.length  && applyMode.value != ApplyMode.ACTIVE.v && applyMode.value != ApplyMode.BOTH_SIDES.v) {            
+                    selection.value.forEach(sect=>{
+                        const s = m.sectors[sect] = shallowClone(m.sectors[sect]);
+                        for (const f of changesSector) f(s);
+                        
+                    });
+                } else {
+                    const s = m.sectors[focus.value.sector] = shallowClone(m.sectors[focus.value.sector]);
+                    for(const f of changesSector) f(s);
+                    update_focus = true;
+                }
             }
 
-            if (old.type != nw.type) changes.push((s:MapSector)=>s.type =nw.type);
-            if (changes.length) {
-                const m  = begin_edit();
-                m.sectors = shallowClone(m.sectors);            
-                selection.value.forEach(sect=>{
-                    const s = m.sectors[sect] = shallowClone(m.sectors[sect]);
-                    for (const f of changes) f(s);
-                });
-                end_edit(m);
+            if (changesSide.length) {
+                if (applyMode.value == ApplyMode.ACTIVE.v || applyMode.value == ApplyMode.BOTH_SIDES.v) {
+                    update_focus = true;
+                    const s = m.sectors[focus.value.sector] = shallowClone(m.sectors[focus.value.sector]);
+                    s.side = shallowClone(s.side);
+                    const sid = s.side[focus.value.side] = shallowClone(s.side[focus.value.side]);
+                    for (const f of changesSide) f(sid);
+                    if (applyMode.value == ApplyMode.BOTH_SIDES.v) {
+                        const s2num = s.exit[focus.value.side];
+                        if (s2num) {
+                            const sid2num = (focus.value.side+2) & 3;
+                            const s2 = m.sectors[s2num] = shallowClone(m.sectors[s2num]);
+                            s2.side = shallowClone(s2.side);
+                            const sid2 = s2.side[sid2num] = shallowClone(s2.side[sid2num]);
+                            for (const f of changesSide) f(sid2);
+                        }
+                    }
+                } else if (selection.value?.length) {
+                    const selset = new Set<number>();
+                    selection.value.forEach(sect=>selset.add(sect));
+                    let filter : ((sect:number,sid:number)=>boolean)|null = null;
+                    switch (applyMode.value) {
+                        case ApplyMode.ALL_SIDES.v: filter = ()=>true;break;
+                        case ApplyMode.EDGE_SIDES.v: filter = (sect,sid)=>m.sectors[sect].exit[sid] == 0;break;
+                        case ApplyMode.INNER_SIDES.v: filter = (sect,sid)=>selset.has(m.sectors[sect].exit[sid]);break;
+                        case ApplyMode.PERIMETER.v: filter = (sect,sid)=>m.sectors[sect].exit[sid]!=0 && !selset.has(m.sectors[sect].exit[sid]);break;
+                        case ApplyMode.EAST.v: filter = (sect,sid)=>sid==3;break;
+                        case ApplyMode.WEST.v: filter = (sect,sid)=>sid==1;break;
+                        case ApplyMode.NORTH.v: filter = (sect,sid)=>sid==0;break;
+                        case ApplyMode.SOUTH.v: filter = (sect,sid)=>sid==2;break;
+                    }
+                    if (filter) {
+                        selection.value.forEach((sect)=>{
+                            for (let i = 0; i < 4; ++i) {
+                                if (filter(sect, i)) {
+                                    const s = m.sectors[sect] = shallowClone(m.sectors[sect]);
+                                    s.side = shallowClone(s.side);
+                                    const sid = s.side[i] = shallowClone(s.side[i]);
+                                    for (const f of changesSide) f(sid);
+                                }
+                            }
+                        });
+                    }
+                }
             }
-        } else {
-            const m = begin_edit();
-            m.sectors = shallowClone(m.sectors);
-            m.sectors[focus.value.sector] = focus.value.sector_def;
             end_edit(m);
-            updateFocusData(focus.value.sector, focus.value.side);
+            if (update_focus) {
+                updateFocusData(focus.value.sector, focus.value.side);
+            }
         }
     }
 }
@@ -689,7 +776,7 @@ function applySector() {
         <div class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall"></PalleteEditor></div>
         <div class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc"></PalleteEditor></div>
         <div class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor"></PalleteEditor></div>
-        <div><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
+        <div class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
     </div>
 </div>
 <div class="right edit" v-if="settings.edit_mode == EditMode.Edit">
@@ -712,7 +799,6 @@ function applySector() {
                     <button :disabled="focus.sector_def.target_sector == 0" @click="focus.sector_def.target_sector = focus.sector_def.target_side = 0">X</button></div>
             </div>
         </x-form>
-        <div class="buttons"><button @click="applySector">Apply changes</button></div>
         </div>
         <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }} [{{ focus.sector * 4 + focus.side }}]</span>
         <x-form>
@@ -724,6 +810,18 @@ function applySector() {
             <button :disabled="focus.sector_def.exit[focus.side] == 0" @click="focus.sector_def.exit[focus.side] = 0">X</button>
         </div>
     </div>
+        </x-form>
+        </div>
+        <div class="apply"><span class="title">Apply changes</span>
+        <x-form>
+            <label><span>Apply to side:</span>
+                <select v-model="applyMode">
+                    <template v-for="(v,n) of ApplyMode" :key="n">
+                        <option v-if="selection?.length || v.v < 0" :value="v.v"> {{ v.t }}</option>
+                    </template>
+                </select>
+            </label>
+            <button class="big-apply" @click="applyChanges">Apply</button>
         </x-form>
         </div>
         
@@ -749,7 +847,7 @@ function applySector() {
 </x-workspace>
 
 <MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
-
+<datalist id="listOfWallAssets9875487"><option v-for="v of list_assets" :key="v" :value="v"></option></datalist>
 </template>
 
 
@@ -884,17 +982,11 @@ x-workspace {
 .palette > div {
     overflow: auto;
     position: relative;
-    height: 100%;
 }
 
 .palette > div > span.title {
     height: 1.4rem;
     line-height: 1.4rem;
-    position: sticky;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 2;
     font-weight: bold;
     display: block;
     background-color: #aaa;
@@ -934,6 +1026,15 @@ x-workspace {
     padding: 2rem 0.5rem 0.5rem 0.5rem;
     border: 1px solid;
     box-shadow: 3px 3px 5px black;
+}
+.big-apply {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 1.5rem;
+}
+.right .palette div.apply {
+    flex-grow: 0;
 }
 
 

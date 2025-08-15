@@ -120,7 +120,7 @@ class TSECTOR extends WithSchema {
 
     floor: number = 0;
     ceil: number = 0;
-    flags: number = 0;
+    flags: number = SideFlag.CHANGE_AUTOMAP|SideFlag.CHANGE_MONST_IMPS|SideFlag.CHANGE_PLAY_IMPS|SideFlag.CHANGE_SOUND_IMPS|SideFlag.CHANGE_THING_IMPS;
     type: number = 0;
     action: number = 0;
     target_side :number = 0;
@@ -1043,6 +1043,7 @@ export const FloorCeilModeRequiredFrames = [1,2,2,4,4,8] as const;
 export class FloorCeilConfiguration extends AssetConfiguration {
     pixmaps:string[] = [""];
     mode : number = FloorCeilMode.SINGLE;
+    button: boolean = false;
     
     static from(sector: TSECTOR, layout: TMAP_LAYOUT, lists: string[], is_ceil: boolean) : FloorCeilConfiguration|null{
         const ret = new FloorCeilConfiguration;
@@ -1051,17 +1052,23 @@ export class FloorCeilConfiguration extends AssetConfiguration {
         const id = idraw-1;
         let f = sector.flags;
         if (is_ceil) f = f >> 4;
+        else if (sector.type == SectorType.Button) {
+            ret.button = true;
+        } 
         f = f & 0xF;
         const animation = (f & 0x8) != 0;
-        const frames = (f & 0x7)+1;
+        let frames = (f & 0x7)+1;
         ret.mode = f & 0x7;
         if (animation) {
-            ret.pixmaps = lists.slice(id, id+frames);
             ret.mode = FloorCeilMode.ANIMATED;
         } else {
             const cnts  = [1,2,2,4,4,8];
-            ret.pixmaps = lists.slice(id, id+cnts[ret.mode]);
+            frames = cnts[ret.mode];
         }
+        if (ret.button) {
+            frames *= 2;
+        }
+        ret.pixmaps = lists.slice(id, id+frames);
         return ret;
     }
 

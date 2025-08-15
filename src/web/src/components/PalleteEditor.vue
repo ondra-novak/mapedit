@@ -109,7 +109,7 @@ function deleteItem() {
 function updateItem() {
     if (cur_floorceil.value 
             && cur_floorceil.value.mode != FloorCeilMode.ANIMATED 
-            && cur_floorceil.value.pixmaps.length != FloorCeilModeRequiredFrames[cur_floorceil.value.mode]) {
+            && cur_floorceil.value.pixmaps.length != (cur_floorceil.value.button?2:1)*FloorCeilModeRequiredFrames[cur_floorceil.value.mode]) {
                 messageBoxAlert("Can't update item: Type of floor/ceil doesn't match to frame count");
                 return;
             }
@@ -302,6 +302,7 @@ onMounted(init);
                             <option :value="4">Four directions (4 frames)</option>
                             <option :value="5">Four directions alternating (8 frames)</option>
                         </select></label>
+                        <label><input type="checkbox" v-model="cur_floorceil.button" /><span>Button off/on (x2 frames)</span></label>
                     </x-form>
                 </x-section>
             </div>

@@ -73,6 +73,7 @@ watch(dlg, (new_val, old_val)=>{
     bottom: 0;
     right: 0;
     background-color: #0008;
+    z-index: 1000;
 }
 .popup {
     position: fixed;
