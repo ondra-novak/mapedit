@@ -30,10 +30,11 @@ protected:
     std::filesystem::path _app_dir;
     std::filesystem::path _assets_dir;
     std::filesystem::path _user_dir;
+    std::u8string _current_ddl;
     std::stop_source _stop;
+    json::value _config;
     bool _check_active = false;
     bool _last_seen = true;
-    bool _ddl_dirty = false;
 
     MGifComp _mgfcomp;
     std::mutex _mgfcomp_mx;
@@ -56,12 +57,14 @@ protected:
     bool ddl_mpg_get(Request &req);
     bool ddl_mpg_create(Request &req);
     bool ddl_mpg_session_put(Request &req);
-    bool config_get(Request &req);
-    bool config_put(Request &req);
+    bool ddl_active(Request &req);
     bool keep_alive(Request &req);
     bool preview_start(Request &req);
     bool preview_stop(Request &req);
     bool preview_teleport(Request &req);
+    bool preview_reload(Request &req);
+    bool preview_console_show(Request &req);
+    bool preview_console_exec(Request &req);
 
 
     bool command(Request &req);
@@ -80,7 +83,10 @@ protected:
 
     SkeldalExeControl _game_control;
  
-    DDLManager getUserDDL(const std::string &name) const;
+    DDLManager getUserDDL() const;
+
+    void load_config();
+    void save_config();
 
 };
 

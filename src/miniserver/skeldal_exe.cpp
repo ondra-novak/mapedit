@@ -214,14 +214,22 @@ bool SkeldalExeControl::stop() {
     return _instance.stop();
 }
 
-void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir, bool )
+void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir )
 {
-/*    std::optional<SwapAndCopy> _sc;
-    if (dirty_ddl) {
-        _sc.emplace(_curddl_path);
-    }
-        */
-    _command_callback(std::format("RELOAD {} {} {}", map, sector,dir));
+    _command_callback(std::format("TELEPORT {} {} {}", map, sector,dir));
+}
+
+void SkeldalExeControl::reload_map() {
+    _command_callback("RELOAD");
+}
+
+void SkeldalExeControl::console_show(bool show) {
+    _command_callback(std::format("CONSOLE {}", show?1:0));
+}
+
+void SkeldalExeControl::console_exec(std::string_view cmd)
+{
+    _command_callback(std::format("CONSOLE_CMD {}", cmd));
 }
 
 void SkeldalExeControl::stop_requested()

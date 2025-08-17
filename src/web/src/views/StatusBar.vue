@@ -9,10 +9,10 @@ import { messageBox, messageBoxAlert } from "@/utils/messageBox";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-const vis = StatusBar.visible;
 const en = StatusBar.enabled;
+const vis = StatusBar.visible;
 const conf = ref<boolean>(false);
-const current_ddl = ref("");
+const current_ddl = ref("<n/a>");
 const connected = ref(true);
 const cur_map = StatusBar.cur_map_name;
 const game_connected = ref(0);
@@ -24,6 +24,8 @@ const focused_element = ref<HTMLInputElement>();
 const router = useRouter();
 const config = ref<Config>(new Config());
 const cur_sector = StatusBar.cur_sector_side;
+
+const ghost_form = ref(false);
 
 
 
@@ -55,7 +57,6 @@ function selectProject() {
     });
 }
 
-
 function check_connection() {
     if (connected.value) {
         messageBoxAlert("Connection to backend, everything is ok");
@@ -65,19 +66,33 @@ function check_connection() {
 }
 
 
-async function watch_server_status() {
-    while (true) {
-        connected.value = await server.connect_change_event.listen();
+watch(server.keep_alive_event, (res)=>{
+        if (!res) {
+            if (connected.value) {
+                connected.value = false;
+            }
+        } else {
+            connected.value = true;
+            game_connected.value = res.game_instances;
+            if (current_ddl.value != res.current_ddl) {                
+                current_ddl.value = res.current_ddl;
+                if (res.current_ddl.length == 0) {
+                    selectProject();
+                }
+            }
+            if (!game_connected.value) {
+                ghost_form.value = false;
+            }
+        }
     }
-}
+);
 
-
-async function watch_game_status() {
-    while (true) {
-        game_connected.value = await server.gameconnect_event.listen();
-
-    }
-}
+watch(ghost_form, ()=>{
+    const console_cmds = ["ghost-form","no-hassle","iron-skin","levitation"];
+    const sw = ghost_form.value?"on":"off";
+    const cmd = console_cmds.map(n=> n + " " + sw).join("~");
+    server.game_client_console_exec(cmd);        
+})
 
 function handleBeforeUnload(event: BeforeUnloadEvent) {
       if (vis.value && en.value) {
@@ -96,16 +111,6 @@ async function openMapPopup() {
 async function init() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     StatusBar.popup_map_open = openMapPopup;
-    watch_server_status();
-    watch_game_status();
-    config.value = await server.get_config();
-    if (!config.value.project) {
-        selectProject();
-    } else {
-        await server.set_current_ddl(config.value.project);
-        current_ddl.value = config.value.project;
-    }
-    
 }
 
 onMounted(init);
@@ -123,11 +128,10 @@ async function open_project(name:string) {
     if (!name.endsWith(".ddl")) name = name+".ddl";
     console.log(name);
     new_object_name.value = "";
-    server.set_current_ddl(name);
+    await server.set_current_ddl(name);
     config.value.project = name;
     current_ddl.value = name;
-    await server.put_config(config.value);
-    list_of_projects.value = undefined;    
+    list_of_projects.value = undefined;
     router.push("/");
 }
 
@@ -197,6 +201,9 @@ function start_client() {
 function stop_client() {
     server.game_client_stop();
 }
+function reload_client() {
+    server.game_client_reload();
+}
 
 function teleport_to() {
     if (cur_sector.value?.sector && StatusBar.cur_map_name.value) {
@@ -214,8 +221,12 @@ function teleport_to() {
             <div><button v-if="game_connected == 0" @click="start_client">Start game client</button>
                  <span v-if="game_connected > 0"> Game client running: {{ game_connected }}</span>        
             </div>            
-            <div v-if="game_connected > 0"><button @click="stop_client">Stop</button></div>
-            <div v-if="game_connected > 0"><button :disabled="!cur_sector || cur_sector.sector == 0" @click="teleport_to">Teleport to sector</button></div>
+            <template v-if="game_connected > 0">
+            <div><button @click="stop_client">Stop</button></div>
+            <div><button @click="reload_client">Reload</button></div>
+            <div><button :disabled="!cur_sector || cur_sector.sector == 0" @click="teleport_to">Teleport to sector</button></div>
+            <div><label><input type="checkbox" v-model="ghost_form">Ghost form</input></label></div>
+            </template>
         </div>
         <div class="right">
             <button v-if="vis" :disabled="!en" @click="show_confirm">Revert</button>
@@ -265,7 +276,7 @@ function teleport_to() {
             </div>
         </div>
     </div>
-    <div v-if="!connected" class="select-project.popup">
+    <div v-if="!connected" class="select-project popup">
         <div>
             <div>
             <p>Lost connection to backend! It probably exited or crashed</p>            

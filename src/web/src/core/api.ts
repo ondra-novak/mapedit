@@ -1,3 +1,4 @@
+import { ref } from "vue";
 import type { AssetGroupType } from "./asset_groups";
 import Distributor from "./distributor";
 
@@ -32,6 +33,7 @@ export interface KeepAliveStatus {
     exit_on_close:boolean;
     keepalive_interval: number;
     game_instances: number;
+    current_ddl: string;
 }
 
 export interface PutImageStatus {
@@ -50,32 +52,15 @@ export class Config {
 
 export class ApiClient {
     
-    current_ddl ;
-    current_ddl_set : ((x:{name:string})=>void) | null = null;
-    
-    connect_change_event = new Distributor<boolean>();
-    gameconnect_event = new Distributor<number>();
-    status: KeepAliveStatus = {exit_on_close:true, game_instances:0,keepalive_interval:5000};
+
+    keep_alive_event = ref<KeepAliveStatus|null>(null);
+    keep_alive_interval = 5000;
     connected: boolean = false;
 
     constructor() {
         this.start_keepalive();
-        this.current_ddl = new Promise<{name?:string}>((ok)=>{this.current_ddl_set = ok;});
     }
 
-    async set_current_ddl(s:string) {
-        const n = encodeURIComponent(s);
-        if (this.current_ddl_set) {
-            this.current_ddl_set({name: s});
-            this.current_ddl_set = null;
-        } else {
-            (await this.current_ddl).name = s;
-        }
-    }
-
-    get_last_status() {return this.status;}
-
-    async get_current_ddl() :Promise<string> {return (await this.current_ddl).name || "empty";}
 
     protected async handle_error(response:Response, message: string) {
             const text = await response.text(); // Může obsahovat chybovou hlášku
@@ -84,10 +69,9 @@ export class ApiClient {
 
     // DDL
     async getDDLFiles(group: number|null, source: string|null): Promise<DDLFiles> {
-        const ddl = await this.get_current_ddl();
         const arg1=group?`group=${group}`:"";
         const arg2=source?`type=${source}`:"";
-        const query = [`api/ddl/${ddl}`, [arg1,arg2].join('&')].join('?');
+        const query = [`api/ddl`, [arg1,arg2].join('&')].join('?');
         const response = await fetch(query);
         const json = await response.json();
         json.files = json.files.map((x:[string, string, boolean][])=>{
@@ -101,8 +85,7 @@ export class ApiClient {
     }
 
     async getDDLFile(id: string): Promise<ArrayBuffer> {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}`);
+        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`);
         if (response.ok) {
             const n = ((await response.bytes()).buffer);
             return n
@@ -112,8 +95,7 @@ export class ApiClient {
     }
 
     async getDDLMGFFile(id: string): Promise<ArrayBuffer> {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/ddl/${ddl}/mgf/${encodeURIComponent(id)}`);
+        const response = await fetch(`api/ddl/mgf/${encodeURIComponent(id)}`);
         if (response.ok) {
             const n = ((await response.bytes()).buffer);
             return n
@@ -123,8 +105,7 @@ export class ApiClient {
     }
 
     async putDDLFile(id: string, data: ArrayBuffer, group: number, fail_if_exists = false): Promise<boolean> {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}?group=${group}&fexists=${fail_if_exists?1:0}`, {
+        const response = await fetch(`api/ddl/${encodeURIComponent(id)}?group=${group}&fexists=${fail_if_exists?1:0}`, {
             method: "PUT",
             headers: { "Content-Type": "application/octet-stream" },
             body: data
@@ -139,8 +120,7 @@ export class ApiClient {
     }    
 
     async deleteDDLFile(id: string): Promise<void> {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/ddl/${ddl}/${encodeURIComponent(id)}`, {
+        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`, {
             method: "DELETE"
         });
        if (response.status !== 202) {
@@ -149,8 +129,7 @@ export class ApiClient {
     }
 
     async compactDDL(): Promise<any> {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/ddl/${ddl}/compact`, {
+        const response = await fetch(`api/ddl/compact`, {
             method: "POST"
         });
         if (response.status !== 202) {
@@ -159,8 +138,7 @@ export class ApiClient {
     }
 
     async mgfCreate(name: string, group: number, frames:number, transparent: boolean): Promise<string> {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/ddl/${ddl}/mgf`, {
+        const response = await fetch(`api/ddl/mgf`, {
             method: "POST",
             body: JSON.stringify({
                 filename: name,
@@ -203,12 +181,11 @@ export class ApiClient {
     } 
 
     async getDownloadLink(id:string):Promise<string> {
-        const ddl = await this.get_current_ddl();
-        return `api/ddl/${ddl}/${encodeURIComponent(id)}`;
+        return `api/ddl/${encodeURIComponent(id)}`;
     }
 
     async listAllDDLs() : Promise<DDLEntry[]> {
-        const response   = await fetch("api/ddl") ;
+        const response   = await fetch("api/list") ;
         if (response.status != 200) {
             await this.handle_error(response, "List ddl failed.")
         }
@@ -227,54 +204,22 @@ export class ApiClient {
         return await response.json();
     }
 
-    async start_keepalive() {
+    async start_keepalive() {        
         try {
             const st = await this.keepalive();
-            if (st.game_instances != this.status.game_instances) {
-                this.gameconnect_event.trigger(st.game_instances);
-            }
-            this.status = st;
-            if (!this.connected) {
-                this.connect_change_event.trigger(true)
-                this.connected = true;
-            }
+            this.keep_alive_interval = st.keepalive_interval;
+            this.keep_alive_event.value = st;
         } catch (e) {
-            if (this.connected) {
-                this.connect_change_event.trigger(false);
-                this.connected = false;
-            }
+            this.keep_alive_event.value = null;
         }
-        setTimeout(()=>this.start_keepalive(), this.status.keepalive_interval);
+        setTimeout(()=>this.start_keepalive(), this.keep_alive_interval);
     }
 
-    async get_config() : Promise<Config>{
-        const response = await fetch("api/config");
-        if (response.status != 200) {
-            await this.handle_error(response, "get_config failed")
-        }
-        const r =await response.json();
-        if (!r) return new Config();
-        else return r;
-    }
 
-    async put_config(conf: Config): Promise<void> {
-        const response = await fetch("api/config",{
-            "method":"PUT",
-            "headers": {
-                "Content-Type":"application/json"
-            },
-            "body":JSON.stringify(conf)
-        });
-        if (response.status != 202) {
-               await this.handle_error(response, "put_config failed")
-        }
-    }
 
     async game_client_start() : Promise<void>  {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/preview_start`, {
+        const response = await fetch(`api/game/start`, {
             method: "POST",
-            body: JSON.stringify({ddl: ddl}),
             headers: {
                 "Content-Type":"application/json"
             }
@@ -285,7 +230,7 @@ export class ApiClient {
     }
 
     async game_client_stop() : Promise<void>  {
-        const response = await fetch(`api/preview_stop`, {
+        const response = await fetch(`api/game/stop`, {
             method: "POST",
         });
         if (response.status !== 202) {
@@ -293,12 +238,45 @@ export class ApiClient {
         }
     }
 
+    async game_client_reload() : Promise<void>  {
+        const response = await fetch(`api/game/reload`, {
+            method: "POST",
+        });
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed reload game client")
+        }
+    }
+
+    async game_client_show_console(show:boolean) : Promise<void>  {
+        const response = await fetch(`api/game/console_show`, {
+            method: "POST",
+            body: show?"true":"false",
+            headers: {
+                "Content-Type":"application/json"
+            }
+        });
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed reload show console")
+        }
+    }
+
+    async game_client_console_exec(cmd:string) : Promise<void>  {
+        const response = await fetch(`api/game/console_exec`, {
+            method: "POST",
+            body: cmd,
+            headers: {
+                "Content-Type":"text/plain"
+            }
+        });
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed reload exec command on console")
+        }
+    }
+
     async game_client_teleport(map: string, sector: number, side: number) : Promise<boolean> {
-        const ddl = await this.get_current_ddl();
-        const response = await fetch(`api/teleport`, {
+        const response = await fetch(`api/game/teleport`, {
             method: "POST",
             body: JSON.stringify({
-                ddl: ddl,
                 map: map,
                 sector: sector,
                 side: side
@@ -311,6 +289,21 @@ export class ApiClient {
             return false;
         } else if (response.status !== 202) {
             await this.handle_error(response, "Failed stop game client")
+            return false;
+        }
+        return true;
+    }
+
+    async set_current_ddl(ddl: string) {
+        const response = await fetch(`api/active`, {
+            method: "PUT",
+            body: ddl,
+            headers: {
+                "Content-Type":"text/plain"
+            }
+        });
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed to store config")
             return false;
         }
         return true;

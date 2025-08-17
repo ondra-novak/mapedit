@@ -19,7 +19,7 @@ WebInterface::WebInterface(Config cfg, std::stop_source stp)
     ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
     ,_game_control(cfg.game_folder, cfg.game_ini, cfg.addr_port,[this](std::string_view cmd){this->control(cmd);})
 {
-
+    load_config();
 }
 
 
@@ -29,23 +29,26 @@ std::function<bool( BasicRequest &)> WebInterface::get_handler() {
 
 
 constexpr Endpoint<WebInterface> endpoints[] = {
-    {Method::GET, "/api/ddl/{}/mgf/{}", &WebInterface::ddl_mpg_get},
-    {Method::POST, "/api/ddl/{}/mgf", &WebInterface::ddl_mpg_create},
-    {Method::GET, "/api/ddl/{}/{}", &WebInterface::ddl_get},
-    {Method::PUT, "/api/ddl/{}/{}", &WebInterface::ddl_put},
-    {Method::DELETE, "/api/ddl/{}/{}", &WebInterface::ddl_delete},
-    {Method::POST, "/api/ddl/{}/compact", &WebInterface::ddl_compact},
-    {Method::GET, "/api/ddl/{}", &WebInterface::ddl_list},
-    {Method::GET, "/api/ddl", &WebInterface::all_ddl_list},
+    {Method::GET, "/api/ddl/mgf/{}", &WebInterface::ddl_mpg_get},
+    {Method::POST, "/api/ddl/mgf", &WebInterface::ddl_mpg_create},
+    {Method::GET, "/api/ddl/{}", &WebInterface::ddl_get},
+    {Method::PUT, "/api/ddl/{}", &WebInterface::ddl_put},
+    {Method::DELETE, "/api/ddl/{}", &WebInterface::ddl_delete},
+    {Method::POST, "/api/ddl/compact", &WebInterface::ddl_compact},
+    {Method::GET, "/api/ddl", &WebInterface::ddl_list},
+    {Method::GET, "/api/list", &WebInterface::all_ddl_list},
+    {Method::PUT, "/api/active", &WebInterface::ddl_active},
+    {Method::GET, "/api/active", &WebInterface::ddl_active},
     {Method::POST, "/api/control", &WebInterface::control},
     {Method::GET, "/api/keepalive", &WebInterface::keep_alive},
-    {Method::GET, "/api/config", &WebInterface::config_get},
-    {Method::PUT, "/api/config", &WebInterface::config_put},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
-    {Method::POST, "/api/preview_start", &WebInterface::preview_start},
-    {Method::POST, "/api/preview_stop", &WebInterface::preview_stop},
-    {Method::POST, "/api/teleport", &WebInterface::preview_teleport},
+    {Method::POST, "/api/game/start", &WebInterface::preview_start},
+    {Method::POST, "/api/game/stop", &WebInterface::preview_stop},
+    {Method::POST, "/api/game/teleport", &WebInterface::preview_teleport},
+    {Method::POST, "/api/game/reload", &WebInterface::preview_reload},
+    {Method::POST, "/api/game/console_show", &WebInterface::preview_console_show},
+    {Method::POST, "/api/game/console_exec", &WebInterface::preview_console_exec},
     {Method::GET, "/command", &WebInterface::command},
     {Method::GET, "/{}", &WebInterface::webserver},
     {Method::GET, "/", &WebInterface::webserver_index}
@@ -164,7 +167,7 @@ bool WebInterface::ddl_list(Request &req)
         };
     }
 
-    auto user = getUserDDL(req.path_vars[0]);
+    auto user = getUserDDL();
 
     std::vector<DDLManager::Item> game_files = _game.list();
     std::vector<DDLManager::Item> user_files = user.list();
@@ -213,10 +216,10 @@ bool WebInterface::ddl_list(Request &req)
 bool WebInterface::ddl_get(Request &req)
 {
     std::shared_lock _(_mx);    
-    auto user = getUserDDL(req.path_vars[0]);
-    auto f = user.get(req.path_vars[1]);
+    auto user = getUserDDL();
+    auto f = user.get(req.path_vars[0]);
     if (!f) {
-        f = _game.get(req.path_vars[1]);
+        f = _game.get(req.path_vars[0]);
         if (!f) return false;
     }    
     return req.response({200},{
@@ -227,8 +230,8 @@ bool WebInterface::ddl_get(Request &req)
 bool WebInterface::ddl_put(Request &req)
 {
     std::lock_guard _(_mx);
-    auto user = getUserDDL(req.path_vars[0]);
-    if (req.path_vars[1].empty()) return false;
+    auto user = getUserDDL();
+    if (req.path_vars[0].empty()) return false;
     if (req.body.size() > 0x7FFFFFFF) {
         return req.response({413,"Content Too Large"},{},"");
     }
@@ -238,12 +241,11 @@ bool WebInterface::ddl_put(Request &req)
     if (iter != req.query.end()) group = static_cast<uint32_t>(std::stoul(iter->second));
     iter = std::find_if(req.query.begin(), req.query.end(), [](const auto &kv){return kv.first == "fexists";});
     if (iter != req.query.end()) fail_if_exists = static_cast<uint32_t>(std::stoul(iter->second)) != 0;
-    const std::string &name = req.path_vars[1];
+    const std::string &name = req.path_vars[0];
     if (fail_if_exists && user.exists(name)) {
         return req.response({409,"Conflict"},{},"");
     } else {
-        user.put(req.path_vars[1], req.body,group);
-        _ddl_dirty = true;
+        user.put(req.path_vars[0], req.body,group);        
         return req.response({202,"Accepted"},{},"");
     }
 }
@@ -251,9 +253,9 @@ bool WebInterface::ddl_put(Request &req)
 bool WebInterface::ddl_delete(Request &req)
 {
     std::lock_guard _(_mx);
-    auto user = getUserDDL(req.path_vars[0]);
-    if (req.path_vars[1].empty()) return false;
-    user.erase(req.path_vars[1]);
+    auto user = getUserDDL();
+    if (req.path_vars[0].empty()) return false;
+    user.erase(req.path_vars[0]);
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -261,7 +263,7 @@ bool WebInterface::ddl_delete(Request &req)
 bool WebInterface::ddl_compact(Request &req)
 {   
     std::lock_guard _(_mx);
-    auto user = getUserDDL(req.path_vars[0]);
+    auto user = getUserDDL();
     user.compact();    
     return req.response({202,"Accepted"},{},"");
 }
@@ -269,10 +271,10 @@ bool WebInterface::ddl_compact(Request &req)
 bool WebInterface::ddl_mpg_get(Request &req)
 {
     std::shared_lock _(_mx);       
-    auto user = getUserDDL(req.path_vars[0]);
-    auto f = user.get(req.path_vars[1]);
+    auto user = getUserDDL();
+    auto f = user.get(req.path_vars[0]);
     if (!f) {
-        f = _game.get(req.path_vars[1]);
+        f = _game.get(req.path_vars[0]);
         if (!f) return false;
     }    
     auto stream = decompress_mgf(f->data());
@@ -308,7 +310,7 @@ bool WebInterface::ddl_mpg_create(Request &req)
         return req.response({400,"Bad Request"},{{"Content-Type","text/plain"}}, err);        
     }
 
-    auto uuid = _mgfcomp.create_mgif(req.path_vars[0],fname.as<std::string>(), group.as<int>(), frames.as<unsigned int>(), transp.as<bool>());
+    auto uuid = _mgfcomp.create_mgif(fname.as<std::string>(), group.as<int>(), frames.as<unsigned int>(), transp.as<bool>());
 
     return req.response({201, "Created"},{{"Location","/api/mgf_session/"+uuid}},uuid);
 }
@@ -334,7 +336,7 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
     }
     if (action == "close") {
         auto r = _mgfcomp.close(uuid);
-        auto user = getUserDDL(r.ddl);
+        auto user = getUserDDL();
         if (!r.creator ) {
             return req.response({410}, {}, "");        
         }
@@ -344,7 +346,6 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
          std::lock_guard __(_mx);
          const auto &data = r.creator->get_data();
          user.put(r.name, {reinterpret_cast<const char *>(data.data()),data.size()},r.group);
-         _ddl_dirty = true;
         return req.response({201},{{"Location","/api/ddl/"+r.name}},r.name);
 
     }
@@ -353,32 +354,24 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
     return false;
 }
 
-bool WebInterface::config_get(Request &req)
+bool WebInterface::ddl_active(Request &req)
 {
-    std::ifstream cfgdata(_user_dir/".config", std::ios::in);
-    json::value cfgjson;
-    if (!cfgdata) {
-        cfgjson = json::type::null;
-    } else {
-        std::string content((std::istreambuf_iterator<char>(cfgdata)), std::istreambuf_iterator<char>());
-        cfgjson = json::value::from_json(content);
-    }
-    return req.response({200,{}},{},cfgjson);    
-}
-
-bool WebInterface::config_put(Request &req)
-{
-    try {
-        auto json = json::value::from_json(req.body);
-        std::ofstream cfgdata(_user_dir/".config", std::ios::out|std::ios::trunc);
-        if (!cfgdata) {
-            return req.response({500,"Internal error: Can't write config"},{},"");
+    if (req.method == Method::PUT) {
+        std::u8string_view name(reinterpret_cast<const char8_t *>(req.body.data()), req.body.size());
+        for (char c: name) {
+            if (!((c >= '0' && c <= '9')
+                || (c >= 'A' && c <='Z')
+                || (c >= 'a' && c <='z')
+                || (c == '_' || c == '-' || c =='.'))) throw std::runtime_error("DDL Archive name validation failed (unsupported characters)");
+                        
         }
-        std::string jsonstr = json.to_json();
-        cfgdata.write(jsonstr.data(), jsonstr.size());
-        return req.response({202,"Accepted"},{},"");
-    } catch (std::exception &e) {
-        return req.response({400,{}},{{"Content-Type","text/plain;charset=utf-8"}}, e.what());
+        _current_ddl = name;
+        _config.set("project", _current_ddl);
+        save_config();        
+        return req.response({202},{},"");
+    } else {
+        return req.response({200},{{"Content-Type", "text/plain;charset=utf-8"}}, 
+            std::string_view(reinterpret_cast<const char *>(_current_ddl.data()), _current_ddl.size()));
     }
 }
 
@@ -392,7 +385,8 @@ bool WebInterface::keep_alive(Request &req)
     if (!req.response({200,{}},{},json::value({
         {"keepalive_interval",std::chrono::duration_cast<std::chrono::milliseconds>(keepalive_interval).count()*9/10},
         {"game_instances",stream_count},
-        {"exit_on_close", _check_active}
+        {"exit_on_close", _check_active},
+        {"current_ddl", _current_ddl}
     }))) return false;
     _last_seen = true;
     return true;
@@ -401,10 +395,7 @@ bool WebInterface::keep_alive(Request &req)
 bool WebInterface::preview_start(Request &req)
 {
     std::lock_guard _(_mx);
-    json::value jr = json::value::from_json(req.body);
-    std::u8string ddl = jr["ddl"].as<std::u8string>();            
-    _game_control.start(_user_dir/ddl);
-    _ddl_dirty = false;
+    _game_control.start(_user_dir/_current_ddl);
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -421,18 +412,39 @@ bool WebInterface::preview_teleport(Request &req)
 {
     std::lock_guard _(_mx);
     json::value jr = json::value::from_json(req.body);
-    std::u8string ddl = jr["ddl"].as<std::u8string>();            
     std::string map = jr["map"].as<std::string>();
     unsigned int sect = jr["sector"].as<unsigned int>();
     unsigned int side = jr["side"].as<unsigned int>();
 
-    std::filesystem::path ddlpath(_user_dir/ddl);
+    std::filesystem::path ddlpath(_user_dir/_current_ddl);
     if (ddlpath != _game_control.get_current_ddlpath()) {
         return req.response({409,"Conflict"},{},"");
     }
 
-    _game_control.teleport_to(map,sect,side,_ddl_dirty);
-    _ddl_dirty = false;
+    _game_control.teleport_to(map,sect,side);
+    return req.response({202,"Accepted"},{},"");
+}
+
+bool WebInterface::preview_reload(Request &req)
+{
+    std::lock_guard _(_mx);
+    _game_control.reload_map();
+    return req.response({202,"Accepted"},{},"");
+}
+
+bool WebInterface::preview_console_show(Request &req)
+{
+    std::lock_guard _(_mx);
+    json::value jr = json::value::from_json(req.body);
+    bool sw = jr.as<bool>();
+    _game_control.console_show(sw);
+    return req.response({202,"Accepted"},{},"");
+}
+
+bool WebInterface::preview_console_exec(Request &req)
+{
+    std::lock_guard _(_mx);
+    _game_control.console_exec(req.body);
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -456,15 +468,46 @@ void  WebInterface::broadcast(std::string_view data) {
     _streams.erase(new_end, _streams.end());    
 }
 
-DDLManager WebInterface::getUserDDL(const std::string &name) const
+DDLManager WebInterface::getUserDDL() const
 {
+    /*
     for (char c: name) {
         if (!((c >= '0' && c <= '9')
               || (c >= 'A' && c <='Z')
               || (c >= 'a' && c <='z')
               || (c == '_' || c == '-' || c =='.'))) throw std::runtime_error("DDL Archive name validation failed (unsupported characters)");
     }
-    return DDLManager(_user_dir/name);
+              */
+    return DDLManager(_user_dir/_current_ddl);
+}
+
+void WebInterface::load_config()
+{
+    try {
+        std::ifstream cfgdata(_user_dir/".config", std::ios::in);
+        if (!cfgdata) {
+            _config = json::type::null;
+        } else {
+            std::string content((std::istreambuf_iterator<char>(cfgdata)), std::istreambuf_iterator<char>());
+            _config = json::value::from_json(content);
+        }
+        _current_ddl = _config["project"].as<std::u8string>();
+    } catch (...) {
+        _config = json::type::null;
+    }
+
+
+}
+
+void WebInterface::save_config()
+{
+    auto cfgpath = _user_dir/".config";
+    std::ofstream cfgdata(_user_dir/".config", std::ios::out|std::ios::trunc);
+    if (!cfgdata) {
+        throw std::runtime_error("Failed to open config file:" + cfgpath.string());
+    }
+    std::string jsonstr = _config.to_json();
+    cfgdata.write(jsonstr.data(), jsonstr.size());
 }
 
 bool WebInterface::control(Request &req)

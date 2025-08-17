@@ -716,41 +716,6 @@ function applyChanges() {
                             disable_items:!layers.items,
                             disable_grid: !layers.grid
                             }"></div>
-<div class="bottom" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0">
-        <div v-for="(s,n) of SideFlagsNames_All" :key="n"><span class="title">{{ s.t }}</span>
-        <x-form>
-            <label v-for="(v,k) of s.f" :key="k">
-                <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
-                <span> {{ v }}</span>
-            </label>
-        </x-form>
-        </div>
-        <div><span class="title">Action</span>
-        <x-form>
-            <div class="label"><span>Target</span><div>            
-                <button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button>
-                <button :disabled="focus.side_def.target_sector == 0" @click="focus.side_def.target_sector = focus.side_def.target_side = 0">X</button>
-            </div></div>
-            <label><span>Type</span><select v-model="focus.side_def.action">
-                <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
-            </select></label>
-            <label v-for="(v,k) of SideFlagsNames_Actions" :key="k">
-                <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
-                <span> {{ v }}</span>
-            </label>
-        </x-form>
-        </div>
-        <div  v-if="focus.side_def.action"><span class="title">Action changes:</span>
-            <x-form>
-                <label v-for="(v,k) of SideFlagsNames_Changes" :key="k">
-                    <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
-                    <span> {{ v }}</span>
-                </label>
-            </x-form>
-
-        </div>
-
-</div>                        
 </div>
 </div>    
 <div class="right draw"  v-if="settings.edit_mode == EditMode.Draw || settings.edit_mode == EditMode.Erase">        
@@ -779,6 +744,42 @@ function applyChanges() {
         <div class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
     </div>
 </div>
+<div class="right side" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0">
+        <div v-for="(s,n) of SideFlagsNames_All" :key="n"><span class="title">{{ s.t }}</span>
+        <x-form>
+            <label v-for="(v,k) of s.f" :key="k">
+                <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                <span> {{ v }}</span>
+            </label>
+            <label v-if="n == 'side_barriers'"><input type="checkbox" v-model="focus.side_def.item_can_be_placed_behind">Item can be placed behind wall</input></label>
+        </x-form>
+        </div>
+        <div><span class="title">Action</span>
+        <x-form>
+            <div class="label"><span>Target</span><div>            
+                <button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button>
+                <button :disabled="focus.side_def.target_sector == 0" @click="focus.side_def.target_sector = focus.side_def.target_side = 0">X</button>
+            </div></div>
+            <label><span>Type</span><select v-model="focus.side_def.action">
+                <option v-for="v of SimpleActionType" :key="v" :value="v"> {{ SimpleActionTypeName[v]}}</option>
+            </select></label>
+            <label v-for="(v,k) of SideFlagsNames_Actions" :key="k">
+                <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                <span> {{ v }}</span>
+            </label>
+        </x-form>
+        </div>
+        <div  v-if="focus.side_def.action"><span class="title">Action changes:</span>
+            <x-form>
+                <label v-for="(v,k) of SideFlagsNames_Changes" :key="k">
+                    <input type="checkbox" @change="focus.side_def.flags^=SideFlag[k]" :checked="(focus.side_def.flags & SideFlag[k])!=0">
+                    <span> {{ v }}</span>
+                </label>
+            </x-form>
+
+        </div>
+
+</div>                        
 <div class="right edit" v-if="settings.edit_mode == EditMode.Edit">
     <div class="palette" v-if="focus && focus.sector > 0" >
         <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: -1}"></button> Sector {{ focus.sector }}</span><x-form>
@@ -856,6 +857,10 @@ x-workspace {
     display: flex;
     align-items: stretch;
     height: 100%;
+    background-color: #aaa;
+}
+x-workspace > * {
+       background-color: #ccc;
 }
 .toolbar {
     display: flex;
@@ -906,7 +911,7 @@ x-workspace {
 }
 
 .right {
-    width: 20rem;
+    width: 17rem;
     height: 100%;
     overflow: auto;
 }
@@ -916,8 +921,11 @@ x-workspace {
     flex-direction: column;
     height: 100%;
     gap: 0.4rem;
-    padding: 0.5rem;
     box-sizing: border-box;
+}
+
+.right x-form {
+    margin:0  0.4rem;
 }
 
 
@@ -998,20 +1006,20 @@ x-workspace {
     height: 100%;
 }
 
-.bottom {
-    height: 10em;;
+.right.side {
     display:flex;
+    flex-direction: column;
     background-color: #aaa;
     gap: 1px;
 }
-.bottom > * {
+.right.side > * {
     position:relative;
     background-color: #ccc;
     margin-top: 1px;
     flex-grow: 1;
 }
 
-.bottom > * > span.title {
+.right.side > * > span.title {
     padding-left: 1rem;
     background-color: #eee;
     font-weight: bold;
@@ -1035,6 +1043,10 @@ x-workspace {
 }
 .right .palette div.apply {
     flex-grow: 0;
+}
+
+.right {
+    margin-left: 1px;
 }
 
 
