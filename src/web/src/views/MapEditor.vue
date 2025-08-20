@@ -813,6 +813,12 @@ function applyChanges() {
     </div>
         </x-form>
         </div>
+        <div><span class="title">Niche</span>
+            <div class="buttons">
+            <button v-if="!focus.side_def.niche">Create</button>
+            <button v-if="focus.side_def.niche">Edit</button>
+            </div>
+        </div>
         <div class="apply"><span class="title">Apply changes</span>
         <x-form>
             <label><span>Apply to side:</span>
@@ -846,7 +852,20 @@ function applyChanges() {
     </x-form>
 </div>
 </x-workspace>
-
+<!--
+<div class="popup-lb niche">
+    <div>
+        <div style="width: 500px; height: 320px; border: 1px solid"></div>
+        <x-section>
+            <x-form>
+            <label><span>Position (X,Y):</span><div><input type="number"><input type="number"></div></label>    
+            <label><span>Size (width,height):</span><div><input type="number"><input type="number"></div></label>    
+            </x-form>
+        </x-section>
+        <div class="buttons">qqweqw</div>
+    </div>
+</div>
+-->
 <MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
 <datalist id="listOfWallAssets9875487"><option v-for="v of list_assets" :key="v" :value="v"></option></datalist>
 </template>
@@ -930,10 +949,10 @@ x-workspace > * {
 
 
 .right .palette div {
-    flex-grow: 1;    
-}
-.right .palette div:first-child {
     flex-grow: 0;    
+}
+.right .palette div:nth-child(3) {
+    flex-grow: 1;    
 }
 
 
@@ -1049,5 +1068,8 @@ x-workspace > * {
     margin-left: 1px;
 }
 
+.niche input {
+    width: 4rem
+}
 
 </style>

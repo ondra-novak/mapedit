@@ -14,6 +14,7 @@ import { SeqFile } from '@/core/seqfile';
 import { computed, onMounted, onUnmounted, reactive, ref, watch, type WatchHandle } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { messageBoxConfirm } from '@/utils/messageBox';
+import ItemList from '@/components/ItemList.vue';
 
 
 const required_files : FileItem[] =[
@@ -344,7 +345,11 @@ function saveEnemyData() {
         enm.stay_strategy = enm_f1.value;
         enm.vlajky = enm_f2.value
         enm.vlastnosti[EnemyStats.VLS_KOUZLA] = enm_eff.value;
-        enm.inv = form.inventory;
+        enm.inv = form.inventory.map(x=>x+1);
+        enm.inv = enm.inv.slice(0, 16);
+        while (enm.inv.length < 16) {
+            enm.inv.push(0);
+        }
         StatusBar.setChangedFlag(true);
     }
 
@@ -397,7 +402,7 @@ function loadEnemyData() {
         form.stat_prot_m =enm.vlastnosti[EnemyStats.VLS_MYSL]
         form.stat_reg =enm.vlastnosti[EnemyStats.VLS_HPREG]
         enm_eff.value =enm.vlastnosti[EnemyStats.VLS_KOUZLA]
-        form.inventory = enm.inv;
+        form.inventory = enm.inv.filter(x=>x).map(x=>x-1);
         loadAppearence();
         loadColors();
         save_watch.value = watch([form,enm_f1,enm_f2,enm_eff],saveEnemyData,{deep:true});        
@@ -405,34 +410,8 @@ function loadEnemyData() {
 }
 
 
-function inventory_erase(n:number) {
-    const idx = form.inventory.findIndex(x=>x==n);
-    if (idx != -1) form.inventory[idx]= 0;
-}
 
-function inventory_add(t : HTMLInputElement) {
-    if (items.value) {
-        const idx = items.value.findIndex(x=>x.jmeno == t.value);
-        if (idx != -1) {
-            const pos =form.inventory.findIndex(x=>!x);
-            if (pos != -1) {
-                form.inventory[pos] = idx+1;
-                t.value = "";
-                if (t.parentElement && t.parentElement.firstChild) t.parentElement.firstChild.textContent="";
-            }
-        }
-    }
-}
 
-function inventory_add_blur(event: Event) {
-    inventory_add(event.target as HTMLInputElement);
-}
-
-function inventory_add_press_return(event: Event) {
-    if ((event as KeyboardEvent).key == "Enter") {
-        inventory_add(event.target as HTMLInputElement);
-    }
-}
 
 watch([selected_enemy], loadEnemyData);
 
@@ -583,13 +562,7 @@ function closeAppearence() {
                     <label><span>Total experience</span><input v-model="form.exp" v-watch-range type="number" min="0" max="999999"/></label>
                     <label><span>Kill experience</span><input v-model="form.bonus_exp" v-watch-range type="number" min="0" max="999999"/></label>
                     <label><span>Inventory</span></label>
-                    <div class="inventory">
-                     <div v-for="n of form.inventory.filter(x=>x)">{{ items[n-1].jmeno }} <button @click="inventory_erase(n)">X</button></div>
-                     <div><div class="wrap"><span></span><input type="text" list="enemiesItems400" placeholder="add item"
-                        @keydown="$event=>inventory_add_press_return($event)" 
-                        @blur="$event=>inventory_add_blur($event)"
-                        oninput="this.parentElement.firstChild.textContent = this.value"></div></div>
-                     </div>
+                    <ItemList v-model="form.inventory"></ItemList>
                     
 
                 </x-form>
@@ -753,41 +726,5 @@ div.multiple > *{
     background-color: #0008;
 }
 
-.inventory {
-    margin-top: 0.4rem;
-    border: 1px solid;
-    padding: 0.4rem;
-}
-.inventory > div {
-    display: inline-block;
-    border: 1px solid;    
-    margin: 0.1rem;
-    padding: 0.1rem;
-    background-color: #EEC;
-    vertical-align: middle;;
-}
-
-.inventory .wrap {
-    position: relative;
-    height: 1rem;    
-    padding: 0.1rem;
-    padding-right: 2em;
-    vertical-align: middle;
-    min-width: 4em;
-}
-
-.inventory .wrap input{
-    position: absolute;
-    left: 2px;
-    right: 2px;
-    top:1px;
-    font-size: 1rem;
-    padding: 0;
-}
-
-.inventory  button, .inventory input {
-    border: none;
-    background-color: #EEC;
-}
 
 </style>

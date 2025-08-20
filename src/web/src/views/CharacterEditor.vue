@@ -9,8 +9,8 @@ import { PCX, PCXProfile } from '@/core/pcx';
 import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } from '@/core/items_struct';
 import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
-import CanvasView from '@/components/CanvasView.vue';
 import { messageBoxConfirm } from '@/utils/messageBox';
+import ItemList from '@/components/ItemList.vue'
 
 const missing_files : FileItem[] = [
     {name:"POSTAVY.DAT",group:AssetGroup.MAPS,ovr:true},
@@ -410,11 +410,7 @@ function onNewCreated() {
                 <label><span>Arrow type: </span><input type="number" min="0" max="255" v-watch-range v-model="selected_char.sip_druh" list="arrowTypes160"></label>
 
                 <label><span>Inventory</span><div class="inventory">
-                    <div v-for="(v,idx) of selected_char.inv">{{  get_item_name(v) }}<button @click="$event=>delete_item($event, idx)">×</button></div>
-                    <div class="input"> {{  cur_inv_item }}
-                    <input type="text" v-model="cur_inv_item" list="charactersItems81" placeholder="add item" 
-                    @keydown="$event=>add_item_to_inv_enter($event)" @change="$event=>add_item_to_inv($event)">
-                    </div>
+                    <ItemList v-model="selected_char.inv"></ItemList>
                 </div></label>
             </x-form>
         </x-section>
