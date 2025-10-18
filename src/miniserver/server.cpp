@@ -135,7 +135,6 @@ namespace server
             int opt = 1;
             setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 #endif
-
             if (bind(sockfd, rp->ai_addr, static_cast<int>(rp->ai_addrlen)) == 0)
             {
                 if (listen(sockfd, SOMAXCONN) == 0)
