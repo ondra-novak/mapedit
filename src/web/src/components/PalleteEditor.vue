@@ -223,7 +223,7 @@ watch(()=>props.palette, ()=>{
 onMounted(init);
 </script>
 <template>
-<select v-model="model_index" :size="props.listview?2:1" @dblclick="showDetail">
+<select v-model="model_index" :size="props.listview?2:1" @dblclick="showDetail" @keydown="(ev)=>{if (ev.key=='Enter') {showDetail();ev.preventDefault();}}">
     <option value="-1">(none)</option>
     <option value="-2">Add new...</option>
     <option v-for="(val, k) of global_palette.list" :key="k" :value="k"> {{ val.get_name() }}</option>

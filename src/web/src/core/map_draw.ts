@@ -1,7 +1,5 @@
 import { SVGDrawing, SVGPath, SvgTextGroupBuilder, Transform2D } from "@/utils/svg";
 import { ActionType, SectorType, SideFlag, TMA_SEND_ACTION, type MapFile } from "./map_structs";
-import type { ParsedBuildCommand } from "typescript";
-import Distributor from "./distributor";
 
 
 

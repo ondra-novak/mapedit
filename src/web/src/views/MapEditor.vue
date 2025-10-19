@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
-import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, WallConfiguration } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import MissingFiles from '@/components/MissingFiles.vue';
 import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
@@ -17,6 +17,8 @@ import svg_enemy from '@/assets/toolbar/enemy.svg'
 import PalleteEditor from '@/components/PalleteEditor.vue';
 import { messageBox } from '@/utils/messageBox';
 import { create_datalist } from '@/utils/datalist';
+import ItemList from '@/components/ItemList.vue';
+import NicheEditor from './NicheEditor.vue';
 const list_assets = ref<string[]>([]);
 
 const EditMode = {
@@ -70,6 +72,7 @@ const focus = ref<FocusItem>();
 const selection = ref<number[]>();
 const link = ref<LinkRef>();
 const applyMode = ref<number>(ApplyMode.ACTIVE.v);
+const curNiche = ref<NicheDef|null>(null);
 
 let warn_empty_tool = true;
 const mapcontainer = globalState("mapcontainer",()=>new MapContainer);
@@ -685,6 +688,45 @@ function applyChanges() {
     }
 }
 
+function create_niche() {
+    const def : NicheDef = {items:[],xpos:250,ypos:160,xs:160,ys:80};
+    curNiche.value = def;    
+}
+function open_niche() {
+    const n = focus.value;
+    if (n) {
+        const cn = shallowClone(n.side_def.niche);
+        if (cn) {
+            cn.items = shallowClone(cn.items);
+        }
+        curNiche.value = cn;
+    }
+    
+}
+function save_niche(n: NicheDef|null) {
+    const f = focus.value;
+    if (f) {
+        const mp = begin_edit();
+        mp.sectors = shallowClone(mp.sectors);
+        const sec = mp.sectors[f.sector] = shallowClone(mp.sectors[f.sector]);
+        sec.side = shallowClone(sec.side);
+        const sid = sec.side[f.side] = shallowClone(sec.side[f.side]);
+        sid.niche = n;
+        end_edit(mp);
+        updateFocusData(f.sector,f.side);
+    }
+}
+
+function save_cur_niche() {
+    save_niche(curNiche.value);
+    curNiche.value = null;
+}
+
+function delete_cur_niche() {
+    save_niche(null);
+    curNiche.value = null;
+}
+
 const ds_wallassets = create_datalist();
 watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
 
@@ -818,8 +860,8 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
         </div>
         <div><span class="title">Niche</span>
             <div class="buttons">
-            <button v-if="!focus.side_def.niche">Create</button>
-            <button v-if="focus.side_def.niche">Edit</button>
+            <button v-if="!focus.side_def.niche" @click="create_niche">Create</button>
+            <button v-if="focus.side_def.niche" @click="open_niche">Edit</button>
             </div>
         </div>
         <div class="apply"><span class="title">Apply changes</span>
@@ -855,20 +897,7 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
     </x-form>
 </div>
 </x-workspace>
-<!--
-<div class="popup-lb niche">
-    <div>
-        <div style="width: 500px; height: 320px; border: 1px solid"></div>
-        <x-section>
-            <x-form>
-            <label><span>Position (X,Y):</span><div><input type="number"><input type="number"></div></label>    
-            <label><span>Size (width,height):</span><div><input type="number"><input type="number"></div></label>                
-            </x-form>
-        </x-section>
-        <div class="buttons">qqweqw</div>
-    </div>
-</div>
--->
+<NicheEditor v-if="curNiche != null" v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus?.side_def"></NicheEditor>
 <MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
 </template>
 
@@ -1070,8 +1099,6 @@ x-workspace > * {
     margin-left: 1px;
 }
 
-.niche input {
-    width: 4rem
-}
+
 
 </style>

@@ -134,7 +134,13 @@ input, button, select {
   padding: 0.5rem;
   background-color: #bbb;
   justify-content: flex-end;
+  position: relative
 
+}
+
+.popup-lb .buttons button.left {
+  position:absolute;
+  left:0.5rem;
 }
 
 .popup-lb .buttons  > * {

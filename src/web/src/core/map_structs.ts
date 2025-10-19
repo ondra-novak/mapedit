@@ -196,7 +196,8 @@ class TNICHE extends WithSchema {
     }};;
 };
 
-type NicheDef = Omit<TNICHE, "sector" | "dir" | "reserved" | "getSchema">;
+export type NicheDef = Omit<TNICHE, "sector" | "dir" | "reserved" | "getSchema">;
+
 
 
 class TMAP_LAYOUT extends WithSchema {
