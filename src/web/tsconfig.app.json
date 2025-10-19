@@ -7,6 +7,11 @@
 
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "target": "ES2021",
+    "lib": ["ES2021", "DOM"],
   }
 }

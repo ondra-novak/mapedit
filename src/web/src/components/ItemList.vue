@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 import type { ItemDef } from '@/core/items_struct';
+import { create_datalist, type DataListItem } from '@/utils/datalist';
 import globalGetItems from '@/utils/global_item_list';
-import { onMounted, ref} from 'vue';
+import { onMounted, ref, watch} from 'vue';
 
 
 const itmlist = defineModel<number[]>();
-const list_html_id = ref('itemlist-' + Math.random().toString(36).substring(2, 9));
 const item_templates = ref<ItemDef[]>();
 const cur_inv_item = ref<string>("");
 
@@ -95,12 +95,29 @@ const filtered_items = computed(() => {
     return item_templates.value;
 });
 
+function create_list() : DataListItem[]{
+    if (!item_templates.value) return [];
+    let itms;
+    if (typeof props.filter === 'function') {
+        itms =  item_templates.value.filter(props.filter);
+    } else{
+         itms = item_templates.value;
+    }
+    return itms.map((v,idx)=>{
+        const n = `${v.jmeno.trim()} #${idx}`;
+        return {value: n};
+    })
+
+}
+
+const datalist = create_datalist(()=>create_list());
+watch(item_templates, ()=>datalist.update());
+
 </script>
 <template>
- <datalist :id="list_html_id"><option v-for="(v,idx) of filtered_items" :key="idx" :value="`${v.jmeno.trim()} #${idx}`"></option></datalist>
 <div class="itemlist"><div v-if="item_templates" v-for="(v,idx) of itmlist" :title="`#${v}`">{{ get_item_name(v) }}<button @click="$event=>delete_item($event, idx)">×</button></div>
         <div> {{  cur_inv_item }}
-        <input type="text" v-model="cur_inv_item" :list="list_html_id" placeholder="add item" 
+        <input type="text" v-model="cur_inv_item" :list="datalist.id" placeholder="add item" 
         @keydown="$event=>add_item_to_inv_enter($event)" @change="$event=>add_item_to_inv($event)">
         </div>
 </div>

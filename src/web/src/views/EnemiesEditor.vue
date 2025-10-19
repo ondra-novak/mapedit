@@ -432,7 +432,6 @@ function closeAppearence() {
 </script>
 
 <template>      
-    <datalist id="enemiesItems400"><option v-for="(n) of items.map(x=>x.jmeno).filter(x=>x)" :value="n" :key="n"></option></datalist>
     <x-workspace>
         <div class="left-panel">
             <select v-model="selected_enemy" size="20" class="enemy-list">

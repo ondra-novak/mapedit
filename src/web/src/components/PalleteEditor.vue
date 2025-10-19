@@ -6,11 +6,13 @@ import { PCX, PCXProfile } from '@/core/pcx';
 import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
 import globalState from '@/utils/global';
 import { AssetGroup } from '@/core/asset_groups';
+import type { DataListHandle } from '@/utils/datalist';
 
 const props = defineProps<{
     palette: ConfigurationPalette<AssetConfiguration>,
     type: string,
     listview: boolean,
+    wall_assets: DataListHandle
 }>();
 
 
@@ -244,9 +246,9 @@ onMounted(init);
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
                         <label><span>Name:</span><input  type="text" v-model="cur_wall.name"></label>
-                        <label><span>Front (main):</span><input  type="text" v-model="cur_wall.graphics[cur_frame][0]" list="listOfWallAssets9875487"></label>
-                        <label><span>Left :</span><input type="text" v-model="cur_wall.graphics[cur_frame][1]" list="listOfWallAssets9875487"></label>
-                        <label><span>Right :</span><input type="text" v-model="cur_wall.graphics[cur_frame][2]" list="listOfWallAssets9875487"></label>
+                        <label><span>Front (main):</span><input  type="text" v-model="cur_wall.graphics[cur_frame][0]" :list="props.wall_assets.id"></label>
+                        <label><span>Left :</span><input type="text" v-model="cur_wall.graphics[cur_frame][1]" :list="props.wall_assets.id"></label>
+                        <label><span>Right :</span><input type="text" v-model="cur_wall.graphics[cur_frame][2]" :list="props.wall_assets.id"></label>
                         <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input  type="text" v-model="cur_wall.lclip" v-watch-range min="1" max="16"></label>
                         <label><input  type="checkbox" v-model="cur_wall.transparent"><span>Transparent (can see through)</span></label>
                         <label><input  type="checkbox" v-model="cur_wall.alternate"><span>Alternating</span></label>
@@ -273,8 +275,8 @@ onMounted(init);
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
                         <label><span>Name:</span><input  type="text" v-model="cur_arc.name"></label>
-                        <label><span>Left :</span><input type="text" v-model="cur_arc.left" list="listOfWallAssets9875487"></label>
-                        <label><span>Right :</span><input type="text" v-model="cur_arc.right" list="listOfWallAssets9875487"></label>
+                        <label><span>Left :</span><input type="text" v-model="cur_arc.left" :list="props.wall_assets.id"></label>
+                        <label><span>Right :</span><input type="text" v-model="cur_arc.right" :list="props.wall_assets.id"></label>
                     </x-form>
                 </x-section>
             </div>
@@ -292,7 +294,7 @@ onMounted(init);
                     <x-section-title>Configuration</x-section-title>
                     <x-form>
                         <label><span>Name:</span><input  type="text" v-model="cur_floorceil.name"></label>
-                        <label><span>Bitmap :</span><input type="text" v-model="cur_floorceil.pixmaps[cur_frame]" list="listOfWallAssets9875487"></label>
+                        <label><span>Bitmap :</span><input type="text" v-model="cur_floorceil.pixmaps[cur_frame]" :list="props.wall_assets.id"></label>
                         <label><span>Mode: </span><select v-model="cur_floorceil.mode">
                             <option :value="-1">Animated</option>
                             <option :value="0">Single (1 frame)</option>

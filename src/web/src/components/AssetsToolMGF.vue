@@ -33,7 +33,7 @@ type RGBA = number[];
 
 let animation = new ArrayBuffer();
 let animation_pos = 0;
-let intnum = 0
+let intnum :NodeJS.Timeout;
 let palette : RGBA[] = new Array(256);
 
 function updatePalette(frame: ArrayBuffer) {
@@ -172,7 +172,7 @@ onUnmounted(cleanup);
 const selected_files = ref<FileList>();
 const new_name = ref<string>();
 const converting = ref<boolean>(false);
-let stop_req = false;
+let stop_req:boolean = false;
 
 
 function select_files(event: Event) {

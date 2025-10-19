@@ -16,7 +16,8 @@ import svg_chest from '@/assets/toolbar/chest.svg'
 import svg_enemy from '@/assets/toolbar/enemy.svg'
 import PalleteEditor from '@/components/PalleteEditor.vue';
 import { messageBox } from '@/utils/messageBox';
-const list_assets = ref<string[]>();
+import { create_datalist } from '@/utils/datalist';
+const list_assets = ref<string[]>([]);
 
 const EditMode = {
     Edit:0,
@@ -684,6 +685,8 @@ function applyChanges() {
     }
 }
 
+const ds_wallassets = create_datalist();
+watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
 
 </script>
 
@@ -738,10 +741,10 @@ function applyChanges() {
                 <option :value="SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC">Set arcs</option>                
             </select></label>
         </x-form></div>
-        <div class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall"></PalleteEditor></div>
-        <div class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc"></PalleteEditor></div>
-        <div class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor"></PalleteEditor></div>
-        <div class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil"></PalleteEditor></div>
+        <div class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></div>
     </div>
 </div>
 <div class="right side" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0">
@@ -786,8 +789,8 @@ function applyChanges() {
             <label><span>Type</span><select v-model="focus.sector_def.type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
             </select></label>
-            <label><span>Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="false" v-model="focus.sector_def.ceil" type="ceil"></PalleteEditor></label>
-            <label><span>Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="false" v-model="focus.sector_def.floor" type="floor"></PalleteEditor></label>
+            <label><span>Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="false" v-model="focus.sector_def.ceil" type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></label>
+            <label><span>Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="false" v-model="focus.sector_def.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></label>
             <label v-for="(v,k) of SectorFlagsNames" :key="k">
                 <input type="checkbox" @change="focus.sector_def.flags^=SectorFlags2[k]" :checked="(focus.sector_def.flags & SectorFlags2[k])!=0">
                 <span> {{ v }}</span>
@@ -803,9 +806,9 @@ function applyChanges() {
         </div>
         <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }} [{{ focus.sector * 4 + focus.side }}]</span>
         <x-form>
-        <label><span>Primary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.primary" type="wall"></PalleteEditor></label>
-        <label><span>Secondary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.secondary" type="wall"></PalleteEditor></label>
-        <label><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="false" v-model="focus.side_def.arc" type="arc"></PalleteEditor></label>
+        <label><span>Primary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.primary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
+        <label><span>Secondary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.secondary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
+        <label><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="false" v-model="focus.side_def.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></label>
         <div class="label"><span>Exit</span><div>
             <button :disabled="!link" @click="focus.sector_def.exit[focus.side] = link?.sector || 0">Sector {{ focus.sector_def.exit[focus.side] }}</button>
             <button :disabled="focus.sector_def.exit[focus.side] == 0" @click="focus.sector_def.exit[focus.side] = 0">X</button>
@@ -859,7 +862,7 @@ function applyChanges() {
         <x-section>
             <x-form>
             <label><span>Position (X,Y):</span><div><input type="number"><input type="number"></div></label>    
-            <label><span>Size (width,height):</span><div><input type="number"><input type="number"></div></label>    
+            <label><span>Size (width,height):</span><div><input type="number"><input type="number"></div></label>                
             </x-form>
         </x-section>
         <div class="buttons">qqweqw</div>
@@ -867,7 +870,6 @@ function applyChanges() {
 </div>
 -->
 <MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
-<datalist id="listOfWallAssets9875487"><option v-for="v of list_assets" :key="v" :value="v"></option></datalist>
 </template>
 
 

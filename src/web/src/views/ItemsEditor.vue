@@ -10,6 +10,7 @@ import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
 import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import StatusBar from '@/core/status_bar_control'
+import { create_datalist } from '@/utils/datalist';
 
 
 const required_files: FileItem[] = [
@@ -25,10 +26,10 @@ const appearence = shallowRef<PCX>();
 const preview_canvas = ref<HTMLCanvasElement|null>(null);
 const change_icon_model = ref<number>();
 
-const allIcons = shallowRef<PCX[]>();
-const allImagesList = shallowRef<string[]>();
-const allSoundsList = shallowRef<string[]>();
-const allAnimationsList = shallowRef<string[]>();
+const allIcons = shallowRef<PCX[]>([]);
+const allImagesList = shallowRef<string[]>([]);
+const allSoundsList = shallowRef<string[]>([]);
+const allAnimationsList = shallowRef<string[]>([]);
 
 const left_hand_place = ref<HTMLCanvasElement|null>(null);
 const right_hand_place = ref<HTMLCanvasElement|null>(null);
@@ -383,6 +384,17 @@ function save() {
 onMounted(init);
 onUnmounted(StatusBar.onFinalSave);
 
+const ds_graphics = create_datalist();
+const ds_sounds = create_datalist();
+const ds_animations = create_datalist();
+const ds_keys = create_datalist();
+const ds_arrows = create_datalist();
+watch(allImagesList, ()=>ds_graphics.update(()=>allImagesList.value.map(x=>({value:x}))));
+watch(allSoundsList, ()=>ds_sounds.update(()=>allSoundsList.value.map(x=>({value:x}))));
+watch(allAnimationsList, ()=>ds_animations.update(()=>allAnimationsList.value.map(x=>({value:x}))));
+watch(allKeys, ()=>ds_keys.update(()=>allKeys.value.map(x=>({value:x.id.toString(),label:x.name}))));
+watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.toString() || "0",label:x.name}))));
+
 </script>
 <template>
     <x-workspace>
@@ -405,23 +417,6 @@ onUnmounted(StatusBar.onFinalSave);
             <button @click="addItem">New / Clone</button>
         </div>
     </div>
-
-    <datalist id="itemsGraphics185">
-    <option v-for="f of allImagesList" :value="f" :key="f"></option>
-    </datalist>
-
-    <datalist id="itemsSounds189">
-    <option v-for="f of allSoundsList" :value="f" :key="f"></option>
-    </datalist>
-    <datalist id="itemsAnimations194">
-    <option v-for="f of allAnimationsList" :value="f" :key="f"></option>
-    </datalist>
-    <datalist id="itemsKeys323">
-        <option v-for="f of allKeys" :value="f.id"> {{  f.name }}</option>
-    </datalist>
-    <datalist id="itemsArrows345">
-        <option v-for="f of allArrows" :value="f.id"> {{  f.name }}</option>
-    </datalist>
 
     <div class="editor-bgr">
     <div class="editor" v-if="selected_item !== undefined">
@@ -450,7 +445,7 @@ onUnmounted(StatusBar.onFinalSave);
                 <label><span>Wear on</span><select  v-model="form.umisteni">
                     <option v-for="(n, v) of ItemWearPlaceName" :key="v" :value="v"> {{  n }}</option>
                 </select></label>
-                <label v-if="form.umisteni == ItemWearPlace.PL_SIP"><span>Arrow type</span><input type="number" list="itemsArrows345" v-model="form.arrow_type" v-watch-range min="0" max="255"/></label>
+                <label v-if="form.umisteni == ItemWearPlace.PL_SIP"><span>Arrow type</span><input type="number" :list="ds_arrows.id" v-model="form.arrow_type" v-watch-range min="0" max="255"/></label>
                 <label v-if="form.umisteni == ItemWearPlace.PL_SIP"><span>Count arrows</span><input type="number"  v-model="form.user_value" v-watch-range min="0" max="99"/></label>
                 <label v-if="form.umisteni == ItemType.TYP_UTOC || form.umisteni == ItemType.TYP_STRELNA || form.umisteni == ItemType.TYP_VRHACI" ><span>Weapon type</span><select  v-model="form.typ_zbrane">
                     <option v-for="(n, v) of WeaponTypeName" :key="v" :value="v"> {{  n }}</option>
@@ -478,7 +473,7 @@ onUnmounted(StatusBar.onFinalSave);
                     <option :value=1>Enabled</option>
                     <option :value=-1>Picklock</option>
                 </select></div></label>
-                <label v-if="key_mode == 1"><span>Lock/Key reference ID</span><input type="number"   v-model="form.keynum" list="itemsKeys323"/></label>                    
+                <label v-if="key_mode == 1"><span>Lock/Key reference ID</span><input type="number"   v-model="form.keynum" :list="ds_keys.id"/></label>                    
                 <label v-if="key_mode == -1"><span>Picklock bonus</span><input type="number"   v-model="negative_keylock_id"/></label>                    
             </x-form>
         </x-section>
@@ -503,12 +498,12 @@ onUnmounted(StatusBar.onFinalSave);
             <x-section>
                 <x-section-title>Assets</x-section-title>
                 <x-form>
-                    <label><span>On ground</span><input list="itemsGraphics185" v-model="form.vzhled_on_ground"/></label>
-                    <label><span>On male</span><input list="itemsGraphics185" v-model="form.vzhled_on_male" /></label>
-                    <label><span>On female</span><input list="itemsGraphics185" v-model="form.vzhled_on_female" /></label>
-                    <label><span>Sound on impact</span><input list="itemsSounds189" v-model="form.sound_file"/></label>
+                    <label><span>On ground</span><input :list="ds_graphics.id" v-model="form.vzhled_on_ground"/></label>
+                    <label><span>On male</span><input :list="ds_graphics.id" v-model="form.vzhled_on_male" /></label>
+                    <label><span>On female</span><input :list="ds_graphics.id" v-model="form.vzhled_on_female" /></label>
+                    <label><span>Sound on impact</span><input :list="ds_sounds.id" v-model="form.sound_file"/></label>
                     <template v-if="(form.druh == ItemType.TYP_UTOC || form.druh == ItemType.TYP_STRELNA || form.druh == ItemType.TYP_VRHACI) && (form.umisteni == ItemWearPlace.PL_RUKA || form.umisteni == ItemWearPlace.PL_OBOUR)">
-                    <label><span>Wpn. anim.</span><input list="itemsAnimations194"  v-model="form.weapon_animation_file"/></label>                
+                    <label><span>Wpn. anim.</span><input :list="ds_animations.id"  v-model="form.weapon_animation_file"/></label>                
                     <label><span>Hit frame</span><input type="number" v-watch-range min="0" max="100" v-model="form.hitpos"></label>
                     </template>
                 </x-form>
@@ -539,28 +534,28 @@ onUnmounted(StatusBar.onFinalSave);
             <x-section-title>When flying</x-section-title>
             <x-form>
                 <label><span>Front</span><div>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[0]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[1]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[2]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[3]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[0]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[1]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[2]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[3]"/>
                     </div></label>
                 <label><span>Left/Right</span><div>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[4]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[5]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[6]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[7]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[4]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[5]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[6]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[7]"/>
                     </div></label>
                 <label><span>Back</span><div>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[8]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[9]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[10]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[11]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[8]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[9]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[10]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[11]"/>
                     </div></label>
                 <label><span>Destroy</span><div>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[12]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[13]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[14]"/>
-                        <input list="itemsGraphics185" v-model="form.v_letu_files[15]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[12]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[13]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[14]"/>
+                        <input :list="ds_graphics.id" v-model="form.v_letu_files[15]"/>
                     </div></label>
             </x-form>
         </x-section>

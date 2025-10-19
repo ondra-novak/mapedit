@@ -8,18 +8,19 @@ import {type ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
 import { spellsFromArrayBuffer, SpellCommandsArgs ,type TKouzlo, SpellArgument, spellsToArrayBuffer } from '@/core/spell_structs';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
+import { create_datalist } from '@/utils/datalist';
 
 const required_files: FileItem[] = [
     {group:AssetGroup.MAPS,name:"ITEMS.DAT",ovr:true},
     {group:AssetGroup.MAPS,name:"KOUZLA.DAT",ovr:true}
 ];
 
-const spell_list = ref<TKouzlo[]>();
+const spell_list = ref<TKouzlo[]>([]);
 const current_spell = ref<TKouzlo>();
 
-const item_list = ref<ItemDef[]>();
-const all_sounds = ref<string[]>();
-const all_animations = ref<string[]>();
+const item_list = ref<ItemDef[]>([]);
+const all_sounds = ref<string[]>([]);
+const all_animations = ref<string[]>([]);
 
 const TargetType = [
     "self",
@@ -219,14 +220,20 @@ watch(cur_spell_trackon, ()=>{
 
 watch(spell_list, ()=>StatusBar.setChangedFlag(true),{deep:true});
 
+const ds_spellAnim = create_datalist();
+const ds_spellSounds = create_datalist();
+const ds_spellItems = create_datalist();
+const ds_spellCommands = create_datalist(()=>Object.keys(SpellCommandsArgs).map(k=>({value:k})));
+
+watch(all_animations, (nv)=>ds_spellAnim.update(()=>nv.map(v=>({value:v}))));
+watch(all_sounds, (nv)=>ds_spellSounds.update(()=>nv.map(v=>({value:v}))));
+watch(item_list, (nv)=>ds_spellItems.update(()=>nv.map((v,id)=>({value:v.jmeno, label:`${v.jmeno} #${id}`}))));
+
+
 
 </script>
 
 <template>
-    <datalist id="spellEditorAnim91"><option v-for="v in all_animations" :key="v" :value="v"></option></datalist>
-    <datalist id="spellEditorSounds92"><option v-for="v in all_sounds" :key="v" :value="v"></option></datalist>
-    <datalist id="spellEditorItems93"><option v-for="(v,id) in item_list" :key="v.jmeno" :value="`${v.jmeno} #${id}`"></option></datalist>    
-    <datalist id="spellEditorCommands183"><option v-for="(v,id) of SpellCommandsArgs" :key="id" :value="id"></option></datalist>
     <x-workspace>
         <h1>Rune spells</h1>
         <table class="spell-list">
@@ -307,10 +314,10 @@ watch(spell_list, ()=>StatusBar.setChangedFlag(true),{deep:true});
                             <td><template v-for="(a, id) of v.args" :key="id">                                                        
                                 <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Number" v-model="v.args[id]" type="number">
                                 <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Percent" v-model="v.args[id]" type="number">
-                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.AnimationFile" v-model="v.args[id]" type="text" list="spellEditorAnim91">
-                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.SoundFile" v-model="v.args[id]" type="text" list="spellEditorSounds92">
+                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.AnimationFile" v-model="v.args[id]" type="text" :list="ds_spellAnim.id">
+                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.SoundFile" v-model="v.args[id]" type="text" :list="ds_spellSounds.id">
                                 <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Item" 
-                                    type="text" :value="`${(item_list && item_list[a as number] && item_list[a as number].jmeno)||'???'} #${a}`" @change="$event=>findItem($event, v.args, id)" list="spellEditorItems93">
+                                    type="text" :value="`${(item_list && item_list[a as number] && item_list[a as number].jmeno)||'???'} #${a}`" @change="$event=>findItem($event, v.args, id)" :list="ds_spellItems.id">
                                 <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Element" v-model="v.args[id]" >
                                     <option v-for="(v,id) of ElementTypeName" :key="id" :value="id"> {{ v }}</option>
                                 </select>
@@ -324,7 +331,7 @@ watch(spell_list, ()=>StatusBar.setChangedFlag(true),{deep:true});
                             <td>
                                 <button @click="current_spell!.script!.splice(id,1)">🞬</button></td>
                         </tr>
-                        <tr><td> {{ current_spell.script!.length }}</td><td colspan="2"><input type="text" list="spellEditorCommands183"
+                        <tr><td> {{ current_spell.script!.length }}</td><td colspan="2"><input type="text" :list="ds_spellCommands.id"
                             @change="$event=>validateCommand($event)" @keydown="$event=>validateCommandEnter($event)"></td></tr>
                     </tbody>
                 </table>

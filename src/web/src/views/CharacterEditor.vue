@@ -11,6 +11,7 @@ import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName, 
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue'
+import { create_datalist, type DataListHandle } from '@/utils/datalist';
 
 const missing_files : FileItem[] = [
     {name:"POSTAVY.DAT",group:AssetGroup.MAPS,ovr:true},
@@ -331,7 +332,7 @@ async function delete_char(index: number) {
 const HumanPlaceToWearPlace = [
 /*BATOH: 0,*/ ItemWearPlace.PL_BATOH,
 /*TELO_H: 1,*/ ItemWearPlace.PL_TELO_H,
-/*TELO_D: 2,*/ ItemWearPlace.PL_TELO_L,
+/*TELO_D: 2,*/ ItemWearPlace.PL_TELO_D,
 /*HLAVA: 3,*/ ItemWearPlace.PL_HLAVA,
 /*NOHY: 4,*/ ItemWearPlace.PL_NOHY,
 /*KUTNA: 5,*/ ItemWearPlace.PL_KUTNA,
@@ -350,15 +351,25 @@ function onNewCreated() {
     postavy.value = [];
 }
 
+const dl_wearitems = Object.keys(ItemWearPlace).reduce((v,k)=>{
+    v[ItemWearPlace[k]] = create_datalist();    return v;
+},[] as DataListHandle[]);
+const dl_arrowlist = create_datalist();
+
+watch(items, ()=>{
+    dl_wearitems.forEach((dl, idx)=>{
+        dl.update(()=>{
+            return items.value.filter(itm=>itm.umisteni == idx)
+                .map(itm=>({value:itm.jmeno.trim()}))
+        })
+    });
+    dl_arrowlist.update(()=>items.value.filter(x=>x.umisteni == ItemWearPlace.PL_SIP)
+        .map((v,idx)=>({value:v.druh_sipu.toString(), label:v.jmeno})))
+})
+
 </script>
 
 <template>
-    <datalist id="charactersItems81"><option v-for="(v,idx) of items" :key="idx" :value="v.jmeno.trim()"></option></datalist>
-    <template v-for="pos of ItemWearPlace" :key="pos">
-        <datalist :id="`charWearList339-${pos}`"><option v-for="(v,idx) of items.filter(itm=>itm.umisteni == pos)" :key="idx" :value="v.jmeno"></option></datalist>
-    </template>
-    <datalist id="arrowTypes160"><option v-for="(v,idx) of items.filter(x=>x.druh_sipu)" :key="idx" :value="v.druh_sipu"> {{ v.jmeno}}</option></datalist>
-
     <x-workspace>
     <div class="top-panel">
         <div v-for="(p,idx) of postavy" :key="idx" @click="selected = idx" :class="{selected: selected == idx}">
@@ -401,13 +412,13 @@ function onNewCreated() {
             <x-section-title>Wears</x-section-title>
             <x-form>
                 <label v-for="(v,idx) of HumanWearPlaceName" :key="idx"><span>{{ v }}</span>
-                    <input type="text" :list="`charWearList339-${HumanPlaceToWearPlace[idx]}`" :value="get_item_name(selected_char.wearing[idx])"
+                    <input type="text" :list="dl_wearitems[HumanPlaceToWearPlace[idx]]?.id" :value="get_item_name(selected_char.wearing[idx])"
                     @change="$event=>set_item_by_name($event, selected_char!.wearing, idx)"></label>
                 <label v-for="idx in [0,1,2,3]" :key="idx"><span>Ring {{ idx }}</span>
-                    <input type="text" :list="`charWearList339-${HumanPlaceToWearPlace[9]}`" :value="get_item_name(selected_char.rings[idx])"
+                    <input type="text" :list="dl_wearitems[HumanPlaceToWearPlace[9]]?.id" :value="get_item_name(selected_char.rings[idx])"
                     @change="$event=>set_item_by_name($event, selected_char!.rings, idx)"></label>
                 <label><span>Count arrows: </span><input type="number" min="0" max="99" v-watch-range v-model="selected_char.sipy"></label>
-                <label><span>Arrow type: </span><input type="number" min="0" max="255" v-watch-range v-model="selected_char.sip_druh" list="arrowTypes160"></label>
+                <label><span>Arrow type: </span><input type="number" min="0" max="255" v-watch-range v-model="selected_char.sip_druh" :list="dl_arrowlist.id"></label>
 
                 <label><span>Inventory</span><div class="inventory">
                     <ItemList v-model="selected_char.inv"></ItemList>
