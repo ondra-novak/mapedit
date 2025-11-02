@@ -296,15 +296,15 @@ export function splitArrayBuffer(arr: ArrayBuffer , separator: number) : ArrayBu
   return result;
 }
 
-export function joinUint8Arrays(arrays: ArrayBuffer[], separator : number) {
+export function joinUint8Arrays(arrays: ArrayBuffer[], separator : number) : Uint8Array<ArrayBuffer>{
   if (!Array.isArray(arrays) || arrays.length === 0) return new Uint8Array();
 
-  const sep =  new Uint8Array([separator]);
+  const sep =  Uint8Array.from([separator]);
 
   const totalLength = arrays.reduce((sum, a) => sum + a.byteLength, 0) +
     sep.length * (arrays.length-1);
 
-  const result : Uint8Array = new Uint8Array(totalLength);
+  const result  = new Uint8Array(new ArrayBuffer(totalLength));
   let offset = 0;
 
   arrays.forEach((arr:ArrayBuffer, index:number) => {

@@ -68,6 +68,25 @@ const ApplyMode = {
     WEST:{t:"West ←",v:3},
 };
 
+const ActionEvent = [
+"Before pass", //MC_PASSSUC 0x1
+"On hit wall", //MC_PASSFAIL 0x2
+"On touch", //MC_TOUCHSUC 0x4
+"Not valid lock", //MC_TOUCHFAIL 0x8
+"Lock info", //MC_LOCKINFO 0x10
+"After pass", //MC_EXIT 0x20
+"On message", //MC_INCOMING 0x40
+"On start level", //MC_STARTLEV 0x80
+"On close door", //MC_CLOSEDOOR 0x100
+"On anim frame", //MC_ANIM  0x200
+"On odd anim frame", //MC_ANIM2 0x400
+"On message applied", //MC_SUCC_DONE 0x800
+"On specproc", //MC_SPEC_SUCC 0x1000
+"On open door", //MC_OPENDOOR 0x2000
+"On modify niche", //MC_VYKEVENT 0x4000
+"On attack wall", //MC_WALLATTACK 0x8000
+]
+
 const focus = ref<FocusItem>();
 const selection = ref<number[]>();
 const link = ref<LinkRef>();
@@ -858,12 +877,6 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
     </div>
         </x-form>
         </div>
-        <div><span class="title">Niche</span>
-            <div class="buttons">
-            <button v-if="!focus.side_def.niche" @click="create_niche">Create</button>
-            <button v-if="focus.side_def.niche" @click="open_niche">Edit</button>
-            </div>
-        </div>
         <div class="apply"><span class="title">Apply changes</span>
         <x-form>
             <label><span>Apply to side:</span>
@@ -875,6 +888,25 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
             </label>
             <button class="big-apply" @click="applyChanges">Apply</button>
         </x-form>
+        </div>
+        <div><span class="title">Niche</span>
+            <div class="buttons">
+            <button v-if="!focus.side_def.niche" @click="create_niche">Create</button>
+            <button v-if="focus.side_def.niche" @click="open_niche">Edit</button>
+            </div>
+        </div>
+        <div class="maevents"><span class="title">Scripts (Multiactions)</span>
+            <div>
+                <div v-for="(item,idx) of focus.side_def.actions.list" :key="item.event" class="itm"> 
+                    <input type="checkbox"></input>
+                    <span>{{  ActionEvent[item.event] }}</span>
+                    <div>                        
+                        <button><img src="@/assets/toolbar/pencil.svg"></button>
+                        <button><img src="@/assets/toolbar/eraser.svg"></button>
+                    </div>
+                </div>
+            </div>
+            <div class="buttons"><button>+</button><button><img src="@/assets/toolbar/eraser.svg"></button></div>
         </div>
         
 
@@ -897,7 +929,7 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
     </x-form>
 </div>
 </x-workspace>
-<NicheEditor v-if="curNiche != null" v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus?.side_def"></NicheEditor>
+<NicheEditor v-if="curNiche != null" v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus!.side_def"></NicheEditor>
 <MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
 </template>
 
@@ -982,10 +1014,6 @@ x-workspace > * {
 .right .palette div {
     flex-grow: 0;    
 }
-.right .palette div:nth-child(3) {
-    flex-grow: 1;    
-}
-
 
 .right .palette > div.h {
     display: flex;
@@ -1092,11 +1120,48 @@ x-workspace > * {
     font-size: 1.5rem;
 }
 .right .palette div.apply {
-    flex-grow: 0;
+    flex-grow: 1;
 }
 
 .right {
     margin-left: 1px;
+}
+.maevents .itm {
+    display:flex;
+    padding-bottom: 0.1rem;
+    margin-bottom: 0.1rem;
+    border-bottom: 1px dotted;
+    cursor: pointer;
+}
+
+.maevents .itm:hover {
+    background-color: white;
+}
+
+.maevents .itm > *:nth-child(2) {
+    flex-grow: 1;
+}
+.maevents .itm > * {
+    height: 1rem;
+}
+.maevents  img {
+    height: 100%;
+}
+.maevents .itm button {
+    padding: 0;
+    width: 2rem;
+    height: 1.5rem;    
+}
+.maevents .buttons {
+    text-align: right;
+}
+.maevents .buttons > *{
+    width: 2rem;
+    height: 2rem;
+    margin: 0 0.2rem;
+    vertical-align: top;
+    padding: 0;
+    font-weight: bold;
 }
 
 

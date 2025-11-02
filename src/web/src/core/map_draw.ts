@@ -125,15 +125,18 @@ export class MapDraw {
                         }
                     }
                     if (sd.actions) {
-                        sd.actions.forEach(ma=>{
-                            if (ma.getAction() == ActionType.SENDA) {
-                                const senda = ma as TMA_SEND_ACTION;
-                                const ts = m.sectors[senda.sector];
-                                if (senda.sector && ts.level == level) {
-                                    const smx = this.transformByDir(ts.x, ts.y, senda.side);
-                                    if (smx) {
-                                        this.drawActionFromWall(set.arrow.from_other,mx,smx);
-                                    }                                    
+                        sd.actions.list.forEach(ma=>{
+                            for (const id in ma.flow) {
+                                const itm = ma.flow[id].item;
+                                if (itm && itm.getAction() == ActionType.SENDA) {
+                                    const senda = itm as TMA_SEND_ACTION;
+                                    const ts = m.sectors[senda.sector];
+                                    if (senda.sector && ts.level == level) {
+                                        const smx = this.transformByDir(ts.x, ts.y, senda.side);
+                                        if (smx) {
+                                            this.drawActionFromWall(set.arrow.from_other,mx,smx);
+                                        }                                    
+                                    }
                                 }
                             }
                         })
@@ -289,20 +292,23 @@ export class MapDraw {
                         }
                     }
                 }
-                if (sd.actions && sd.actions.length) {
+                if (sd.actions && sd.actions.list.length) {
                     this.drawAction(set.action.script, mx);
-                    sd.actions.forEach(ma=>{
-                        if (ma.getAction() == ActionType.SENDA) {
-                            const senda = ma as TMA_SEND_ACTION;
-                            if (senda.sector != sector && senda.sector) {
-                                const ts = m.sectors[senda.sector];
-                                const tmx = this.transformByDir(ts.x, ts.y, senda.side);
-                                if (tmx) {
-                                    this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                    sd.actions.list.forEach(ma=>{
+                        for (const id in ma.flow) {
+                            const item = ma.flow[id].item;
+                            if (item && item.getAction() == ActionType.SENDA) {
+                                const senda = item as TMA_SEND_ACTION;
+                                if (senda.sector != sector && senda.sector) {
+                                    const ts = m.sectors[senda.sector];
+                                    const tmx = this.transformByDir(ts.x, ts.y, senda.side);
+                                    if (tmx) {
+                                        this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                                    }
                                 }                                    
                             }
                         }
-                    })
+                    });
                 }
                 if (sd.items.length) {
                     this.drawItems(set.items.placed,mx);
