@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { ArcConfiguration, create_action_instance, MAScriptList, TMA_GEN } from '@/core/map_structs';
+import { server } from '@/core/api';
+import { AssetGroup } from '@/core/asset_groups';
+import {  create_action_instance, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
+import { readWavInfoFromBuffer } from '@/core/sound_info';
+import { create_datalist, type DataListHandle } from '@/utils/datalist';
 import { computed, onMounted, ref, watch } from 'vue';
+import ItemList from './ItemList.vue';
+
+const directions = ["North ↑","East →","South ↓","West ←"];
 
 const ActionEvent = [
 ["On interaction",  0x4, "Interaction with the wall - mouse click or spacebar. If there is secondary wall defined, the player must click on the secondary wall"],
@@ -30,7 +37,7 @@ const ActionName = [
 [1,"Play sound",true,"Play sound on this side"],              //    SOUND: 1,
 [2,"Show test (global)",false,"Display message, use global stringtable"],                //    TEXTG: 2,
 [3,"Show text",true,"Display message"],             //    TEXTL: 3,
-[4,"Send action",true,"Send action to other side"],             //    SENDA: 4,
+[4,"Send message",true,"Send a message to a different place in current level to invoke some effect"],             //    SENDA: 4,
 [5,"Throwing trap",true,"Makes object throwing trap. When triggered an object is throwing from the wall"],               //    FIREB: 5,
 [6,"Destroy item",true,"Destroyes item currently held in mouse cursor"],                //    DESTI: 6,
 [7,"Load map",true,"Loads different map, transfers player to different map"],              //    LOADL: 7,
@@ -71,12 +78,93 @@ const ActionNameMap = ActionName.reduce((a,b)=>{
     return a;
 },[] as string[]);
 
+const globalEvents = [
+  "Before leaving the map",
+  "Before falling asleep",
+  "After waking up",
+  "Before saving",
+  "After saving",
+  "Before casting a spell",
+  "After casting a spell",
+  "Map opened",
+  "Map closed",
+  "Before battle",
+  "After battle",
+  "Book opened",
+  "Book closed",
+  "Every turn",
+  "Male character death",
+  "Female character death",
+  "All characters dead",
+  "Male character injured",
+  "Female character injured",
+  "Rune picked up",
+  "Item picked up",
+  "Step taken",
+  "Turned around",
+  "Alarm",
+  "Fire magic",
+  "Water magic",
+  "Earth magic",
+  "Air magic",
+  "Mind magic",
+  "On spell 1 <param=id>",
+  "On spell 2 <param=id>",
+  "On spell 3 <param=id>",
+  "On spell 4 <param=id>",
+  "On spell 5 <param=id>",
+  "On spell 6 <param=id>",
+  "On spell 7 <param=id>",
+  "On spell 8 <param=id>",
+  "On spell 9 <param=id>",
+  "Timer 1 <turns/-time>",
+  "Timer 2 <turns/-time>",
+  "Timer 3 <turns/-time>",
+  "Timer 4 <turns/-time>",
+  "Flute melody 1 <melody id>",
+  "Flute melody 2 <melody id>",
+  "Flute melody 3 <melody id>",
+  "Flute melody 4 <melody id>",
+  "Flute melody 5 <melody id>",
+  "Flute melody 6 <melody id>",
+  "Flute melody 7 <melody id>",
+  "Flute melody 8 <melody id>",
+] as const;
 
+const WoundType = [
+    "Non resistable damage",
+    "Psychical attack",
+    "Fire damage",
+    "Water damage",
+    "Earth damage",
+    "Air damage",
+    "Mind damage"
+] as const;
 
 type ActionList = TMA_GEN[];
 
 const script = defineModel<ActionList>();
 const cur_event = ref<number>(0);
+const list_of_sounds = ref<HTMLInputElement>();
+const list_of_items = ref<HTMLInputElement>();
+let cur_datalist:DataListHandle|null = null;
+
+watch(list_of_sounds,()=>{
+    const el = list_of_sounds.value;
+    if (el) {
+        cur_datalist =  create_datalist(async ()=>{
+            const files = await server.getDDLFiles(AssetGroup.SOUNDS,null);
+            return files.files.map(x=>({
+                value: x.name
+            }));
+        });
+        el.setAttribute("list", cur_datalist.id);
+    }
+})
+
+
+function dl_all_sounds() {
+}
 
 
 const last_selected_event_desc = computed(()=>{
@@ -85,6 +173,10 @@ const last_selected_event_desc = computed(()=>{
 })
 const last_selected_command_desc = computed(()=>{
     const itm = ActionName.find(x=>x[0] == last_selected_command.value);
+    return itm?itm[3]:"";
+})
+const focused_command_desc = computed(()=>{
+    const itm = ActionName.find(x=>x[0] == focused_item.value?.header.action);
     return itm?itm[3]:"";
 })
 
@@ -103,6 +195,7 @@ function prepareList() {
     console.log(events);
     event_list.value = events;
 }
+
 
 onMounted(()=>{
     prepareList();
@@ -127,6 +220,7 @@ function open_close(cat:string) {
 
 const dialog_add_item = ref<HTMLDialogElement>();
 const dialog_clone_item = ref<HTMLDialogElement>();
+const dialog_editor = ref<HTMLDialogElement>();
 
 function add_new_item() {
     if (last_selected_command.value && last_selected_event.value) {
@@ -134,6 +228,7 @@ function add_new_item() {
         const itm = create_action_instance(last_selected_command.value, last_selected_event.value)
         script.value = [ ... (script.value || []), itm];
         focused_item.value = itm;
+        dialog_editor.value!.show();
     
     }
     dialog_add_item.value!.close();
@@ -179,6 +274,83 @@ function move_item(dir: number) {
     script.value = [...s1.slice(0,t), f, ...s1.slice(t)];
 }
 
+watch(focused_item, ()=>{
+    const dlg = dialog_editor.value!;
+    if (!focused_item.value) {
+        dlg.close();
+    } else {
+        if (dlg.open) {
+            dlg.close();
+            setTimeout(()=>dlg.show(),1);
+        }
+    }
+})
+
+const focused_action = computed(()=>focused_item.value?focused_item.value.header.action:0);
+
+
+function print_action_flags(action: TMA_GEN) {
+    const flags : string[] = [];
+    if (action.header.once) flags.push("①");
+    if (action.header.cancel) flags.push("✘");
+    if (flags.length) {
+        return " "+flags.join("");
+    } else {
+        return "";
+    }
+}
+
+async function fill_sound_info() {
+    const f = focused_item.value as TMA_SOUND
+    if (!f) return;
+    try {
+        const blob = await server.getDDLFile(f.filename);
+        const info = readWavInfoFromBuffer(blob);
+        f.snd_flags.bit16 = info.bitsPerSample == 16?1:0;
+        f.end_loop = info.numSamples;
+        f.start_loop = info.numSamples;
+        f.freq = info.sampleRate;        
+    } catch (e) {
+        console.warn(e);
+    }
+}
+
+async function play_sound() {
+    const f = focused_item.value as TMA_SOUND
+    if (!f) return;
+    try {
+        const data = await server.getDDLFile(f.filename);
+        const type = f.filename.toLocaleUpperCase().endsWith(".MP3")?"mpeg":"wav";
+        const blob = new Blob([data], { type: "audio/"+type });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.play();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function create_computed_select_item<T>(field: keyof T) {
+    return computed({
+    get:()=>{
+        const ret : number[] = [];
+        const f = focused_item.value as T;
+        if (f && f[field] !== null) ret.push(f[field] as number);
+        return ret;
+    },
+    set(newval) {
+        const f = focused_item.value as T;
+        if (f) {
+            if (newval.length) (f[field] as number|null) = newval[newval.length-1];
+            else (f[field] as number|null) = null;
+        }
+    }
+})
+}
+const item_list_TMA_DROPITM = create_computed_select_item<TMA_DROPITM>("item");
+const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
+
+
 </script>
 
 <template>
@@ -187,9 +359,10 @@ function move_item(dir: number) {
     <div v-for="(x, cat) of event_list" :key="cat" :class="{'tree-node': true, opened: !!(ActionEventToBin[cat] & opened_events)}">
         <div @click="open_close(cat)" class="event-name" > {{  cat }}</div>
         <template v-if="!!(ActionEventToBin[cat] & opened_events)">
-            <div v-for="(y,idx) of x" :key="idx" class="item" :class="{focused: y == focused_item}" @click="focused_item =y">
-                {{ ActionNameMap[y.getAction()]}}
-                <div class="buttonx" @click="erase_item(y, cat)"></div>
+            <div v-for="(y,idx) of x" :key="idx" class="item" :class="{focused: y == focused_item}" 
+                @click="if(focused_item ==y) dialog_editor!.show(); else focused_item =y">
+                {{ ActionNameMap[y.header.action]}} {{ print_action_flags(y) }}
+                <div class="buttonx" @click="(ev:Event) => {erase_item(y, cat);ev.stopPropagation()}"></div>
             </div>
         </template>
     </div>
@@ -211,7 +384,7 @@ function move_item(dir: number) {
                 <option v-for="x of ActionEvent" :key="x[0]" :value="x[1]"> {{  x[0] }} </option>
             </select>
             </div>
-            <p class="note"> {{ last_selected_event_desc }}</p>
+            <p class="note spc"> {{ last_selected_event_desc }}</p>
         </div>
         <div>
             <div>Command</div>
@@ -221,7 +394,7 @@ function move_item(dir: number) {
                 </template>
                 </select>
             </div>        
-            <p class="note"> {{ last_selected_command_desc }}</p>
+            <p class="note spc"> {{ last_selected_command_desc }}</p>
         </div>
     </div>
     <footer>
@@ -230,7 +403,7 @@ function move_item(dir: number) {
     </footer>
 </dialog>
 
-<dialog ref="dialog_clone_item" class="add">
+<dialog ref="dialog_clone_item" class="clone">
     <header>Clone command</header>
     <div>
         <div>
@@ -239,7 +412,7 @@ function move_item(dir: number) {
                 <option v-for="x of ActionEvent" :key="x[0]" :value="x[1]"> {{  x[0] }} </option>
             </select>
             </div>
-            <p class="note"> {{ last_selected_event_desc }}</p>
+            <p class="note spc"> {{ last_selected_event_desc }}</p>
         </div>
     </div>
     <footer>
@@ -248,6 +421,97 @@ function move_item(dir: number) {
     </footer>
 </dialog>
 
+<dialog ref="dialog_editor" class="editor">
+    <header>Edit command: {{  ActionNameMap[focused_item?.header.action || 0] }}</header>
+    <template v-if="focused_item">
+        <x-form>
+            <label><input type="checkbox" v-model="focused_item.header.once"><span>Once - execute only once</span></label>
+            <label><input type="checkbox" v-model="focused_item.header.cancel"><span>Stop - if executed, do not continue to next command</span></label>
+            <p class="note"> {{  focused_command_desc  }}</p>
+        <template v-if="(focused_item instanceof TMA_SOUND)">       
+            <label><span>Sound file</span><input type="search" ref="list_of_sounds" v-model="focused_item.filename" maxlength="12" @input="fill_sound_info"></label>                    
+            <label><span>Volume</span><input type="number" v-model="focused_item.volume" min="0" max="100" v-watch-range></label>                    
+            <label><span>Pitch -freq Hz</span><input type="number" v-model="focused_item.freq" v-watch-range min="0" max="99999"></label>                    
+            <label><span>Start loop</span><input type="number" v-model="focused_item.start_loop" v-watch-range min="0" max="999999999"></label>                    
+            <label><span>End loop</span><input type="number" v-model="focused_item.end_loop" v-watch-range min="0" max="999999999"></label>                    
+            <label><span>Start offset</span><input type="number" v-model="focused_item.offset" v-watch-range min="0" max="999999999"></label>                    
+            <label><span>Track (0=none)</span><input type="number" v-model="focused_item.soundid" min="0" max="100" v-watch-range></label>                    
+            <label><input type="checkbox" v-model="focused_item.snd_flags.bit16"><span>16bit</span></label>
+            <label><input type="checkbox" v-model="focused_item.snd_flags.mute_close"><span>Mute when animation going backward</span></label>
+            <label><input type="checkbox" v-model="focused_item.snd_flags.mute_open"><span>Mute when animation going forward</span></label>
+            <label><input type="checkbox" v-model="focused_item.snd_flags.random_balance"><span>Randomize sound direction</span></label>
+            <label><button @click="play_sound">Test</button></label>
+        </template>
+        <template v-if="(focused_item instanceof TMA_CANCELACTION)">       
+            <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector"></input></label>
+            <label><span>Target side</span><select v-model="focused_item.dir"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></label>
+            <p class="note">You must specify target of the message to cancel. Only one pending message is canceled </p>
+        </template>
+        <template v-if="(focused_item instanceof TMA_CODELOCK)">       
+            <label><span>Letter to add</span><input type="text" v-model="focused_item.znak" maxlength="1"></input></label>
+            <label><span>Valid seq. of letters</span><input type="text" v-model="focused_item.string" maxlength="8"></input></label>
+            <label><span>Memory slot</span><input type="number" v-watch-range v-model="focused_item.codenum" min="0" max="15"></input></label>
+        </template>
+        <template v-if="focused_item instanceof TMA_TEXT">       
+            {{ focused_item }}
+        </template>
+        <template v-if="focused_item instanceof TMA_TWOP">       
+            {{ focused_item }}
+        </template>
+        <template v-if="(focused_item instanceof TMA_DROPITM)">       
+            <label><span>Select an item:</span><ItemList v-model="item_list_TMA_DROPITM" :limit="1"></ItemList></label>
+        </template>
+        <template v-if="(focused_item instanceof TMA_FIREBALL)">       
+            <label><span>X - front back</span><input type="number" v-watch-range min="-63" max="63" v-model="focused_item.xpos"></input></label>
+            <label><span>Y - left right</span><input type="number" v-watch-range min="0" max="499" v-model="focused_item.ypos"></input></label>
+            <label><span>Z - top bottom</span><input type="number" v-watch-range min="0" max="319" v-model="focused_item.zpos"></input></label>
+            <label><span>Speed (+X per frame)</span><input type="number" v-watch-range min="0" max="128" v-model="focused_item.speed"></input></label>
+            <label><span>Thrown item:</span><ItemList v-model="item_list_TMA_FIREBALL" :limit="1"></ItemList></label>            
+        </template>
+        <template v-if="(focused_item instanceof TMA_GLOBE)">       
+            <label><span>Global event</span><select v-model="focused_item.event">
+                <option v-for="(s, idx) of globalEvents" :key="idx" :value="idx"> {{ s }}</option>
+                </select></label>
+            <label v-if="focused_item.event>28"><span>Argument</span><input type="number" v-model="focused_item.param"/></label>
+            <p class="note">When triggered, send message to:</p>
+            <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector"></input></label>
+            <label><span>Target side</span><div><select v-model="focused_item.side"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></div></label>
+        </template>
+        <template v-if="focused_item instanceof TMA_IFSEC">       
+            {{ focused_item }}
+        </template>
+        <template v-if="focused_item instanceof TMA_LOADLEV">       
+            {{ focused_item }}
+        </template>
+        <template v-if="focused_item instanceof TMA_LOCK">       
+            {{ focused_item }}
+        </template>
+        <template v-if="focused_item instanceof TMA_SEND_ACTION">       
+            {{ focused_item }}
+        </template>
+        <template v-if="(focused_item instanceof TMA_SWAPS)">       
+            <label><span>Sector1</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector1"></input></label>
+            <label><span>Sector2</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector2"></input></label>
+        </template>
+        <template v-if="focused_item instanceof TMA_UNIQUE">       
+            {{ focused_item }}
+        </template>
+        <template v-if="focused_item instanceof TMA_WOUND">       
+            <label><span>Type of damage</span><select v-model="focused_item.pflags">
+                <option v-for="(s,idx) of WoundType" :key="idx" :value="idx"> {{ s }}</option>               
+            </select></label>
+            <label><span>Damage</span><div>
+                <input type="number" v-watch-range min="0" max="65535" v-model="focused_item.minor"></input> -
+                <input type="number" v-watch-range min="0" max="65535" v-model="focused_item.major"></input>
+            </div></label>
+        </template>
+        </x-form>
+    </template>
+    <footer>
+        <button @click="dialog_editor!.close()">Close</button>
+    </footer>
+
+</dialog>
 
 </template>
 
@@ -327,7 +591,18 @@ dialog.add   select { width: 100%;}
 .note {
     font-style: italic;
     margin: 0.5rem;
+}
+.note.spc{    
     min-height: 6rem;
+}
+
+dialog.editor {
+    inset: 0;
+}
+
+dialog input[type=number] {
+    width: 7rem;
+    text-align: center;
 }
 
 </style>

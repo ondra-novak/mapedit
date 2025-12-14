@@ -187,7 +187,7 @@ export function itemsToArrayBuffers(items : ItemDef[]) : ArrayBuffer {
     ] as [number, string[] ][]).forEach((p)=> {
         const txt = p[1].map(t=>Uint8Array.from(keybcs2_from_string(t)));
         txt.push(Uint8Array.from([]));
-        const buff = joinUint8Arrays(txt,0);
+        const buff = joinUint8Arrays(txt.map(x=>x.buffer),0);
         writeSection(wr, p[0], buff.buffer);
     });
     writeSection(wr, SV_END, new ArrayBuffer());

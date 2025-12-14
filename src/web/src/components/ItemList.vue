@@ -11,13 +11,14 @@ const cur_inv_item = ref<string>("");
 
 
 const props = defineProps<{
-    filter?: (item: ItemDef) => boolean
+    filter?: (item: ItemDef) => boolean;
+    limit?: number;
 }>();
 
 
 function delete_item(event: Event, idx: number) {
     if (itmlist.value) {
-        itmlist.value.splice(idx,1);
+        itmlist.value = [...itmlist.value.slice(0,idx),...itmlist.value.slice(idx+1)];
         event.stopPropagation();
         event.preventDefault();
     }
@@ -65,7 +66,7 @@ function add_item_to_inv(event: Event) {
     const c : number[] = [];
     set_item_by_name(event,c,0);
     if (c[0] && itmlist.value) {
-        itmlist.value.push(c[0]);
+        itmlist.value = [...itmlist.value, c[0] ];
         (event.target as HTMLInputElement).value="";
         cur_inv_item.value = "";
     }
@@ -117,7 +118,7 @@ watch(item_templates, ()=>datalist.update());
 <template>
 <div class="itemlist"><div v-if="item_templates" v-for="(v,idx) of itmlist" :title="`#${v}`">{{ get_item_name(v) }}<button @click="$event=>delete_item($event, idx)">×</button></div>
         <div> {{  cur_inv_item }}
-        <input type="text" v-model="cur_inv_item" :list="datalist.id" placeholder="add item" 
+        <input v-if="typeof props.limit != 'number' || !itmlist || itmlist.length < props.limit" type="text" v-model="cur_inv_item" :list="datalist.id" placeholder="add item" 
         @keydown="$event=>add_item_to_inv_enter($event)" @change="$event=>add_item_to_inv($event)">
         </div>
 </div>

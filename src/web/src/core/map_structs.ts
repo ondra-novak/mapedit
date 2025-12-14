@@ -2,6 +2,7 @@ import { parse } from "vue/compiler-sfc";
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, loadBinaryContent, parseSection, splitArrayBuffer, writeSection, type Schema } from "./binary"
 import { ItemDef, ItemSchema } from "./items_struct";
 import { string_from_keybcs2 } from "./keybcs2";
+import { bitproxy } from "./bitproxy";
 
 const MapSections = {
     SIDEMAP: 0x8001,
@@ -302,35 +303,48 @@ function serializeItems(items: number[][]): ArrayBuffer {
 
 export class TMA_GEN extends WithSchema {
     
-    action:number = 0;
+    _action:number = 0;
     flags:number = 0;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
     }};;
 
-    getAction() {return this.action & 0x3F;}
-    getCancel() {return this.action & 0x40;}
-    getOnce() {return this.action & 0x80;}
+    static action_mask = {
+        action: 0x3F,
+        cancel: 0x40,
+        once: 0x80
+    };
+
+    header = bitproxy(TMA_GEN.action_mask, this, "_action");
 
 };
 
 export class TMA_SOUND extends TMA_GEN {
 
-    bit16:number=0;
-    volume:number=0;
+    _snd_flags:number=1;
+    volume:number=100;
     soundid:number=0;
-    freq:number=0;
+    freq:number=22050;
     start_loop:number=0;
     end_loop:number=0;
     offset:number=0;
     filename: string = "";
 
+    static snd_flags_def = {
+        bit16: 0x1,
+        mute_open: 0x2,
+        mute_close: 0x4,
+        random_balance: 0x8
+    }
+
+    snd_flags = bitproxy(TMA_SOUND.snd_flags_def, this, "_snd_flags");    
+
     getSchema(): Schema { return {
         action: "uint8",
         flags: "uint16",    
-        bit16: "uint8",
+        _snd_flags: "uint8",
         volume: "uint8",
         soundid: "uint8",
         freq: "uint16",
@@ -377,10 +391,10 @@ export class TMA_SEND_ACTION extends TMA_GEN {
 export class TMA_FIREBALL extends TMA_GEN {
 
     xpos:number = 0;
-    ypos:number = 0;
-    zpos:number = 0;
-    speed:number = 0;
-    item:number = 0;
+    ypos:number = 250;
+    zpos:number = 160;
+    speed:number = 16;
+    item:number | null = null;
 
     getSchema() : Schema { return {
         action: "uint8",
@@ -410,7 +424,7 @@ export class TMA_LOADLEV extends TMA_GEN {
 
 export class TMA_DROPITM extends TMA_GEN {
 
-    item: number = 0;
+    item: number | null = null;
 
     getSchema() : Schema { return {
         action: "uint8",
@@ -574,7 +588,7 @@ export class MAExecutionLine<T extends TMA_GEN> {
 
 function containsTWOPJump(item:TMA_GEN | null) : boolean{
     if (item) {
-        const an = item.getAction();
+        const an = item.header.action;
         return  (an == ActionType.IFACT||an == ActionType.IFJMP 
             || an == ActionType.IFSTP||an == ActionType.RANDJ
             || an == ActionType.ISFLG);
@@ -738,7 +752,7 @@ export const ActionType = {
 
 export function create_action_instance(type: typeof ActionType[keyof typeof ActionType], event: number) {
     const r = new action_to_schema[type];
-    r.action = type;    
+    r.header.action = type;    
     r.flags = event;
     return r;
 }
@@ -1286,7 +1300,7 @@ function createActionScript(alist : TMA_GEN[]) : MAScriptList {
                 any = true;
                 if (prev) {
                     const prev_itm = script.flow[prev].item;
-                    if (!prev_itm || !prev_itm.getCancel() || prev_itm.getOnce()) {
+                    if (!prev_itm || !prev_itm.header.cancel || prev_itm.header.once) {
                         script.flow[prev].next = id;
                     } 
                     prev = id;
@@ -1299,7 +1313,7 @@ function createActionScript(alist : TMA_GEN[]) : MAScriptList {
             const ma = script.flow[id];
             const itm = ma.item;
             if (itm) {
-                const anum = itm.getAction();
+                const anum = itm.header.action;
                 const ln = parseInt(id);
                 if (containsTWOPJump(itm)) {
                     const nx = (ln + (itm as TMA_TWOP).parm2).toString();
