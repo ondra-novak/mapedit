@@ -69,22 +69,22 @@ const ApplyMode = {
 };
 
 const ActionEvent = [
-"Before pass", //MC_PASSSUC 0x1
-"On hit wall", //MC_PASSFAIL 0x2
-"On touch", //MC_TOUCHSUC 0x4
-"Not valid lock", //MC_TOUCHFAIL 0x8
-"Lock info", //MC_LOCKINFO 0x10
-"After pass", //MC_EXIT 0x20
-"On message", //MC_INCOMING 0x40
-"On start level", //MC_STARTLEV 0x80
-"On close door", //MC_CLOSEDOOR 0x100
-"On anim frame", //MC_ANIM  0x200
-"On odd anim frame", //MC_ANIM2 0x400
+"Before leaving tile", //MC_PASSSUC 0x1
+"On wall bump", //MC_PASSFAIL 0x2
+"On interaction", //MC_TOUCHSUC 0x4
+"On wrong key", //MC_TOUCHFAIL 0x8
+"On locked", //MC_LOCKINFO 0x10
+"After leaving tile", //MC_EXIT 0x20
+"On message received", //MC_INCOMING 0x40
+"On level start", //MC_STARTLEV 0x80
+"On door closed", //MC_CLOSEDOOR 0x100
+"On animation frame", //MC_ANIM  0x200
+"On odd anim. frame", //MC_ANIM2 0x400
 "On message applied", //MC_SUCC_DONE 0x800
 "On specproc", //MC_SPEC_SUCC 0x1000
-"On open door", //MC_OPENDOOR 0x2000
-"On modify niche", //MC_VYKEVENT 0x4000
-"On attack wall", //MC_WALLATTACK 0x8000
+"On door opened", //MC_OPENDOOR 0x2000
+"On niche interaction", //MC_VYKEVENT 0x4000
+"On wall attack", //MC_WALLATTACK 0x8000
 ]
 
 const focus = ref<FocusItem>();

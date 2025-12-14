@@ -7,6 +7,7 @@ import {resolve } from 'path';
 
 // Získání argumentu z CLI
 const outFile = process.argv[2];
+const target = process.argv[3];
 
 if (!outFile) {
   console.error("Usage: node generate-vue-deps.js <output.dep>");
@@ -21,7 +22,7 @@ async function run() {
   ], { onlyFiles: true })).map(file => resolve(file));
 
   
-  const target = 'web/index.html'; // Tento řetězec musí odpovídat tomu, co CMake očekává v OUTPUT
+//  const target = 'index.html'; // Tento řetězec musí odpovídat tomu, co CMake očekává v OUTPUT
   const depLine = `${target}: ${sources.join(' ')}`;
 
   const outDir = dirname(outFile);

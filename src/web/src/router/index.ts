@@ -9,6 +9,7 @@ import CharacterEditor from '@/views/CharacterEditor.vue'
 import ShopsEditor from '@/views/ShopsEditor.vue'
 import BasicInfo from '@/views/BasicInfo.vue'
 import MapEditor from '@/views/MapEditor.vue'
+import TestView from '@/views/TestView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -62,6 +63,11 @@ const router = createRouter({
       path: "/maps",
       name: "Maps",
       component: MapEditor
+    },
+    {
+      path: "/test",
+      name: "Test",
+      component: TestView
     }
 
 

@@ -6,4 +6,4 @@ node_modules
 /SKELDAL.DDL
 /mapedit.local.conf
 src/web/.editorconfig
-
+/.cache

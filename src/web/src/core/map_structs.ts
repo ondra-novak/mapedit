@@ -736,6 +736,13 @@ export const ActionType = {
     IFSTP: 39,  //if sector type
 }
 
+export function create_action_instance(type: typeof ActionType[keyof typeof ActionType], event: number) {
+    const r = new action_to_schema[type];
+    r.action = type;    
+    r.flags = event;
+    return r;
+}
+
 export const SimpleActionType = {
 NONE: 0,
 OPEN_DOOR: 1,

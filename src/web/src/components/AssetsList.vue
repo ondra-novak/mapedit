@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed, defineEmits } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { AssetGroup, AssetGroupLabel } from "@/core/asset_groups.ts";
 import {server  } from '@/core/api.ts';
 import type{ FileItem } from '@/core/api.ts';

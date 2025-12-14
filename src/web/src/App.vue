@@ -18,6 +18,7 @@ import MessageBoxComponent from './utils/messageBoxComponent.vue';
   <RouterLink to="/shops">Shops</RouterLink>
   <RouterLink to="/facts">Facts</RouterLink>
   <RouterLink to="/texts">Book/Texts</RouterLink>    
+  <RouterLink to="/test">Test space</RouterLink>    
 </nav>
 <div class="workspace-outer">
   <div class="workspace-inner">
