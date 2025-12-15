@@ -128,7 +128,7 @@ export class MapDraw {
                         sd.actions.list.forEach(ma=>{
                             for (const id in ma.flow) {
                                 const itm = ma.flow[id].item;
-                                if (itm && itm.getAction() == ActionType.SENDA) {
+                                if (itm && itm.header.action == ActionType.SENDA) {
                                     const senda = itm as TMA_SEND_ACTION;
                                     const ts = m.sectors[senda.sector];
                                     if (senda.sector && ts.level == level) {
@@ -297,7 +297,7 @@ export class MapDraw {
                     sd.actions.list.forEach(ma=>{
                         for (const id in ma.flow) {
                             const item = ma.flow[id].item;
-                            if (item && item.getAction() == ActionType.SENDA) {
+                            if (item && item.header.action == ActionType.SENDA) {
                                 const senda = item as TMA_SEND_ACTION;
                                 if (senda.sector != sector && senda.sector) {
                                     const ts = m.sectors[senda.sector];

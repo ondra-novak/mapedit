@@ -371,16 +371,23 @@ export class TMA_TEXT extends TMA_GEN{
 
 export class TMA_SEND_ACTION extends TMA_GEN {
 
-    change_bits:number= 0;
+    _change_bits:number= 0;
     sector:number= 0;
     side:number= 0;
     s_action:number= 0;
     delay:number= 0;
+    change_bits = bitproxy({
+        automap:0x1,
+        block_player:0x2,
+        block_monster:0x4,
+        block_item: 0x8,
+        block_sound:0x10
+    },this,"_change_bits");
 
     getSchema() : Schema { return {
         action: "uint8",
         flags: "uint16",    
-        change_bits: "uint8",
+        _change_bits: "uint8",
         sector: "uint16",
         side: "uint16",
         s_action: "uint16",
@@ -498,7 +505,7 @@ export class TMA_WOUND extends TMA_GEN {
 export class TMA_LOCK extends TMA_GEN {
 
     key_id: number = 0;
-    thieflevel: number = 0;
+    thieflevel: number = -1;
 
     getSchema() : Schema { return {
         action: "uint8",
@@ -779,17 +786,17 @@ CODELOCK_LOG3: 18,
 
 export const SimpleActionTypeName = [
     "None",
-/*OPEN_DOOR: 1,*/ "Open door",
-/*CLOSE_DOOR: 2,*/ "Close door",
-/*OPEN_CLOSE: 3,*/ "Open/Close door",
+/*OPEN_DOOR: 1,*/ "Open door (animate forward)",
+/*CLOSE_DOOR: 2,*/ "Close door (animate backward)",
+/*OPEN_CLOSE: 3,*/ "Toggle door (toggle direction)",
 /*RUN_PRIM: 4,*/   "Animate primary",
 /*SHOW_PRIM: 5,*/  "Show primary",
 /*HIDE_PRIM: 6,*/  "Hide primary",
-/*SHOW_HIDE_PRIM: 7,*/ "Show/Hide primary",
+/*SHOW_HIDE_PRIM: 7,*/ "Toggle primary",
 /*RUN_SEC: 8,*/    "Animate secodary",
 /*SHOW_SEC: 9,*/   "Show secondary",
 /*HIDE_SEC: 10,*/  "Hide secondary",
-/*SHOW_HIDE_SEC: 11,*/ "Show/Hide secondary",
+/*SHOW_HIDE_SEC: 11,*/ "Toggle secondary",
 /*HIDE_PRIM_SEC: 12,*/ "Hide primary and secondary",
 /*DISPLAY_TEXT: 13,*/  null,    //defunc
 /*CODELOCK_LOG: 14,*/  null,    //defunc

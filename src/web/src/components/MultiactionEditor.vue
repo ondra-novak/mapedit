@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import {  create_action_instance, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
+import {  ActionType, create_action_instance, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
 import { readWavInfoFromBuffer } from '@/core/sound_info';
-import { create_datalist, type DataListHandle } from '@/utils/datalist';
+import { create_datalist, type DataListHandle, type DataListItem } from '@/utils/datalist';
 import { computed, onMounted, ref, watch } from 'vue';
 import ItemList from './ItemList.vue';
+import globalGetItems from '@/utils/global_item_list';
 
 const directions = ["North ↑","East →","South ↓","West ←"];
 
@@ -64,7 +65,7 @@ const ActionName = [
 [28,"Give money",true,"Give money to player"],              //    MONEY: 28,
 [29,"Give unique item",false,"(not implemented)"],               //    GUNIQ: 29,
 [30,"Use item and jump",true,"Check if the player is holding a specific item, if so, pick it up and jump"],               //    PICKI: 30,
-[31,"Append to book",true,"Append a text to book"],              //    WBOOK: 31,
+[31,"Append to book",true,"Append a text to the book"],              //    WBOOK: 31,
 [32,"Random jump",true,"Jump depend on random number"],             //    RANDJ: 32,
 [33,"End game",true,"Finish the game"],                //    ENDGM: 33,
 [34,"Control enemy",true,"Send an enemy from a sector to different sectorSend the monster to another sector. The monster will get there on its own. The monster must be mobile"],               //    GOMOB: 34,
@@ -141,12 +142,19 @@ const WoundType = [
     "Mind damage"
 ] as const;
 
-type ActionList = TMA_GEN[];
+export type ActionList = TMA_GEN[];
+export type ModelDef = {
+    actionList: ActionList,
+    stringTable: string[],   
+}
 
-const script = defineModel<ActionList>();
+const script = defineModel<ModelDef>();
 const cur_event = ref<number>(0);
 const list_of_sounds = ref<HTMLInputElement>();
-const list_of_items = ref<HTMLInputElement>();
+const list_of_keys = ref<HTMLInputElement>();
+const list_of_maps = ref<HTMLInputElement>();
+const list_of_books = ref<HTMLInputElement>();
+const stringtable_cur_text = ref<string>("");
 let cur_datalist:DataListHandle|null = null;
 
 watch(list_of_sounds,()=>{
@@ -162,9 +170,44 @@ watch(list_of_sounds,()=>{
     }
 })
 
+watch(list_of_keys,()=>{
+    const el = list_of_keys.value;
+    if (el) {
+        cur_datalist =  create_datalist(async ()=>{
+            const items = await globalGetItems();
+            return items.filter(x=>x.keynum).map(x=>({value:`${x.keynum}`,label: x.jmeno}))
+        });
+        el.setAttribute("list", cur_datalist.id);
+    }
+})
 
-function dl_all_sounds() {
-}
+watch(list_of_maps,()=>{
+    const el = list_of_maps.value;
+    if (el) {
+        cur_datalist =  create_datalist(async ()=>{
+            const files = await server.getDDLFiles(AssetGroup.MAPS,null);
+            return files.files.filter(x=>x.name.toUpperCase().endsWith(".MAP")).map(x=>({
+                value: x.name
+            }));
+        });
+        el.setAttribute("list", cur_datalist.id);
+    }
+})
+
+watch(list_of_books,()=>{
+    const el = list_of_books.value;
+    if (el) {
+        cur_datalist =  create_datalist(async ()=>{
+            const files = await server.getDDLFiles(AssetGroup.MAPS,null);
+            const allmaps = Object.fromEntries(files.files.filter(x=>x.name.toUpperCase().endsWith(".MAP")).map(x=>[x.name.toUpperCase().substring(0,x.name.length-4)+".TXT",true]));   
+            const is_map_txt = (x:string) => !!allmaps[x.toUpperCase()];        
+            return files.files.filter(x=>x.name.toUpperCase().endsWith(".TXT") && !is_map_txt(x.name)).map(x=>({
+                value: x.name
+            }));
+        });
+        el.setAttribute("list", cur_datalist.id);
+    }
+})
 
 
 const last_selected_event_desc = computed(()=>{
@@ -184,18 +227,51 @@ const event_list = ref<Record<string, ActionList> >({})
 
 
 function prepareList() {
-    let this_script = script.value || [];
-    const events = ActionEvent.reduce((a,b)=>{
-        const lst = this_script.filter(x=>x.flags & b[1]);
-        if (lst.length) {
-            a[b[0]] = lst;
-        }
-        return a;
-    }, {} as Record<string, ActionList>)
-    console.log(events);
-    event_list.value = events;
+    if (!script.value) {
+        event_list.value = {};
+    } else {
+        let this_script = script.value.actionList;
+        const events = ActionEvent.reduce((a,b)=>{
+            const lst = this_script.filter(x=>x.flags & b[1]);
+            if (lst.length) {
+                a[b[0]] = lst;
+            }
+            return a;
+        }, {} as Record<string, ActionList>)
+        event_list.value = events;
+    }
 }
 
+function stringtable_load_text() {
+    const f = focused_item.value as TMA_TEXT;
+    if (!f || !script.value) return;
+    let s = script.value.stringTable[f.textindex];
+    if (f.header.action == ActionType.MUSIC) {
+        s = s.replaceAll(' ','\n');
+    }
+    stringtable_cur_text.value = s;
+}
+
+function stringtable_save_text() {
+    const f = focused_item.value as TMA_TEXT;
+    if (!f || !script.value) return;
+    let s = stringtable_cur_text.value;
+    if (f.header.action == ActionType.MUSIC) {
+        s = s.split('\n').map(x=>x.trim()).join(' ');
+    }
+    script.value.stringTable[f.textindex] = s;
+}
+
+function stringtable_add_text() {
+    const f = focused_item.value as TMA_TEXT;
+    if (!f || !script.value) return;
+    const st = script.value.stringTable;
+    let idx = 0;
+    const found = st.find((_,idx2)=>idx2 && idx2 != ++idx);
+    if (!found) idx = Math.max(1,st.length);
+    f.textindex = idx;
+    stringtable_cur_text.value = "";
+}
 
 onMounted(()=>{
     prepareList();
@@ -203,7 +279,7 @@ onMounted(()=>{
 
 watch(script, ()=>{
     prepareList();
-});
+},{deep:true});
 
 const opened_events = ref<number>(0);
 const last_selected_event = ref<number>(0);
@@ -223,10 +299,10 @@ const dialog_clone_item = ref<HTMLDialogElement>();
 const dialog_editor = ref<HTMLDialogElement>();
 
 function add_new_item() {
-    if (last_selected_command.value && last_selected_event.value) {
+    if (last_selected_command.value && last_selected_event.value && script.value) {
         opened_events.value = (opened_events.value || 0) | last_selected_event.value;
         const itm = create_action_instance(last_selected_command.value, last_selected_event.value)
-        script.value = [ ... (script.value || []), itm];
+        script.value.actionList = [ ... script.value.actionList, itm];
         focused_item.value = itm;
         dialog_editor.value!.show();
     
@@ -241,11 +317,11 @@ function erase_item(item: TMA_GEN, event: string) {
         prepareList();
         return;
     }
-    const s = script.value;
+    const s = script.value?.actionList;
     if (!s) return;
     const idx = s.findIndex(x=>x==item);
     if (idx < 0) return;
-    script.value = [...s.slice(0,idx), ...s.slice(idx+1)];
+    script.value!.actionList = [...s.slice(0,idx), ...s.slice(idx+1)];
     setTimeout(()=>focused_item.value = null,10);
 }
 
@@ -261,7 +337,7 @@ function clone_item() {
 
 function move_item(dir: number) {
     const f = focused_item.value;
-    const s = script.value;
+    const s = script.value?.actionList;
     if (!f || !s) return;
     const idx = s.findIndex(x=>x==f);
     if (idx < 0) return;
@@ -270,8 +346,9 @@ function move_item(dir: number) {
         if ((s[t].flags & f.flags) != 0) break;
         t = t+dir;
     }
+    if (t < 0) t = 0;
     const s1 = [...s.slice(0,idx), ...s.slice(idx+1)];
-    script.value = [...s1.slice(0,t), f, ...s1.slice(t)];
+    script.value!.actionList = [...s1.slice(0,t), f, ...s1.slice(t)];
 }
 
 watch(focused_item, ()=>{
@@ -283,10 +360,13 @@ watch(focused_item, ()=>{
             dlg.close();
             setTimeout(()=>dlg.show(),1);
         }
+        if (focused_item.value instanceof TMA_TEXT) {
+            stringtable_load_text();
+        }
     }
 })
 
-const focused_action = computed(()=>focused_item.value?focused_item.value.header.action:0);
+
 
 
 function print_action_flags(action: TMA_GEN) {
@@ -354,25 +434,27 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
 </script>
 
 <template>
-<div class="wrk">
-<div class="list">
-    <div v-for="(x, cat) of event_list" :key="cat" :class="{'tree-node': true, opened: !!(ActionEventToBin[cat] & opened_events)}">
-        <div @click="open_close(cat)" class="event-name" > {{  cat }}</div>
-        <template v-if="!!(ActionEventToBin[cat] & opened_events)">
-            <div v-for="(y,idx) of x" :key="idx" class="item" :class="{focused: y == focused_item}" 
-                @click="if(focused_item ==y) dialog_editor!.show(); else focused_item =y">
-                {{ ActionNameMap[y.header.action]}} {{ print_action_flags(y) }}
-                <div class="buttonx" @click="(ev:Event) => {erase_item(y, cat);ev.stopPropagation()}"></div>
+<div class="wrk">    
+    <div class="scroll">
+        <div class="list">
+            <div v-for="(x, cat) of event_list" :key="cat" :class="{'tree-node': true, opened: !!(ActionEventToBin[cat] & opened_events)}">
+                <div @click="open_close(cat)" class="event-name" > {{  cat }}</div>
+                <template v-if="!!(ActionEventToBin[cat] & opened_events)">
+                    <div v-for="(y,idx) of x" :key="idx" class="item" :class="{focused: y == focused_item}" 
+                        @click="if(focused_item ==y) dialog_editor!.show(); else focused_item =y">
+                        {{ ActionNameMap[y.header.action as number]}} {{ print_action_flags(y) }}
+                        <div class="buttonx" @click="(ev:Event) => {erase_item(y, cat);ev.stopPropagation()}"></div>
+                    </div>
+                </template>
             </div>
-        </template>
+        </div>
     </div>
-</div>
-<div class="toolbar">
-    <button @click="move_item(-1)":hidden="focused_item == null" :disabled="focused_item != null && script && script[0] == focused_item">▲</button>
-    <button @click="move_item(1)":hidden="focused_item == null" :disabled="focused_item != null && script && script[script.length-1] == focused_item">▼</button>
-    <button @click="dialog_clone_item!.showModal()" :hidden="focused_item == null">Clone</button>
-    <button @click="dialog_add_item!.showModal()">Add</button>    
-</div>
+    <div class="toolbar">
+        <button @click="move_item(-1)":hidden="focused_item == null" :disabled="focused_item != null && script && script.actionList[0] == focused_item">▲</button>
+        <button @click="move_item(1)":hidden="focused_item == null" :disabled="focused_item != null && script && script.actionList[script.actionList.length-1] == focused_item">▼</button>
+        <button @click="dialog_clone_item!.showModal()" :hidden="focused_item == null">Clone</button>
+        <button @click="dialog_add_item!.showModal()">Add</button>    
+    </div>
 </div>
 
 <dialog ref="dialog_add_item" class="add">
@@ -422,7 +504,7 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
 </dialog>
 
 <dialog ref="dialog_editor" class="editor">
-    <header>Edit command: {{  ActionNameMap[focused_item?.header.action || 0] }}</header>
+    <header>Edit command: {{  ActionNameMap[focused_item?.header.action as number || 0] }}</header>
     <template v-if="focused_item">
         <x-form>
             <label><input type="checkbox" v-model="focused_item.header.once"><span>Once - execute only once</span></label>
@@ -452,8 +534,35 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
             <label><span>Valid seq. of letters</span><input type="text" v-model="focused_item.string" maxlength="8"></input></label>
             <label><span>Memory slot</span><input type="number" v-watch-range v-model="focused_item.codenum" min="0" max="15"></input></label>
         </template>
-        <template v-if="focused_item instanceof TMA_TEXT">       
-            {{ focused_item }}
+        <template v-if="(focused_item instanceof TMA_TEXT) && script">       
+            <template v-if="focused_item.header.action == ActionType.DIALG">
+                <label><span>Dialog ID</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.textindex"></input></label>
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.SSHOP">
+                <label><span>Shop ID</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.textindex"></input></label>
+            </template>
+            <template v-else>
+                <template v-if="focused_item.header.action == ActionType.MUSIC">
+                    <p class="note">Select or create a playlist by listing all the song file names, each on a separate line</p>
+                    <p class="note">One of the following keywords may be listed instead of the first song:</p>
+                    <dl class="note">
+                        <dt>RANDOM</dt>
+                        <dd>Play songs in random order (default)</dd>
+                        <dt>FORWARD</dt>
+                        <dd>Play songs in the order listed</dd>
+                        <dt>FIRST</dt>
+                        <dd>The song in first place is always played first, then it is played in random order</dd>
+                    </dl>
+                </template>
+                <label><span v-if="focused_item.header.action == ActionType.MUSIC">Selected playlist</span>
+                        <span v-else>Selected text:</span><select v-model="focused_item.textindex" @change="stringtable_load_text">
+                    <option v-for="(t,idx) of script.stringTable" :key="idx" :value="idx"> {{ t.replaceAll('\n','|') }}</option>
+                </select></label>
+                <div>
+                    <textarea rows="5" cols="49" v-model="stringtable_cur_text" @change="stringtable_save_text"></textarea>
+                </div>
+                <div style="text-align: right;"><button @click="stringtable_add_text">Add new text</button></div>
+            </template>
         </template>
         <template v-if="focused_item instanceof TMA_TWOP">       
             {{ focused_item }}
@@ -477,17 +586,46 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
             <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector"></input></label>
             <label><span>Target side</span><div><select v-model="focused_item.side"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></div></label>
         </template>
-        <template v-if="focused_item instanceof TMA_IFSEC">       
+        <template v-if="(focused_item instanceof TMA_IFSEC)">       
             {{ focused_item }}
         </template>
-        <template v-if="focused_item instanceof TMA_LOADLEV">       
-            {{ focused_item }}
+        <template v-if="(focused_item instanceof TMA_LOADLEV)">       
+            <template v-if="focused_item.header.action == ActionType.LOADL">
+                <label><span>Level name</span><input type="text" ref="list_of_maps" v-model="focused_item.name" maxlength="12"></label>
+                <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65536" v-model="focused_item.start_pos"></label>
+                <label><span>Target side</span><div><select v-model="focused_item.dir"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></div></label>
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.WBOOK">
+                <label><span>Book file</span><input type="text" ref="list_of_books" v-model="focused_item.name" maxlength="12"></label>
+                <label><span>Paragraph ID</span><input type="number" v-watch-range min="0" max="65536" v-model="focused_item.start_pos"></label>
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.PLAYA">
+                <label><span>Video file (MGF)</span><input type="text"  v-model="focused_item.name" maxlength="12"></label>
+                <label><span>UI behavior</span><select v-model="focused_item.dir">
+                    <option value="0">In game window</option>
+                    <option value="1">Fullscreen</option>
+                </select></label>
+            </template>
+            <template v-else>
+                {{ focused_item }}
+            </template>
         </template>
-        <template v-if="focused_item instanceof TMA_LOCK">       
-            {{ focused_item }}
+        <template v-if="(focused_item instanceof TMA_LOCK)">       
+            <label><span>Key ID (-1 = no key exists)</span><input type="number" ref="list_of_keys" v-watch-range min="-1" max="255" v-model="focused_item.key_id"></input></label>
+            <label><span>Picklock level (-1 = can't be picked):</span><input type="number" v-watch-range min="-1" max="256" v-model="focused_item.thieflevel"></input></label>
         </template>
-        <template v-if="focused_item instanceof TMA_SEND_ACTION">       
-            {{ focused_item }}
+        <template v-if="(focused_item instanceof TMA_SEND_ACTION)">       
+            <label><span>Action</span><select v-model="focused_item.s_action">
+                <template v-for="(n,idx) of SimpleActionTypeName" :key="idx"><option v-if="n" :value="idx"> {{ n }}</option></template>
+            </select></label>
+            <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector"></label>
+            <label><span>Target side</span><div><select v-model="focused_item.side"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></div></label>
+            <label><span>Delay in frames (0 = immediate)</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.delay"></label>
+            <label><input type="checkbox" v-model="focused_item.change_bits.automap"><span>Toggle automap flag</span></label>
+            <label><input type="checkbox" v-model="focused_item.change_bits.block_player"><span>Toggle player barrier</span></label>
+            <label><input type="checkbox" v-model="focused_item.change_bits.block_monster"><span>Toggle monster barrier</span></label>
+            <label><input type="checkbox" v-model="focused_item.change_bits.block_item"><span>Toggle item barrier</span></label>
+            <label><input type="checkbox" v-model="focused_item.change_bits.block_sound"><span>Toggle sound barrier</span></label>
         </template>
         <template v-if="(focused_item instanceof TMA_SWAPS)">       
             <label><span>Sector1</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector1"></input></label>
@@ -521,8 +659,14 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
     width: 100%;
     height: 100%;
     background-color: white;
-    position: relative;
+    position: relative;    
+}
+
+.wrk .scroll {
+    width: 100%;
+    height: 100%;
     overflow: auto;
+
 }
 
 .event-name {
@@ -547,6 +691,10 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
     padding-left: 2rem;
     line-height: 1.5rem;
     position: relative;
+}
+
+.list > *:last-child {
+    margin-bottom: 2.5rem;
 }
 .list .item.focused {
     background-color: wheat;
@@ -574,7 +722,7 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
     position: absolute;
     bottom: 0;
     text-align: right;
-    right: 0;
+    right: 1rem;
 }
 .toolbar button {
     font-size: 1.1rem;    
