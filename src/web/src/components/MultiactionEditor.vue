@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import {  ActionType, create_action_instance, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
+import {  ActionType, create_action_instance, SimpleActionType, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFJMP, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TELEPORT, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
 import { readWavInfoFromBuffer } from '@/core/sound_info';
 import { create_datalist, type DataListHandle, type DataListItem } from '@/utils/datalist';
 import { computed, onMounted, ref, watch } from 'vue';
 import ItemList from './ItemList.vue';
 import globalGetItems from '@/utils/global_item_list';
+import { SVGDrawing, SVGPath } from '@/utils/svg';
+import FactEditor from './FactEditor.vue';
 
 const directions = ["North ↑","East →","South ↓","West ←"];
 
@@ -39,7 +41,7 @@ const ActionName = [
 [2,"Show test (global)",false,"Display message, use global stringtable"],                //    TEXTG: 2,
 [3,"Show text",true,"Display message"],             //    TEXTL: 3,
 [4,"Send message",true,"Send a message to a different place in current level to invoke some effect"],             //    SENDA: 4,
-[5,"Throwing trap",true,"Makes object throwing trap. When triggered an object is throwing from the wall"],               //    FIREB: 5,
+[5,"Throwing trap",true,"Makes object throwing trap. When triggered an object is thrown from the wall"],               //    FIREB: 5,
 [6,"Destroy item",true,"Destroyes item currently held in mouse cursor"],                //    DESTI: 6,
 [7,"Load map",true,"Loads different map, transfers player to different map"],              //    LOADL: 7,
 [8,"Drop item",true,"Drops item at ground"],               //    DROPI: 8,
@@ -50,26 +52,26 @@ const ActionName = [
 [13,"Lock",true,"Checks for key held in mouse cursor"],                //    LOCK:  13,
 [14,"Swap sectors",true,"Swap definition of two sectors"],                //    SWAPS: 14,
 [15,"Cause injury",true,"Cause injury to all charactes on current sector"],                //    WOUND: 15,
-[16,"If jump",true,"Test some condition and jump when it is met"],             //    IFJMP: 16,
+[16,"If cond",true,"Test some condition and jump when it is met"],             //    IFJMP: 16,
 [17,"Call specproc",false,""],               //    CALLS: 17,
-[18,"If have item jump",true,"Test whether player has specified item and jump if does (anywhere in inventory)"],               //    HAVIT: 18,
+[18,"If have item",true,"Test whether player has specified item (anywhere in inventory)"],               //    HAVIT: 18,
 [19,"Append to story",true,"Append a text to story"],             //    STORY: 19,
-[20,"If message jump",true,"Test current message and jump"],              //    IFACT: 20,
+[20,"If message",true,"Test current message "],              //    IFACT: 20,
 [21,"Send experience",true,"Send experience"],             //    SNDEX: 21,
 [22,"Teleport group",true,"Teleport group to different sector in current map"],              //    MOVEG: 22,
 [23,"Play animation",true,"Play MGF animation"],              //    PLAYA: 23,
 [24,"Create item",true,"Create an item and put it to mouse cursor"],             //    CREAT: 24,
-[25,"If fact jump",true,"Checks given fact and jump if met"],                //    ISFLG: 25,
+[25,"If fact",true,"Checks given fact and jump if met"],                //    ISFLG: 25,
 [26,"Set fact",true,"Set/Reset/Update fact"],                //    CHFLG: 26,
 [27,"Create unique item",false,"(not implemented)"],             //    CUNIQ: 27,
 [28,"Give money",true,"Give money to player"],              //    MONEY: 28,
 [29,"Give unique item",false,"(not implemented)"],               //    GUNIQ: 29,
-[30,"Use item and jump",true,"Check if the player is holding a specific item, if so, pick it up and jump"],               //    PICKI: 30,
+[30,"If consume item",true,"Check if the player is holding a specific item in mouse cursor, if so, consume it"],               //    PICKI: 30,
 [31,"Append to book",true,"Append a text to the book"],              //    WBOOK: 31,
-[32,"Random jump",true,"Jump depend on random number"],             //    RANDJ: 32,
+[32,"If random",true,"Jump depend on random number"],             //    RANDJ: 32,
 [33,"End game",true,"Finish the game"],                //    ENDGM: 33,
 [34,"Control enemy",true,"Send an enemy from a sector to different sectorSend the monster to another sector. The monster will get there on its own. The monster must be mobile"],               //    GOMOB: 34,
-[35,"Call sub",true,"Call a script on another wall as a subroutine"],                //    SHRMA: 35,
+[35,"Call sub",true,"Call a script on another wall as a subroutine (for same event). Doesn't change context of execution."],                //    SHRMA: 35,
 [36,"Change music",true,"Change music"],                //    MUSIC: 36,
 [37,"Define global event",true,"Defines global events. Global events are not saved in the saved game, they must be set during the \"On level start\" event"]             //    GLOBE: 37,
 ].sort((x,y)=>(x[1] as string).localeCompare(y[1] as string));
@@ -142,6 +144,25 @@ const WoundType = [
     "Mind damage"
 ] as const;
 
+const IfJumpCondition = [
+  [33,"Enemy in area"],  
+  [32,"Enemy in level"],
+  [9,"Primary visible"],
+  [8,"Primary animated"],
+  [11,"Primary forward"],
+  [13,"Secondary visible"],
+  [12,"Secondary animated"],
+  [15,"Secondary forward"],
+  [1,"Barrier for player"],
+  [2,"Barrier for enemy"],
+  [3,"Barrier for item"],
+  [4,"Barrier for sound"],
+  [0,"Automaping enabled"],
+  [29,"Secret wall"],
+  [30,"TRUESEE wall"],
+  [31,"Invisible on map"],
+] as const;
+
 export type ActionList = TMA_GEN[];
 export type ModelDef = {
     actionList: ActionList,
@@ -149,6 +170,7 @@ export type ModelDef = {
 }
 
 const script = defineModel<ModelDef>();
+const show_raw_object = ref(false);
 const cur_event = ref<number>(0);
 const list_of_sounds = ref<HTMLInputElement>();
 const list_of_keys = ref<HTMLInputElement>();
@@ -245,7 +267,7 @@ function prepareList() {
 function stringtable_load_text() {
     const f = focused_item.value as TMA_TEXT;
     if (!f || !script.value) return;
-    let s = script.value.stringTable[f.textindex];
+    let s = script.value.stringTable[f.textindex] || "";
     if (f.header.action == ActionType.MUSIC) {
         s = s.replaceAll(' ','\n');
     }
@@ -310,6 +332,35 @@ function add_new_item() {
     dialog_add_item.value!.close();
 }
 
+class JumpGuard {
+
+    map = new Map<TMA_IFJMP, TMA_GEN>;
+
+    constructor(lst: ActionList) {
+        lst.forEach((x,idx)=>{
+            if (x instanceof TMA_IFJMP) {
+                const t = lst[idx+x.parm2];
+                if (t) this.map.set(x, t);
+            }
+        });
+    }
+
+    update(lst:ActionList) {
+        lst.forEach((x,idx)=>{
+            if (x instanceof TMA_IFJMP) {
+                const f = this.map.get(x);
+                if (f) {
+                    const i = lst.findIndex(y=>y === f);
+                    if (i >= 0) {
+                        x.parm2 = i - idx;
+                    }
+                }
+            }
+        });
+    }
+    
+}
+
 function erase_item(item: TMA_GEN, event: string) {
     const mask = ActionEventToBin[event];
     item.flags &= ~mask;
@@ -317,11 +368,14 @@ function erase_item(item: TMA_GEN, event: string) {
         prepareList();
         return;
     }
-    const s = script.value?.actionList;
-    if (!s) return;
+    const ss = script.value;
+    if (!ss) return;
+    const s = ss.actionList;
     const idx = s.findIndex(x=>x==item);
     if (idx < 0) return;
-    script.value!.actionList = [...s.slice(0,idx), ...s.slice(idx+1)];
+    const g = new JumpGuard(s);
+    ss.actionList = [...s.slice(0,idx), ...s.slice(idx+1)];
+    g.update(ss.actionList);
     setTimeout(()=>focused_item.value = null,10);
 }
 
@@ -337,8 +391,9 @@ function clone_item() {
 
 function move_item(dir: number) {
     const f = focused_item.value;
-    const s = script.value?.actionList;
-    if (!f || !s) return;
+    const ss = script.value;
+    if (!f || !ss) return;
+    const s = ss.actionList;
     const idx = s.findIndex(x=>x==f);
     if (idx < 0) return;
     let t = idx+dir;
@@ -347,8 +402,10 @@ function move_item(dir: number) {
         t = t+dir;
     }
     if (t < 0) t = 0;
+    const g = new JumpGuard(s);
     const s1 = [...s.slice(0,idx), ...s.slice(idx+1)];
-    script.value!.actionList = [...s1.slice(0,t), f, ...s1.slice(t)];
+    ss.actionList = [...s1.slice(0,t), f, ...s1.slice(t)];
+    g.update(ss.actionList);
 }
 
 watch(focused_item, ()=>{
@@ -410,26 +467,99 @@ async function play_sound() {
     }
 }
 
-function create_computed_select_item<T>(field: keyof T) {
+function create_computed_select_item(get: ()=>number|null, set:(x:number|null)=>void) {
     return computed({
     get:()=>{
         const ret : number[] = [];
-        const f = focused_item.value as T;
-        if (f && f[field] !== null) ret.push(f[field] as number);
+        const x = get();
+        if (x !== null) ret.push(x as number);
         return ret;
     },
     set(newval) {
-        const f = focused_item.value as T;
-        if (f) {
-            if (newval.length) (f[field] as number|null) = newval[newval.length-1];
-            else (f[field] as number|null) = null;
-        }
+        if (newval.length) set(newval[newval.length-1]);
+        else set(null)
     }
 })
 }
-const item_list_TMA_DROPITM = create_computed_select_item<TMA_DROPITM>("item");
-const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
+const item_list_TMA_DROPITM = create_computed_select_item(
+    ()=>(focused_item.value as TMA_DROPITM).item,
+    (x:number|null)=>(focused_item.value as TMA_DROPITM).item = x
+);
+const item_list_TMA_FIREBALL = create_computed_select_item(
+    ()=>(focused_item.value as TMA_FIREBALL).item,
+    (x:number|null)=>(focused_item.value as TMA_FIREBALL).item = x
+)
+const item_list_TMA_HAVEIT = create_computed_select_item(
+    ()=>(focused_item.value as TMA_IFJMP).cond.cond,
+    (x:number|null)=>(focused_item.value as TMA_IFJMP).cond.cond = x
+)
+const relative_offset_TMA_IFJMP = computed({
+    get: ()=>{
+        const f = focused_item.value as TMA_IFJMP;
+        const s = script.value;
+        if (!f || !s) return -1;
+        const idx = s.actionList.findIndex(x=>f===x);
+        return idx + f.parm2;
+    },
+    set:(x:number) => {
+        const f = focused_item.value as TMA_IFJMP;
+        const s = script.value;
+        if (!f || !s) return -1;
+        const idx = s.actionList.findIndex(x=>f===x);
+        f.parm2 = x - idx;
+    }
+})
 
+function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
+    const s = script.value;
+    if (!s || !p) return;
+    const my_pos = s.actionList.findIndex(x=>x === from);
+    if (my_pos < 0) return;
+    const to = s.actionList[my_pos+from.parm2];
+    const to_pos = list.findIndex(x=>x === to);
+    if (to_pos < 0) return;
+    const from_pos = list.findIndex(x=>x === from);
+    if (from_pos < 0) return;
+    queueMicrotask(()=>{
+
+        const drw = new SVGDrawing();
+        const el = p as HTMLElement;
+        el.innerHTML = "";
+        const bound = el.parentElement?.getBoundingClientRect();
+        const height = (bound?.height || 0)-1;
+        const svgel = drw.getSvgElement()
+        const id = "marker"+Math.random().toString().substring(2);
+        const marker = SVGDrawing.createElement("marker",{
+            id: id,
+            markerWidth:"10",
+            markerHeight: "10",
+            refX:"10",
+            refY:"5",
+            orient: "auto",        
+        })
+        marker.appendChild(SVGDrawing.createElement("path",{d:"M0,0 L10,5 L0,10 Z",class:"arrowhead" }));
+        const defs = SVGDrawing.createElement("defs");
+        defs.appendChild(marker);
+        drw.getSvgElement().appendChild(defs);
+        const path = new SVGPath("arrow",{"marker-end":`url(#${id})`});
+        const dist = (to_pos - from_pos) * height;        
+        let starty = 0;
+        let endy = starty+dist;
+        let shift = 0;
+        if (endy < 0) {
+            shift = -endy;
+            endy+=shift;
+            starty+=shift;
+        } 
+        const arc = Math.abs(dist)/2;
+        const m = (starty+endy)/2;
+        path.mt(0,starty);
+        path.bct(m,m, m, m, 0,endy);
+        svgel.appendChild(path.build());
+        svgel.setAttribute("style",`pointer-events: none;position: absolute; height:${Math.abs(dist)}px;width:${m+10}px;left:0;top:${-shift+height/2}px;z-index:1000`);    
+        el.appendChild(svgel);
+    });
+}
 
 </script>
 
@@ -444,6 +574,9 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
                         @click="if(focused_item ==y) dialog_editor!.show(); else focused_item =y">
                         {{ ActionNameMap[y.header.action as number]}} {{ print_action_flags(y) }}
                         <div class="buttonx" @click="(ev:Event) => {erase_item(y, cat);ev.stopPropagation()}"></div>
+                        <div class="arrowstart" v-if="(y instanceof TMA_IFJMP) && y.parm2" :ref="el=>draw_arrow(el, x, y)">
+
+                        </div>
                     </div>
                 </template>
             </div>
@@ -524,17 +657,17 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
             <label><input type="checkbox" v-model="focused_item.snd_flags.random_balance"><span>Randomize sound direction</span></label>
             <label><button @click="play_sound">Test</button></label>
         </template>
-        <template v-if="(focused_item instanceof TMA_CANCELACTION)">       
+        <template v-else-if="(focused_item instanceof TMA_CANCELACTION)">       
             <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector"></input></label>
             <label><span>Target side</span><select v-model="focused_item.dir"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></label>
             <p class="note">You must specify target of the message to cancel. Only one pending message is canceled </p>
         </template>
-        <template v-if="(focused_item instanceof TMA_CODELOCK)">       
+        <template v-else-if="(focused_item instanceof TMA_CODELOCK)">       
             <label><span>Letter to add</span><input type="text" v-model="focused_item.znak" maxlength="1"></input></label>
             <label><span>Valid seq. of letters</span><input type="text" v-model="focused_item.string" maxlength="8"></input></label>
             <label><span>Memory slot</span><input type="number" v-watch-range v-model="focused_item.codenum" min="0" max="15"></input></label>
         </template>
-        <template v-if="(focused_item instanceof TMA_TEXT) && script">       
+        <template v-else-if="(focused_item instanceof TMA_TEXT) && script">       
             <template v-if="focused_item.header.action == ActionType.DIALG">
                 <label><span>Dialog ID</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.textindex"></input></label>
             </template>
@@ -564,20 +697,86 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
                 <div style="text-align: right;"><button @click="stringtable_add_text">Add new text</button></div>
             </template>
         </template>
-        <template v-if="focused_item instanceof TMA_TWOP">       
-            {{ focused_item }}
+        <template v-else-if="(focused_item instanceof TMA_IFJMP)">       
+            <template v-if="focused_item.header.action == ActionType.RANDJ">
+                <p class="note">The dice is rolled once per event, not per command</p>
+                <label><span>Jump percentage [%]</span><input type="number" v-model="focused_item.parm1" v-watch-range min="1" max="100"></input></label>
+            </template>
+            <template v-else>
+                <template v-if="focused_item.header.action == ActionType.IFJMP">
+                    <label><span>Condition</span><select v-model="focused_item.cond.cond">
+                        <option v-for="x of IfJumpCondition" :key="x[0]" :value="x[0]">{{ x[1] }}</option>
+                    </select></label>
+                </template>                
+                <template v-else-if="focused_item.header.action == ActionType.ISFLG">
+                    <div class="factedit"><FactEditor v-model="focused_item.cond.cond"></FactEditor></div>
+                </template>
+                <template v-else-if="focused_item.header.action == ActionType.HAVIT || focused_item.header.action == ActionType.PICKI">
+                    <ItemList v-model="item_list_TMA_HAVEIT" :limit="1"></ItemList>
+                </template>
+                <template v-else-if="focused_item.header.action == ActionType.IFACT">
+                    <label><span>Action type</span><select v-model="focused_item.cond.cond">
+                        <template v-for="(x, idx) of SimpleActionTypeName" :key="idx">
+                            <option v-if="x" :value="idx">{{ x }}</option>
+                        </template>
+                    </select></label>
+                </template>
+                <label><input type="checkbox" v-model="focused_item.cond.invert"><span>Jump if FALSE</span></label>
+            </template>
+            <label><span>Jump to command</span>
+                <select v-model="relative_offset_TMA_IFJMP">
+                    <template v-for="(x,idx) of script?.actionList" :key="idx">
+                        <option v-if="(x.flags & focused_item.flags)" :value="idx"> {{ `#${idx}` }} - {{ ActionNameMap[x.header.action as number] }} </option>
+                    </template>
+                </select></label>
         </template>
-        <template v-if="(focused_item instanceof TMA_DROPITM)">       
+        <template v-else-if="(focused_item instanceof TMA_TELEPORT)">       
+            <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.parm1"></input></label>
+            <label><span>Target side</span><select v-model="focused_item.telep_flags.direction"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></label>
+            <label><input type="checkbox" v-model="focused_item.telep_flags.effect"></input><span>Play teleport effect</span></label>
+        </template>
+        <template v-else-if="(focused_item instanceof TMA_TWOP)">       
+            <template v-if="focused_item.header.action == ActionType.SWAPS">
+                <label><span>Sector 1</span><input type="number" v-watch-range min="1" max="65535" v-model="focused_item.parm1"></input></label>
+                <label><span>Sector 2</span><input type="number" v-watch-range min="1" max="65535" v-model="focused_item.parm2"></input></label>
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.SHRMA">
+                <label><span>Target sector</span><input type="number" v-watch-range min="1" max="65535" v-model="focused_item.parm1"></input></label>
+                <label><span>Target side</span><select v-model="focused_item.parm2"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></label>
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.CHFLG">
+                <label><span>Operation</span><select v-model="focused_item.parm2">
+                    <option value="0">Clear</option>
+                    <option value="1">Set</option>
+                    <option value="2">Toggle</option>
+                </select></label>
+                <div class="factedit"><FactEditor v-model="focused_item.parm1"></FactEditor></div>
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.GOMOB">
+                <label><span>Enemy which is at sector</span><input type="number" v-watch-range min="1" max="65535" v-model="focused_item.parm1"></input></label>
+                <label><span>Send it to sector</span><input type="number" v-watch-range min="1" max="65535" v-model="focused_item.parm2"></input></label>
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.SNDEX">
+                <label><span>Experience value</span><input type="number" v-watch-range min="1" max="32767" v-model="focused_item.parm1"></input></label>
+            </template>
+            <template v-else>
+                <p class="note">UI is not available yet, fallback to generic form</p>
+                <label><span>Parameter 1</span><input type="number" v-watch-range min="-32768" max="32767" v-model="focused_item.parm1"></input></label>
+                <label><span>Parameter 2</span><input type="number" v-watch-range min="-32768" max="32767" v-model="focused_item.parm2"></input></label>
+            </template>
+            
+        </template>
+        <template v-else-if="(focused_item instanceof TMA_DROPITM)">       
             <label><span>Select an item:</span><ItemList v-model="item_list_TMA_DROPITM" :limit="1"></ItemList></label>
         </template>
-        <template v-if="(focused_item instanceof TMA_FIREBALL)">       
+        <template v-else-if="(focused_item instanceof TMA_FIREBALL)">       
             <label><span>X - front back</span><input type="number" v-watch-range min="-63" max="63" v-model="focused_item.xpos"></input></label>
             <label><span>Y - left right</span><input type="number" v-watch-range min="0" max="499" v-model="focused_item.ypos"></input></label>
             <label><span>Z - top bottom</span><input type="number" v-watch-range min="0" max="319" v-model="focused_item.zpos"></input></label>
             <label><span>Speed (+X per frame)</span><input type="number" v-watch-range min="0" max="128" v-model="focused_item.speed"></input></label>
             <label><span>Thrown item:</span><ItemList v-model="item_list_TMA_FIREBALL" :limit="1"></ItemList></label>            
         </template>
-        <template v-if="(focused_item instanceof TMA_GLOBE)">       
+        <template v-else-if="(focused_item instanceof TMA_GLOBE)">       
             <label><span>Global event</span><select v-model="focused_item.event">
                 <option v-for="(s, idx) of globalEvents" :key="idx" :value="idx"> {{ s }}</option>
                 </select></label>
@@ -586,10 +785,10 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
             <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector"></input></label>
             <label><span>Target side</span><div><select v-model="focused_item.side"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></div></label>
         </template>
-        <template v-if="(focused_item instanceof TMA_IFSEC)">       
+        <template v-else-if="(focused_item instanceof TMA_IFSEC)">       
             {{ focused_item }}
         </template>
-        <template v-if="(focused_item instanceof TMA_LOADLEV)">       
+        <template v-else-if="(focused_item instanceof TMA_LOADLEV)">       
             <template v-if="focused_item.header.action == ActionType.LOADL">
                 <label><span>Level name</span><input type="text" ref="list_of_maps" v-model="focused_item.name" maxlength="12"></label>
                 <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65536" v-model="focused_item.start_pos"></label>
@@ -604,17 +803,20 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
                 <label><span>UI behavior</span><select v-model="focused_item.dir">
                     <option value="0">In game window</option>
                     <option value="1">Fullscreen</option>
-                </select></label>
+                </select></label>            
+            </template>
+            <template v-else-if="focused_item.header.action == ActionType.ENDGM">
+                <label><span>Credits file</span><input type="text"  v-model="focused_item.name" maxlength="12"></label>
             </template>
             <template v-else>
                 {{ focused_item }}
             </template>
         </template>
-        <template v-if="(focused_item instanceof TMA_LOCK)">       
+        <template v-else-if="(focused_item instanceof TMA_LOCK)">       
             <label><span>Key ID (-1 = no key exists)</span><input type="number" ref="list_of_keys" v-watch-range min="-1" max="255" v-model="focused_item.key_id"></input></label>
             <label><span>Picklock level (-1 = can't be picked):</span><input type="number" v-watch-range min="-1" max="256" v-model="focused_item.thieflevel"></input></label>
         </template>
-        <template v-if="(focused_item instanceof TMA_SEND_ACTION)">       
+        <template v-else-if="(focused_item instanceof TMA_SEND_ACTION)">       
             <label><span>Action</span><select v-model="focused_item.s_action">
                 <template v-for="(n,idx) of SimpleActionTypeName" :key="idx"><option v-if="n" :value="idx"> {{ n }}</option></template>
             </select></label>
@@ -627,14 +829,14 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
             <label><input type="checkbox" v-model="focused_item.change_bits.block_item"><span>Toggle item barrier</span></label>
             <label><input type="checkbox" v-model="focused_item.change_bits.block_sound"><span>Toggle sound barrier</span></label>
         </template>
-        <template v-if="(focused_item instanceof TMA_SWAPS)">       
+        <template v-else-if="(focused_item instanceof TMA_SWAPS)">       
             <label><span>Sector1</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector1"></input></label>
             <label><span>Sector2</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector2"></input></label>
         </template>
-        <template v-if="focused_item instanceof TMA_UNIQUE">       
+        <template v-else-if="(focused_item instanceof TMA_UNIQUE)">       
             {{ focused_item }}
         </template>
-        <template v-if="focused_item instanceof TMA_WOUND">       
+        <template v-else-if="focused_item instanceof TMA_WOUND">       
             <label><span>Type of damage</span><select v-model="focused_item.pflags">
                 <option v-for="(s,idx) of WoundType" :key="idx" :value="idx"> {{ s }}</option>               
             </select></label>
@@ -646,7 +848,11 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
         </x-form>
     </template>
     <footer>
-        <button @click="dialog_editor!.close()">Close</button>
+        <div class="raw">
+            <input type="checkbox" v-model="show_raw_object">Show raw object</input>
+            <pre v-if="show_raw_object">{{  focused_item }}</pre>
+        </div>
+        <button @click="dialog_editor!.close()">Close</button>        
     </footer>
 
 </dialog>
@@ -675,6 +881,9 @@ const item_list_TMA_FIREBALL = create_computed_select_item<TMA_DROPITM>("item");
     position: relative;
 }
 
+.list .tree-node {
+    position: relative;
+}
 
 .list .tree-node .event-name::before {
     position: absolute;
@@ -751,6 +960,37 @@ dialog.editor {
 dialog input[type=number] {
     width: 7rem;
     text-align: center;
+}
+
+.raw {
+    float: left;
+    text-align: left;
+}
+.raw pre {
+    font-size: 0.8rem;
+}
+
+.arrowstart {
+    display: inline-block;
+    height: 1rem;
+    position: relative;
+}
+
+.arrowstart :deep(path) {
+    fill:none;
+    stroke: #0008;
+}
+
+.arrowstart :deep(.arrowhead) {
+    fill:#0008;
+    stroke: none;
+}
+
+.factedit {
+    max-height: 15rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-bottom: 1px solid;
 }
 
 </style>

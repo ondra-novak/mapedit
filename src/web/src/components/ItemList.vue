@@ -147,8 +147,8 @@ watch(item_templates, ()=>datalist.update());
 .itemlist > div:last-child {
     padding-right: 3rem;
     white-space: nowrap;
-    min-width: 3rem;
+    min-width: 5rem;
     border: 0;
-    height: 1rem;
+    height: 1.5rem;
 }
 </style>

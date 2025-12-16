@@ -2,7 +2,7 @@ import { parse } from "vue/compiler-sfc";
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, loadBinaryContent, parseSection, splitArrayBuffer, writeSection, type Schema } from "./binary"
 import { ItemDef, ItemSchema } from "./items_struct";
 import { string_from_keybcs2 } from "./keybcs2";
-import { bitproxy } from "./bitproxy";
+import { bitproxy, condition_proxy} from "./bitproxy";
 
 const MapSections = {
     SIDEMAP: 0x8001,
@@ -528,6 +528,18 @@ export class TMA_TWOP extends TMA_GEN {
     }};;
 };
 
+export class TMA_IFJMP extends TMA_TWOP {
+    cond = condition_proxy(this, "parm1");
+    constructor() {
+        super();
+        this.parm2 = 1;
+    }
+};
+
+export class TMA_TELEPORT extends TMA_TWOP {
+    telep_flags = bitproxy({direction:0x3, effect:0x80},this, "parm2");
+};
+
 export class TMA_UNIQUE extends TMA_GEN {
     
     item: ItemDef = new ItemDef();
@@ -707,10 +719,10 @@ const action_to_schema = [
    TMA_SEND_ACTION,TMA_FIREBALL,TMA_GEN,TMA_LOADLEV,
    TMA_DROPITM,TMA_TEXT,TMA_TEXT,TMA_CODELOCK,
    TMA_CANCELACTION,TMA_LOCK,TMA_SWAPS,TMA_WOUND,
-   TMA_TWOP,TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_TWOP,
-   TMA_TWOP,TMA_TWOP,TMA_LOADLEV,TMA_DROPITM,
-   TMA_TWOP,TMA_TWOP,TMA_UNIQUE,TMA_TWOP,TMA_UNIQUE,
-   TMA_TWOP,TMA_LOADLEV,TMA_TWOP,TMA_LOADLEV,
+   TMA_IFJMP,TMA_TWOP,TMA_IFJMP,TMA_TEXT,TMA_IFJMP,
+   TMA_TWOP,TMA_TELEPORT,TMA_LOADLEV,TMA_DROPITM,
+   TMA_IFJMP,TMA_TWOP,TMA_UNIQUE,TMA_TWOP,TMA_UNIQUE,
+   TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_LOADLEV,
    TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_IFSEC,TMA_TWOP
 ]
 

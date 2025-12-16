@@ -242,7 +242,8 @@ export class SVGDrawing {
     }
 
     createElement(tagName: string, attributes : Record<string, string> = {}, className = "") {
-        SVGDrawing.createElement(tagName,attributes, className);
+        const el = SVGDrawing.createElement(tagName,attributes, className);
+        this.appendElement(el);
         return this;
     }
 
@@ -262,41 +263,41 @@ export class SVGDrawing {
 
 
     static createRectangle(x:number, y:number, width:number, height:number, attributes = {}, className = "") {
-        return this.createElement("rect", { x:round(x), y:round(y), width:round(width), height:round(height), ...attributes }, className);
+        return SVGDrawing.createElement("rect", { x:round(x), y:round(y), width:round(width), height:round(height), ...attributes }, className);
     }
 
     static createLine(x1:number, y1:number, x2:number, y2:number, attributes = {}, className = "") {
-        return this.createElement("line", { x1:round(x1), y1:round(y1), x2:round(x2), y2:round(y2), ...attributes }, className);
+        return SVGDrawing.createElement("line", { x1:round(x1), y1:round(y1), x2:round(x2), y2:round(y2), ...attributes }, className);
         
     }
 
     /*
     createCircle(cx, cy, r, attributes = {}, className = "") {
-        const circle = this.createElement("circle", { cx, cy, r, ...attributes }, className);
+        const circle = SVGDrawing.createElement("circle", { cx, cy, r, ...attributes }, className);
         this.appendElement(circle);
         return circle;
     }
 
     createLine(x1, y1, x2, y2, attributes = {}, className = "") {
-        const line = this.createElement("line", { x1, y1, x2, y2, ...attributes }, className);
+        const line = SVGDrawing.createElement("line", { x1, y1, x2, y2, ...attributes }, className);
         this.appendElement(line);
         return line;
     }
 
     createEllipse(cx, cy, rx, ry, attributes = {}, className = "") {
-        const ellipse = this.createElement("ellipse", { cx, cy, rx, ry, ...attributes }, className);
+        const ellipse = SVGDrawing.createElement("ellipse", { cx, cy, rx, ry, ...attributes }, className);
         this.appendElement(ellipse);
         return ellipse;
     }
 
     createPolygon(points, attributes = {}, className = "") {
-        const polygon = this.createElement("polygon", { points, ...attributes }, className);
+        const polygon = SVGDrawing.createElement("polygon", { points, ...attributes }, className);
         this.appendElement(polygon);
         return polygon;
     }
 
     createText(x, y, t, attributes = {}, className = "") {
-        const text = this.createElement("text", { x, y, ...attributes }, className);
+        const text = SVGDrawing.createElement("text", { x, y, ...attributes }, className);
         text.textContent = t;
         this.appendElement(text);
         return text;
@@ -308,7 +309,7 @@ export class SVGDrawing {
     }
 
     createGroup(attributes:Record<string,string>={}, className = "") {
-        const group = this.createElement("g", { ...attributes }, className);
+        const group = SVGDrawing.createElement("g", { ...attributes }, className);
         return group;
 
     }

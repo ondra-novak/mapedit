@@ -25,3 +25,36 @@ export function bitproxy<T extends Record<string, number> > (definition:T, obj:a
     });
 }
 
+
+type Condition = {
+    invert: boolean,
+    cond: number|null,
+}
+
+export function condition_proxy(obj: any, field:string): Condition {
+
+    function decompose(): Condition {
+        const v = obj[field];
+        return {invert: v < 0, cond: v?Math.abs(v)-1:null};
+    }
+    function compose(x : Condition) {
+        obj[field] = (x.cond === null)?0:(x.invert?-1:1) * (x.cond+1);
+    }
+
+    return new Proxy<Condition> ( {} as Condition, {
+        get(_,prop:string) {
+            const x = decompose();            
+            return (x as Record<string, any>)[prop];
+        },
+        set(_, prop:string, newValue: any) {
+            const x = decompose();
+            if (prop in x) {
+                const y = x as Record<string, any>;
+                y[prop] = newValue;
+                compose(x);
+                return true;
+            }
+            return false;
+        }
+    });
+}
