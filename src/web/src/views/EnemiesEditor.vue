@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import AssetToolSeq from '@/components/AssetToolSeq.vue';
 import CanvasView from '@/components/CanvasView.vue';
-import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { COLPaletteSet } from '@/core/col_palette_set';
@@ -15,22 +14,15 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch, type WatchHandl
 import StatusBar from '@/core/status_bar_control'
 import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
 
-const required_files : FileItem[] =[
-    {name:"ENEMY.DAT",group:AssetGroup.MAPS,ovr:false},
-    {name:"SOUND.DAT",group:AssetGroup.MAPS,ovr:false},
-    {name:"ITEMS.DAT",group:AssetGroup.MAPS,ovr:false},
-];
 
 const enemies = ref<EnemyDef[]>([]);
 const sounds = ref<EnemySounds>([]);
 const items = ref<ItemDef[]>([]);
 
 const selected_enemy = ref<number>();
-
-const import_enemy_dat_file = ref<File>();
-const import_sound_dat_file = ref<File>();
 
 const list_graphics = ref<string[]>([]);
 const list_sounds = ref<string[]>([]);
@@ -44,42 +36,34 @@ const edit_seq = ref<string>();
 
 
 async function  load_files() {
-    const ep = server.getDDLFile("ENEMY.DAT");
-    const sp = server.getDDLFile("SOUND.DAT");
-    const ip = server.getDDLFile("ITEMS.DAT");
-    try {
-        enemies.value = enemyFromArrayBuffer((await ep));
-    } catch (e) {
-        console.warn("failed to load ENEMY.DAT",e);
+
+    const [en, sd, id] = await Promise.all([
+        getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS),
+        getDDLFileWithImport(server, "SOUND.DAT", AssetGroup.MAPS),
+        getDDLFileWithImport(server, "ITEMS.DAT", AssetGroup.MAPS)
+    ]);
+    if (en) {
+        enemies.value = enemyFromArrayBuffer(en);
     }
-    try {
-        sounds.value = enemySoundsFromArrayBuffer((await sp));
-    } catch (e) {
-        console.warn("failed to load SOUND.DAT",e);
-    }
-    if (enemies.value && sounds.value) {
+    if (sd) {
+        sounds.value = enemySoundsFromArrayBuffer(sd);
         enemies.value.forEach(enm=>{
             enm.sound_files = [];
             for (let i = 0; i < 4; ++i) {
                 enm.sound_files[i] = sounds.value[enm.sounds[i]-1] || "";
             }
         });
-    }
-    try {
-        items.value = itemsFromArrayBuffer(await ip);
-    } catch (e){
-        console.warn("failed to load ITEMS.DAT")
-    }
+    } 
+    if (id) {
+        items.value = itemsFromArrayBuffer(id);
+    } 
+
 
     StatusBar.setChangedFlag(false);
     selected_enemy.value = undefined;
 }
 
 
-function create_new_project() {
-    enemies.value = [];
-    sounds.value = [];
-}
 
 async function load_graphics() {
     try {
@@ -569,8 +553,6 @@ function closeAppearence() {
         </div>
         </div>
     </x-workspace>
-
-    <MissingFiles :files="required_files" @imported="load_files" @created_new="create_new_project"></MissingFiles>
 
     <div class="new-enemy-window" v-if="new_enemy_type !== undefined">
         <x-form>

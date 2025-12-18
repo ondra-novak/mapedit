@@ -1,11 +1,11 @@
 <script lang="ts" setup>
-import MultiactionEditor, { type ModelDef } from '@/components/MultiactionEditor.vue';
+import MultiactionEditor, { type MultiactionModelDef } from '@/components/MultiactionEditor.vue';
 import { ActionType, create_action_instance, TMA_TEXT, type TMA_GEN } from '@/core/map_structs';
 import { onMounted, ref, triggerRef } from 'vue';
 
 
 
-const initial_script = ref<ModelDef>({actionList:[],stringTable:[]});
+const initial_script = ref<MultiactionModelDef>({actionList:[],stringTable:[]});
 
 
 onMounted(()=>{            

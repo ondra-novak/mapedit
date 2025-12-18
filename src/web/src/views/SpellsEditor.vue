@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { CharacterStatsNames, ElementTypeName, SpellEffectName } from '@/core/common_defs';
@@ -9,11 +8,8 @@ import { spellsFromArrayBuffer, SpellCommandsArgs ,type TKouzlo, SpellArgument, 
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { create_datalist } from '@/utils/datalist';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
-const required_files: FileItem[] = [
-    {group:AssetGroup.MAPS,name:"ITEMS.DAT",ovr:true},
-    {group:AssetGroup.MAPS,name:"KOUZLA.DAT",ovr:true}
-];
 
 const spell_list = ref<TKouzlo[]>([]);
 const current_spell = ref<TKouzlo>();
@@ -40,17 +36,22 @@ const FlagsNames = ["---","enemy in front","teleport","enemy in front | teleport
 function init() {
     function reload() {
         current_spell.value = undefined;
-        server.getDDLFile("KOUZLA.DAT").then(x=>{
-            spell_list.value = spellsFromArrayBuffer(x);
-                nextTick(()=>{
-                    StatusBar.setChangedFlag(false);
-                })
+        getDDLFileWithImport(server, "KOUZLA.DAT", AssetGroup.MAPS).then(x=>{
+            if (x) {
+                spell_list.value = spellsFromArrayBuffer(x);
+            } else {
+                spell_list.value = [];
+            }
+            nextTick(()=>{
+                StatusBar.setChangedFlag(false);
+            })
+        });
+        getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(x=>{
+            if (x) item_list.value = itemsFromArrayBuffer(x);    
+            else item_list.value = [];
         });
     }
 
-    server.getDDLFile("ITEMS.DAT").then(x=>{
-        item_list.value = itemsFromArrayBuffer(x);    
-    });
     
     reload();
     server.getDDLFiles(null,null).then(x=>{
@@ -341,7 +342,7 @@ watch(item_list, (nv)=>ds_spellItems.update(()=>nv.map((v,id)=>({value:v.jmeno, 
     </div>
 
 
-<MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
+
 </template>
 
 <style scoped>

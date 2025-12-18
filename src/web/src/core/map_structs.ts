@@ -1,7 +1,5 @@
-import { parse } from "vue/compiler-sfc";
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, loadBinaryContent, parseSection, splitArrayBuffer, writeSection, type Schema } from "./binary"
 import { ItemDef, ItemSchema } from "./items_struct";
-import { string_from_keybcs2 } from "./keybcs2";
 import { bitproxy, condition_proxy} from "./bitproxy";
 
 const MapSections = {
@@ -342,7 +340,7 @@ export class TMA_SOUND extends TMA_GEN {
     snd_flags = bitproxy(TMA_SOUND.snd_flags_def, this, "_snd_flags");    
 
     getSchema(): Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         _snd_flags: "uint8",
         volume: "uint8",
@@ -362,7 +360,7 @@ export class TMA_TEXT extends TMA_GEN{
     textindex:number = 0;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         pflags: "uint8",
         textindex: "int32"
@@ -385,7 +383,7 @@ export class TMA_SEND_ACTION extends TMA_GEN {
     },this,"_change_bits");
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         _change_bits: "uint8",
         sector: "uint16",
@@ -404,7 +402,7 @@ export class TMA_FIREBALL extends TMA_GEN {
     item:number | null = null;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         xpos: "int16",
         ypos: "int16",
@@ -421,7 +419,7 @@ export class TMA_LOADLEV extends TMA_GEN {
     name:string = "";
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         start_pos: "int16",
         dir: "uint8",
@@ -434,7 +432,7 @@ export class TMA_DROPITM extends TMA_GEN {
     item: number | null = null;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         item: "int16"
     }};;
@@ -449,7 +447,7 @@ export class TMA_CODELOCK extends TMA_GEN {
 
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         znak: "char[1]",
         string: "char[8]",
@@ -464,7 +462,7 @@ export class TMA_CANCELACTION extends TMA_GEN {
     dir:number = 0;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         pflags: "uint8",
         sector: "int16",
@@ -479,7 +477,7 @@ export class TMA_SWAPS extends TMA_GEN {
     sector2: number = 0;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         pflags: "uint8",
         sector1: "int16",
@@ -494,7 +492,7 @@ export class TMA_WOUND extends TMA_GEN {
     major:number = 0;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         pflags: "uint8",
         minor: "int16",
@@ -508,7 +506,7 @@ export class TMA_LOCK extends TMA_GEN {
     thieflevel: number = -1;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         key_id: "int16",
         thieflevel: "int16"
@@ -521,7 +519,7 @@ export class TMA_TWOP extends TMA_GEN {
     parm2:number = 0;
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         parm1: "int16",
         parm2: "int16"
@@ -545,7 +543,7 @@ export class TMA_UNIQUE extends TMA_GEN {
     item: ItemDef = new ItemDef();
 
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         item: ItemSchema
     }};;
@@ -561,7 +559,7 @@ export class TMA_GLOBE extends TMA_GEN {
     param:number=0;
     
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         event: "uint8",
         sector: "uint16",
@@ -579,7 +577,7 @@ export class TMA_IFSEC extends TMA_GEN {
     invert: number = 0;
     
     getSchema() : Schema { return {
-        action: "uint8",
+        _action: "uint8",
         flags: "uint16",    
         side: "uint8",
         sector: "uint16",
@@ -615,76 +613,6 @@ function containsTWOPJump(item:TMA_GEN | null) : boolean{
     return false;
 
 }
-
-export class MAScript {
-    event: number = 0;
-    start: string = "";
-    flow: Record<string, MAExecutionLine<TMA_GEN> > = {};
-};
-
-export class MAScriptList {
-    list : MAScript[] = [];
-
-    get_or_create_script(event: number): MAScript {
-        const v = this.list.find(x=>x.event == event);
-        if (v) return v;
-        const w = new MAScript();
-        w.event = event;
-        this.list.push(w);
-        return w;
-    }
-
-    build() : TMA_GEN[] {
-        const res : TMA_GEN[] = [];
-        this.list.forEach(script => {
-
-            console.log("TMA building needs debugging!!!");
-
-            const seq : TMA_GEN[] = [];
-            const idmap : Record<string, number> = {};
-            let start = script.start;
-
-            function buildSet(start: string) {
-                let cur = start;
-                while (cur) {
-                    const ma = script.flow[cur];
-                    idmap[cur] = seq.length;
-                    const item = ma.item;
-                    if (!item) throw new Error("Errornous structure in multiactions!");
-                    item.flags = 1 << script.event;
-                    seq.push(item);
-                    cur = ma.next;
-                }
-                cur = start;
-                while (cur) {
-                    const idx = idmap[cur]
-                    const ma = script.flow[cur];
-                    const item = ma.item;
-                    if (containsTWOPJump(item)) {
-                        const twop = item as TMA_TWOP;
-                        const trg = ma.jump;
-                        let exists = idmap[trg];
-                        if (!exists) {
-                            buildSet(trg);
-                            exists = idmap[trg];
-                        }
-                        if (exists) {
-                            twop.parm2 = exists - idx;                            
-                        } else {
-                            throw new Error("Failed to build jump branch");
-                        }
-                    }
-                    cur = ma.next;
-                }
-            }
-
-            buildSet(start);
-
-            res.push(...seq);
-        });
-        return res;
-    }
-};
 
 type ConstructorWithSchema<T extends WithSchema> = { new(): T };
 
@@ -1235,7 +1163,7 @@ export class MapSide {
     target_side: number = 0;
     target_sector: number = 0;
     niche: NicheDef | null = null; 
-    actions = new MAScriptList;
+    actions : TMA_GEN[] = [];
     item_can_be_placed_behind: boolean = false;
     items: number[] = [];      //items always lying in front of side on left 
 }
@@ -1301,53 +1229,6 @@ export class MapPalettes {
     
 }
 
-function createActionScript(alist : TMA_GEN[]) : MAScriptList {        
-
-    const ret = new MAScriptList;
-
-    for (let i = 0; i < 16; ++i) {
-        const flg = 1 << i;
-        const script = new MAScript;        
-        let prev = "";
-        let any = false;
-        script.start = "0";
-        for (let p = 0; p < alist.length; ++p) {
-            const itm = alist[p];
-            if (itm.flags & flg) {
-                const id = p.toString();
-                script.flow[id] = new MAExecutionLine(itm, id);
-                any = true;
-                if (prev) {
-                    const prev_itm = script.flow[prev].item;
-                    if (!prev_itm || !prev_itm.header.cancel || prev_itm.header.once) {
-                        script.flow[prev].next = id;
-                    } 
-                    prev = id;
-                }                    
-            }
-        }
-        if (!any) continue;
-        script.event = i;
-        for (const id in script.flow) {
-            const ma = script.flow[id];
-            const itm = ma.item;
-            if (itm) {
-                const anum = itm.header.action;
-                const ln = parseInt(id);
-                if (containsTWOPJump(itm)) {
-                    const nx = (ln + (itm as TMA_TWOP).parm2).toString();
-                    if (!script.flow[nx]) {
-                        script.flow[nx] = new MAExecutionLine(null, nx);
-                    }
-                    ma.jump = nx;                                        
-                }
-            }
-        }
-        ret.list.push(script);
-    }
-
-    return ret;
-}
 
 export class MapFile {
     
@@ -1379,7 +1260,7 @@ export class MapFile {
                 n.target_sector = side.target_sector;
                 n.target_side = side.target_side & 0x3;                
                 n.niche = m.niches[place] || null;
-                n.actions = createActionScript(m.actions[place] || []);
+                n.actions = m.actions[place] || [];
                 n.items = m.items[place] || [];
                 n.item_can_be_placed_behind = (side.oblouk & 0x80) != 0;
                 nw.side[i] = n;
@@ -1512,11 +1393,7 @@ export class MapFile {
             });
         }).flat(1).filter(x=>x) as TNICHE[];
 
-        const actions : TMA_GEN[][] = this.sectors.map((s)=>{
-            return s.side.map((s)=>{
-                return s.actions.build();
-            });
-        }).flat(1);
+        const actions : TMA_GEN[][] = this.sectors.map(s=>s.side.map(ss=>ss.actions)).flat(1);
 
 
         const items : number[][] = this.sectors.map((s)=>{

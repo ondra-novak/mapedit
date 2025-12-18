@@ -1,7 +1,7 @@
 import ItemsEditor from "@/views/ItemsEditor.vue";
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, parseSection, splitArrayBuffer, writeSection, type Schema, type SectionInfo } from "./binary";
 import { StringList1, StringList3 } from "./common_defs";
-import { keybcs2_from_string } from "./keybcs2";
+import { string2keybcs } from "./keybcs2";
 
 
 export const ItemSchema : Schema =  {
@@ -185,7 +185,7 @@ export function itemsToArrayBuffers(items : ItemDef[]) : ArrayBuffer {
         [SV_WEAPON_ANIM, weapon_animation.lst],
         [SV_SNDLIST, sound.lst]        
     ] as [number, string[] ][]).forEach((p)=> {
-        const txt = p[1].map(t=>Uint8Array.from(keybcs2_from_string(t)));
+        const txt = p[1].map(t=>Uint8Array.from(string2keybcs(t)));
         txt.push(Uint8Array.from([]));
         const buff = joinUint8Arrays(txt.map(x=>x.buffer),0);
         writeSection(wr, p[0], buff.buffer);

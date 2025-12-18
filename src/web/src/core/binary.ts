@@ -1,4 +1,5 @@
-import { string_from_keybcs2, keybcs2_from_string } from "./keybcs2.ts";
+import { keybcs2string, string2keybcs } from "./keybcs2";
+
 
 export async function loadBinaryContent(url:string) {
     try {
@@ -77,7 +78,7 @@ export class BinaryIterator {
                     }
                     chars.push(charCode);
                 }
-                result = string_from_keybcs2(chars);                
+                result = keybcs2string(chars);                
             }
         } else {
             switch (type) {
@@ -155,7 +156,7 @@ export class BinaryIterator {
             if (byte === 0) break; // Null-terminated
             bytes.push(byte);
         }        
-        return string_from_keybcs2(bytes);
+        return keybcs2string(bytes);
     }
 
 }
@@ -202,7 +203,7 @@ export class BinaryWriter {
         } else if (type.startsWith('char[')) {
             const m = type.match(/\d+/) || ["0"];
             const length = parseInt(m[0], 10);
-            const encodedChars = keybcs2_from_string(value);
+            const encodedChars = string2keybcs(value);
             for (let i = 0; i < length; i++) {
                 const charCode = i < encodedChars.length ? encodedChars[i] : 0;
                 this.buffer.push(charCode);

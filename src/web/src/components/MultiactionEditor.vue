@@ -37,6 +37,7 @@ const ActionEventToBin = ActionEvent.reduce((a,b)=>{
 },{} as Record<string,number>);
 
 const ActionName = [
+[0,"Target",true,"No operation. This can be used as jump target if there is no other action available for this purpose"],
 [1,"Play sound",true,"Play sound on this side"],              //    SOUND: 1,
 [2,"Show test (global)",false,"Display message, use global stringtable"],                //    TEXTG: 2,
 [3,"Show text",true,"Display message"],             //    TEXTL: 3,
@@ -164,12 +165,12 @@ const IfJumpCondition = [
 ] as const;
 
 export type ActionList = TMA_GEN[];
-export type ModelDef = {
+export type MultiactionModelDef = {
     actionList: ActionList,
     stringTable: string[],   
 }
 
-const script = defineModel<ModelDef>();
+const script = defineModel<MultiactionModelDef>();
 const show_raw_object = ref(false);
 const cur_event = ref<number>(0);
 const list_of_sounds = ref<HTMLInputElement>();
@@ -320,12 +321,13 @@ const dialog_add_item = ref<HTMLDialogElement>();
 const dialog_clone_item = ref<HTMLDialogElement>();
 const dialog_editor = ref<HTMLDialogElement>();
 
+
 function add_new_item() {
     if (last_selected_command.value && last_selected_event.value && script.value) {
         opened_events.value = (opened_events.value || 0) | last_selected_event.value;
         const itm = create_action_instance(last_selected_command.value, last_selected_event.value)
         script.value.actionList = [ ... script.value.actionList, itm];
-        focused_item.value = itm;
+        focused_item.value = itm;        
         dialog_editor.value!.show();
     
     }
@@ -413,10 +415,6 @@ watch(focused_item, ()=>{
     if (!focused_item.value) {
         dlg.close();
     } else {
-        if (dlg.open) {
-            dlg.close();
-            setTimeout(()=>dlg.show(),1);
-        }
         if (focused_item.value instanceof TMA_TEXT) {
             stringtable_load_text();
         }
@@ -636,6 +634,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
     </footer>
 </dialog>
 
+<Teleport to="body">
 <dialog ref="dialog_editor" class="editor">
     <header>Edit command: {{  ActionNameMap[focused_item?.header.action as number || 0] }}</header>
     <template v-if="focused_item">
@@ -856,6 +855,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
     </footer>
 
 </dialog>
+</Teleport>
 
 </template>
 
@@ -864,7 +864,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
 .wrk {
     width: 100%;
     height: 100%;
-    background-color: white;
+    background-color: #ccc;
     position: relative;    
 }
 
@@ -879,6 +879,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
     cursor: pointer;
     padding-left: 1rem;
     position: relative;
+    background-color: #ddd;
 }
 
 .list .tree-node {

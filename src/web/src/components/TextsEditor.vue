@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { keybcs2_from_string, string_from_keybcs2 } from '@/core/keybcs2';
+import { keybcs2string, string2keybcs } from '@/core/keybcs2';
 import { readFileToArrayBuffer } from '@/core/read_file';
 import { MainStringtable } from '@/core/ui_strings';
 import { isImportTypeAssertionContainer } from 'typescript';
@@ -53,8 +53,7 @@ async function load_text() {
     if (filename.value && filename.value.endsWith(".TXT")) {
         try {
             const data = await server.getDDLFile(filename.value);
-            const udata = new Uint8Array(data);
-            const text = string_from_keybcs2(Array.from(udata));
+            const text = keybcs2string(data);
             const lines = text.split("\n").map(x=>x.trim()).filter(x=>x && !x.startsWith(";") && !x.startsWith("-1"));
             changed.value = undefined;
 
@@ -119,8 +118,8 @@ async function save_text() {
             ln.push("");
             text_file = ln.join("\n");
         }
-        const data = Uint8Array.from(keybcs2_from_string(text_file));
-        const p =  server.putDDLFile(changed.value, data.buffer, AssetGroup.MAPS);
+        const data = string2keybcs(text_file);
+        const p =  server.putDDLFile(changed.value, Uint8Array.from(data).buffer, AssetGroup.MAPS);
         emit("upload", changed.value, p);
         changed.value = undefined;
     }

@@ -2,11 +2,11 @@
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
-import { keybcs2_from_string, string_from_keybcs2 } from '@/core/keybcs2';
 import { AssetGroup } from '@/core/asset_groups';
 import { dosname_sanitize } from '@/core/dosname';
 import { humanDataFromArrayBuffer, humanDataToArrayBuffer, Runes, type THumanData } from '@/core/character_structs';
-import MissingFiles from '@/components/MissingFiles.vue';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
+import { string2keybcs } from '@/core/keybcs2';
 
 const missing_files : FileItem[] = [
     {name:"POSTAVY.DAT",group:AssetGroup.MAPS,ovr:true},
@@ -34,10 +34,12 @@ function reload() {
         Object.assign(basic_info.value, data);
         nextTick(()=>StatusBar.setChangedFlag(false));
     })
-    server.getDDLFile("POSTAVY.DAT").then(buff=>{
-        postavy_dat.value = humanDataFromArrayBuffer(buff);
-        runes.value = postavy_dat.value.runes;
-        nextTick(()=>StatusBar.setChangedFlag(false));
+    getDDLFileWithImport(server,"POSTAVY.DAT",AssetGroup.MAPS).then(buff=>{
+        if (buff) {
+            postavy_dat.value = humanDataFromArrayBuffer(buff);
+            runes.value = postavy_dat.value.runes;
+            nextTick(()=>StatusBar.setChangedFlag(false));
+        }
     })
 }
 
@@ -53,7 +55,7 @@ async function save() {
         lines.push(`${e[0]}=${e[1]}`.replace(/\r?\n/g,"|"));
     });
     const text = lines.join("\r\n");
-    const buff2 = Uint8Array.from(keybcs2_from_string(text)).buffer;
+    const buff2 = Uint8Array.from(string2keybcs(text)).buffer;
     await server.putDDLFile("_ADV.INI", buff2, AssetGroup.UNKNOWN);
 
     if (postavy_dat.value) {
@@ -103,7 +105,6 @@ watch([basic_info, runes], ()=>StatusBar.setChangedFlag(true),{deep:true});
 
 </x-workspace>
 
-<MissingFiles :files="missing_files"  @imported="reload"></MissingFiles>
 
 </template>
 <style lang="css" scoped>

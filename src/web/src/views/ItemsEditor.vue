@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch, type Ref, type WatchHandle } from 'vue';
@@ -11,11 +10,8 @@ import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/co
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import StatusBar from '@/core/status_bar_control'
 import { create_datalist } from '@/utils/datalist';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
-
-const required_files: FileItem[] = [
-    {group:AssetGroup.MAPS,name:"ITEMS.DAT",ovr:true}
-];
 
 const selected_item = ref<number>();
 
@@ -50,8 +46,8 @@ function init() {
         allIcons.value = x ;
     });
     function reload() {
-        server.getDDLFile("ITEMS.DAT").then(x=>{
-            item_list.value = itemsFromArrayBuffer(x);
+        getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
+            item_list.value = x?itemsFromArrayBuffer(x):[];
             selected_item.value = undefined;
             nextTick(()=>StatusBar.setChangedFlag(false));
         });
@@ -91,15 +87,6 @@ function addItem() {
     form.jmeno = "New Item";
     selected_item.value = pos;
     saveItemData();
-}
-
-function onCreateNew() {
-        item_list.value = [];  
-}
-
-function onImported() {
-    init();
-
 }
 
 const filteredAndSortedItems = computed(() => {
@@ -621,9 +608,6 @@ watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.t
     </div><button class="close" @click="change_icon_model=undefined"></button></div>
      </x-workspace>
 
-
-
-<MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
 
 </template>
 

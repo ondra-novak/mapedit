@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -9,12 +8,9 @@ import { itemsFromArrayBuffer, ItemTypeName, type ItemDef } from '@/core/items_s
 import HIFormat from '@/core/hiformat'
 import { PCX, PCXProfile } from '@/core/pcx';
 import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
 
-const missing_files : FileItem[] = [
-    {name:"SHOPS.DAT",group:AssetGroup.MAPS,ovr:true},
-    {name:"ITEMS.DAT",group:AssetGroup.MAPS,ovr:true},
-];
 
 const shop_list = ref<TShop[]>([]);
 const item_list = ref<ItemDef[]>([]);
@@ -66,26 +62,24 @@ watch([current_shop,pic_preview], ()=>{
         }
     }
 }, {deep:true})
-function onCreateNew() {
-    shop_list.value=[];
-}
-
-function onImported() {
-    init();
-}
 
 function init() {
 
     function reload() {
-        server.getDDLFile("SHOPS.DAT").then(buff=>{
-            shop_list.value = shopsFromArrayBuffer(buff);
+        getDDLFileWithImport(server,"SHOPS.DAT",AssetGroup.MAPS).then(buff=>{
+            if (buff) {
+                shop_list.value = shopsFromArrayBuffer(buff);
+            } else {
+                shop_list.value = [];   
+            }
             nextTick(()=>{
                 StatusBar.setChangedFlag(false);
             });
         })
-        server.getDDLFile("ITEMS.DAT").then(buff=>{
-            item_list.value = itemsFromArrayBuffer(buff);            
-        })
+        getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(buff=>{
+            if (buff) item_list.value = itemsFromArrayBuffer(buff);            
+            else item_list.value = [];
+        });
     }
     reload();
 
@@ -292,7 +286,6 @@ onUnmounted(StatusBar.onFinalSave);
     </div>
 </x-workspace>
 
-<MissingFiles :files="missing_files" @created_new="onCreateNew" @imported="onImported"/>
 
 </template>
 <style lang="css" scoped>

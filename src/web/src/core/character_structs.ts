@@ -1,5 +1,5 @@
 import { ItemWearPlace } from "./items_struct";
-import { keybcs2_from_string, string_from_keybcs2 } from "./keybcs2";
+import { keybcs2string, string2keybcs } from "./keybcs2";
 
 export interface THuman {
   jmeno: string;
@@ -103,7 +103,7 @@ export interface THumanData  {
 }
 
 export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
-  const data = string_from_keybcs2(Array.from(new Uint8Array(buff)));
+  const data = keybcs2string(Array.from(new Uint8Array(buff)));
   const iter = new Iterator(data);
   const humans: THuman[] = [];
   const runes: Runes = new Runes();
@@ -250,5 +250,5 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
         }
     }).join("\r\n")+"\r\n";
 
-    return Uint8Array.from(keybcs2_from_string(whole_str)).buffer;
+    return Uint8Array.from(string2keybcs(whole_str)).buffer;
 }

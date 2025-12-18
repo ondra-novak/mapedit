@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import MissingFiles from '@/components/MissingFiles.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -12,13 +11,9 @@ import { useBitmaskCheckbox2 } from '@/core/flags';
 import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue'
 import { create_datalist, type DataListHandle } from '@/utils/datalist';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
-const missing_files : FileItem[] = [
-    {name:"POSTAVY.DAT",group:AssetGroup.MAPS,ovr:true},
-    {name:"ITEMS.DAT",group:AssetGroup.MAPS,ovr:true},
-];
-
-let humand_data: THumanData;
+let humand_data: THumanData = {characters:[], runes:{air:[],earth:[],fire:[],mind:[],water:[]}};
 const postavy = ref<THuman[]>([]);
 const selected = ref<number>();
 const items  = ref<ItemDef[]>([]);
@@ -145,16 +140,24 @@ watch([effects], ()=>{if (selected_char.value && effects.value !== undefined) se
 
 function init() {
     function reload() {
-        server.getDDLFile("POSTAVY.DAT").then(buff=>{
-            humand_data = humanDataFromArrayBuffer(buff);
-            postavy.value = humand_data.characters;
-            console.log(postavy.value);
+        getDDLFileWithImport(server,"POSTAVY.DAT",AssetGroup.MAPS).then(buff=>{
+            if (buff) {
+                humand_data = humanDataFromArrayBuffer(buff);
+                postavy.value = humand_data.characters;
+            } else {
+                postavy.value = [];
+            }
             nextTick(()=>StatusBar.setChangedFlag(false));
         })
+        getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(buff=>{
+            if (buff) items.value = itemsFromArrayBuffer(buff);
+            else items.value = [];                    
+        });
     }
     
     StatusBar.registerSaveAndRevert(()=>{
         if (postavy.value) {
+            humand_data.characters = postavy.value;
             const buff = humanDataToArrayBuffer(humand_data)
             server.putDDLFile("POSTAVY.DAT", buff, AssetGroup.MAPS);
             }
@@ -163,10 +166,6 @@ function init() {
             reload();
     });
     reload();
-    server.getDDLFile("ITEMS.DAT").then(buff=>{
-        items.value = itemsFromArrayBuffer(buff);
-        
-    });
 }
 
 onMounted(init);
@@ -343,14 +342,6 @@ const HumanPlaceToWearPlace = [
 
 ]
 
-function onImported() {
-    init();
-}
-
-function onNewCreated() {
-    postavy.value = [];
-}
-
 const dl_wearitems = Object.keys(ItemWearPlace).reduce((v,k)=>{
     v[ItemWearPlace[k]] = create_datalist();    return v;
 },[] as DataListHandle[]);
@@ -495,9 +486,6 @@ watch(items, ()=>{
             </div>
         </x-section>
     </div>
-
-
-<MissingFiles :files="missing_files" @created_new="onNewCreated" @imported="onImported"></MissingFiles>
 
 </template>
 

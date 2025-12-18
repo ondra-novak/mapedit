@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
 import StatusBar from '@/core/status_bar_control'
 import { server, type FileItem } from '@/core/api';
-import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, WallConfiguration, type NicheDef } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
-import MissingFiles from '@/components/MissingFiles.vue';
 import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
 import { shallowClone, type Document } from '@/utils/document';
 import  globalState from '@/utils/global';
@@ -17,8 +16,12 @@ import svg_enemy from '@/assets/toolbar/enemy.svg'
 import PalleteEditor from '@/components/PalleteEditor.vue';
 import { messageBox } from '@/utils/messageBox';
 import { create_datalist } from '@/utils/datalist';
-import ItemList from '@/components/ItemList.vue';
 import NicheEditor from './NicheEditor.vue';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
+import { enc2string, keybcs2string } from '@/core/keybcs2';
+import type { MultiactionModelDef } from '@/components/MultiactionEditor.vue';
+import MultiactionEditor from '@/components/MultiactionEditor.vue';
+import { apply_array_diff, create_array_diff } from '@/utils/madiff';
 const list_assets = ref<string[]>([]);
 
 const EditMode = {
@@ -31,6 +34,7 @@ const EditMode = {
 
 const mapview = ref<HTMLElement>();
 const mapdraw :MapDraw=  new MapDraw();
+const stringtable = ref<string[]>([]);
 const curmap = shallowRef<MapFile>(new MapFile());
 const settings = reactive(globalState("mapview_settings",{
     curlevel : 0 as number,
@@ -49,6 +53,7 @@ type FocusItem = {
     side: number;
     sector_def: MapSector ;
     side_def: MapSide;    
+    script: MultiactionModelDef;
 }
 type LinkRef = {
     sector: number;
@@ -58,10 +63,11 @@ type LinkRef = {
 const ApplyMode = {
     ACTIVE:{t:"Active wall",v:-1},
     BOTH_SIDES:{t:"Active wall both sides",v:-2},
+    SELECTION_DIR:{t:"Selected in direction",v:8},
     PERIMETER:{t:"Perimeter walls ☐",v:4},
     INNER_SIDES:{t:"Inner walls ",v:5},
     EDGE_SIDES:{t:"Edge walls",v:6},
-    ALL_SIDES:{t:"All walls",v:7},
+    ALL_SIDES:{t:"All selected walls",v:7},
     NORTH:{t:"North ↑",v:0},
     EAST:{t:"East →",v:1},
     SOUTH:{t:"South ↓",v:2},
@@ -199,7 +205,12 @@ function updateFocusData(sect: number, side: number) {
                 focus.value = {sector: sect, 
                                side: side, 
                                sector_def: sdef,
-                               side_def: wdef};                
+                               side_def: wdef,
+                               script: {
+                                    actionList:shallowClone(wdef.actions),
+                                    stringTable:stringtable.value
+                               }
+                            };                
                                updateFocus();
                 StatusBar.setCurSectorSide(sect, side);
             } else {
@@ -532,6 +543,29 @@ function onMapLoaded() {
         settings.curlevel = curmap.value.sectors[start].level;
         redraw();
         mapcontainer.zoom_reset();
+        if (curmap.value.sectors.length) {
+            const sname = (StatusBar.cur_map_name.value || "").replace(/.MAP$/,".ENC");
+            getDDLFileWithImport(server,sname,AssetGroup.MAPS).then(x=>{
+                if (x) {
+                    const strings = enc2string(x).split('\n').map(x=>x.trim())
+                        .filter(x=>x.length && !x.startsWith(';'))
+                        .reduce((a,b)=>{
+                            const p = b.indexOf(' ');
+                            if (p == -1) return a;
+                            const idx = b.substring(0,p);
+                            const val = b.substring(p+1).trim();
+                            const idxval = parseInt(idx);
+                            if (isFinite(idxval) && idxval >= 0) {
+                                a[idxval] = val;
+                            }
+                            return a;
+                        },[] as string[]);
+                    stringtable.value = strings;
+                } else {
+                    stringtable.value = [];
+                }
+            })
+        }
     }
 
     StatusBar.registerSaveAndRevert(()=>{
@@ -568,13 +602,6 @@ function resetFloor() {
     settings.curlevel = s?.level || 0;
 }
 
-function onCreateNew() {
-
-}
-
-function onImported() {
-    
-}
 
 const edit_modes = [
 [svg_pointer,"Edit"],
@@ -636,6 +663,16 @@ function applyChanges() {
             const f_rem = ~old_sid.flags | nw_sid.flags;
             changesSide.push((s:MapSide)=>s.flags = (s.flags & f_rem)|f_add);
         }
+        if (JSON.stringify(old_sid.actions) != JSON.stringify(focus.value.script.actionList)) {
+            const diff = create_array_diff<TMA_GEN>(old_sid.actions, toRaw(focus.value.script.actionList), (a,b)=>{
+                return JSON.stringify(a) == JSON.stringify(b);
+            })
+            changesSide.push((s:MapSide)=>{
+                s.actions = apply_array_diff(s.actions, diff, (a,b)=>{
+                    return a._action == b._action && a.flags == b.flags;
+                });
+            });
+        }
 
         if (changesSector.length || changesSide.length) {
             const m  = begin_edit();
@@ -677,6 +714,7 @@ function applyChanges() {
                     let filter : ((sect:number,sid:number)=>boolean)|null = null;
                     switch (applyMode.value) {
                         case ApplyMode.ALL_SIDES.v: filter = ()=>true;break;
+                        case ApplyMode.SELECTION_DIR.v: filter = (_,sid)=>sid == focus.value?.side;break;
                         case ApplyMode.EDGE_SIDES.v: filter = (sect,sid)=>m.sectors[sect].exit[sid] == 0;break;
                         case ApplyMode.INNER_SIDES.v: filter = (sect,sid)=>selset.has(m.sectors[sect].exit[sid]);break;
                         case ApplyMode.PERIMETER.v: filter = (sect,sid)=>m.sectors[sect].exit[sid]!=0 && !selset.has(m.sectors[sect].exit[sid]);break;
@@ -877,6 +915,11 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
     </div>
         </x-form>
         </div>
+        <div class="maevents"><span class="title">Scripts (Multiactions)</span>
+            <div>
+            <MultiactionEditor v-model="focus.script"></MultiactionEditor>
+            </div>
+        </div>
         <div class="apply"><span class="title">Apply changes</span>
         <x-form>
             <label><span>Apply to side:</span>
@@ -894,19 +937,6 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
             <button v-if="!focus.side_def.niche" @click="create_niche">Create</button>
             <button v-if="focus.side_def.niche" @click="open_niche">Edit</button>
             </div>
-        </div>
-        <div class="maevents"><span class="title">Scripts (Multiactions)</span>
-            <div>
-                <div v-for="(item,idx) of focus.side_def.actions.list" :key="item.event" class="itm"> 
-                    <input type="checkbox"></input>
-                    <span>{{  ActionEvent[item.event] }}</span>
-                    <div>                        
-                        <button><img src="@/assets/toolbar/pencil.svg"></button>
-                        <button><img src="@/assets/toolbar/eraser.svg"></button>
-                    </div>
-                </div>
-            </div>
-            <div class="buttons"><button>+</button><button><img src="@/assets/toolbar/eraser.svg"></button></div>
         </div>
         
 
@@ -930,7 +960,7 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
 </div>
 </x-workspace>
 <NicheEditor v-if="curNiche != null" v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus!.side_def"></NicheEditor>
-<MissingFiles :files="required_files" @created_new="onCreateNew" @imported="onImported" />
+
 </template>
 
 
@@ -1018,6 +1048,7 @@ x-workspace > * {
 .right .palette > div.h {
     display: flex;
     flex-direction: column;    
+    flex-grow: 1;
 }
 
 .toolbar > .disabled img {
@@ -1119,51 +1150,27 @@ x-workspace > * {
     box-sizing: border-box;
     font-size: 1.5rem;
 }
-.right .palette div.apply {
+.right .palette div.maevents {
     flex-grow: 1;
 }
 
 .right {
     margin-left: 1px;
 }
-.maevents .itm {
-    display:flex;
-    padding-bottom: 0.1rem;
-    margin-bottom: 0.1rem;
-    border-bottom: 1px dotted;
-    cursor: pointer;
-}
 
-.maevents .itm:hover {
-    background-color: white;
+.maevents {
+    position:relative;
 }
-
-.maevents .itm > *:nth-child(2) {
-    flex-grow: 1;
+.maevents > span {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
 }
-.maevents .itm > * {
-    height: 1rem;
-}
-.maevents  img {
+.maevents > div {
     height: 100%;
+    box-sizing: border-box;
+    padding-top: 1.5rem;
 }
-.maevents .itm button {
-    padding: 0;
-    width: 2rem;
-    height: 1.5rem;    
-}
-.maevents .buttons {
-    text-align: right;
-}
-.maevents .buttons > *{
-    width: 2rem;
-    height: 2rem;
-    margin: 0 0.2rem;
-    vertical-align: top;
-    padding: 0;
-    font-weight: bold;
-}
-
-
 
 </style>

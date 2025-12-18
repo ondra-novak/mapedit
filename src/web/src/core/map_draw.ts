@@ -125,9 +125,8 @@ export class MapDraw {
                         }
                     }
                     if (sd.actions) {
-                        sd.actions.list.forEach(ma=>{
-                            for (const id in ma.flow) {
-                                const itm = ma.flow[id].item;
+                        sd.actions.forEach(ma=>{
+                                const itm = ma;
                                 if (itm && itm.header.action == ActionType.SENDA) {
                                     const senda = itm as TMA_SEND_ACTION;
                                     const ts = m.sectors[senda.sector];
@@ -137,8 +136,7 @@ export class MapDraw {
                                             this.drawActionFromWall(set.arrow.from_other,mx,smx);
                                         }                                    
                                     }
-                                }
-                            }
+                                }                            
                         })
                     }
 
@@ -292,11 +290,10 @@ export class MapDraw {
                         }
                     }
                 }
-                if (sd.actions && sd.actions.list.length) {
+                if (sd.actions && sd.actions.length) {
                     this.drawAction(set.action.script, mx);
-                    sd.actions.list.forEach(ma=>{
-                        for (const id in ma.flow) {
-                            const item = ma.flow[id].item;
+                    sd.actions.forEach(ma=>{
+                            const item = ma;
                             if (item && item.header.action == ActionType.SENDA) {
                                 const senda = item as TMA_SEND_ACTION;
                                 if (senda.sector != sector && senda.sector) {
@@ -305,8 +302,7 @@ export class MapDraw {
                                     if (tmx) {
                                         this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
                                     }
-                                }                                    
-                            }
+                                }                                                                
                         }
                     });
                 }

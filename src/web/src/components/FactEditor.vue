@@ -4,7 +4,6 @@ import { FactDB } from '@/core/factdb';
 import { computed, onMounted, ref, watch } from 'vue';
 import svg_pencil from '@/assets/toolbar/pencil.svg'
 import { AssetGroup } from '@/core/asset_groups';
-import { skip } from 'node:test';
 
 
 
