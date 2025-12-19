@@ -14,7 +14,7 @@ export function keybcs2string(buff: ArrayBuffer|number[]) {
 
 export function string2keybcs(s: string) {
     const bytes:number[] =[];
-    const replacement = "?".codePointAt(0);
+    const replacement = "?".codePointAt(0) as number;
     for (let i = 0; i < s.length; ++i) {
         let cp = s.codePointAt(i) || 32;
         if (cp >= 128) cp = keybcs2_rev_table[String.fromCodePoint(cp)] || replacement;

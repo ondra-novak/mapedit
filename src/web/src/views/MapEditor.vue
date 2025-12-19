@@ -177,6 +177,7 @@ function end_edit(map : MapFile) {
     StatusBar.cur_map.add_change(map);
     curmap.value = StatusBar.cur_map.get_current();
     updateControls();
+    StatusBar.setChangedFlag(true);
 }
 
 function doUndo() {
@@ -207,7 +208,7 @@ function updateFocusData(sect: number, side: number) {
                                sector_def: sdef,
                                side_def: wdef,
                                script: {
-                                    actionList:shallowClone(wdef.actions),
+                                    actionList:wdef.actions.map(x=>toRaw(shallowClone(x))),
                                     stringTable:stringtable.value
                                }
                             };                
@@ -569,7 +570,7 @@ function onMapLoaded() {
     }
 
     StatusBar.registerSaveAndRevert(()=>{
-        console.log("save");
+        StatusBar.saveMap();
     }, async ()=>{
         const doc = await StatusBar.reloadMap();
         reload(doc);
@@ -631,7 +632,6 @@ function applyChanges() {
         const nw_sec = focus.value.sector_def;
         const old_sid = curmap.value.sectors[focus.value.sector].side[focus.value.side]
         const nw_sid = focus.value.side_def;
-        let update_focus = false;
         if (old_sec.action != nw_sec.action) changesSector.push((s:MapSector)=>s.action = nw_sec.action);
         if (old_sec.ceil != nw_sec.ceil) changesSector.push((s:MapSector)=>s.ceil = nw_sec.ceil);
         if (old_sec.flags != nw_sec.flags) changesSector.push((s:MapSector)=>{
@@ -687,13 +687,11 @@ function applyChanges() {
                 } else {
                     const s = m.sectors[focus.value.sector] = shallowClone(m.sectors[focus.value.sector]);
                     for(const f of changesSector) f(s);
-                    update_focus = true;
                 }
             }
 
             if (changesSide.length) {
                 if (applyMode.value == ApplyMode.ACTIVE.v || applyMode.value == ApplyMode.BOTH_SIDES.v) {
-                    update_focus = true;
                     const s = m.sectors[focus.value.sector] = shallowClone(m.sectors[focus.value.sector]);
                     s.side = shallowClone(s.side);
                     const sid = s.side[focus.value.side] = shallowClone(s.side[focus.value.side]);
@@ -738,9 +736,7 @@ function applyChanges() {
                 }
             }
             end_edit(m);
-            if (update_focus) {
-                updateFocusData(focus.value.sector, focus.value.side);
-            }
+            updateFocusData(focus.value.sector, focus.value.side);
         }
     }
 }

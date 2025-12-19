@@ -1,6 +1,12 @@
 
+interface Clonable<T> {
+    clone?: ()=>T;
+}
+
 export function shallowClone<T>(obj: T):T {
-    if (obj === null || typeof obj !== "object") return obj;
+    if (obj === null || typeof obj !== "object") return obj;    
+    const c = obj as Clonable<T>;
+    if (c.clone && typeof(c.clone) === "function") return c.clone()
     if (Array.isArray(obj)) return obj.slice() as T;
     const cloned = Object.create(Object.getPrototypeOf(obj));
     return Object.assign(cloned, obj);

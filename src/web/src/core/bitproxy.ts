@@ -3,6 +3,7 @@
 export function bitproxy<T extends Record<string, number> > (definition:T, obj:any, field: string) : Record<keyof T, boolean | number>  {  
     return new Proxy<Record<keyof T, boolean | number> >( {} as Record<keyof T, boolean | number> ,{
         get(_, prop:string) {
+            if (prop == "__isProxy") return true;
             const m = definition[prop];
             if (m === undefined) return m;
             const shift = Math.log2(m & -m);
@@ -43,7 +44,8 @@ export function condition_proxy(obj: any, field:string): Condition {
 
     return new Proxy<Condition> ( {} as Condition, {
         get(_,prop:string) {
-            const x = decompose();            
+           if (prop == "__isProxy") return true;
+           const x = decompose();            
             return (x as Record<string, any>)[prop];
         },
         set(_, prop:string, newValue: any) {

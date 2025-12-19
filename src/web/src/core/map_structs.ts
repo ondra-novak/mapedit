@@ -317,6 +317,22 @@ export class TMA_GEN extends WithSchema {
 
     header = bitproxy(TMA_GEN.action_mask, this, "_action");
 
+    clone() : TMA_GEN  {
+        const c = create_action_instance(this.header.action as number, this.flags);
+        const r = c as Record<string, any>;
+        for (const n in this) {
+            const v = this[n] as any;
+            if (typeof v == "object" && v !== null) {
+                if (!v.__isProxy) {
+                    r[n] = JSON.parse(JSON.stringify(v));
+                }                 
+            } else {
+                r[n] = v;
+            }
+        }
+        return c;
+    }
+
 };
 
 export class TMA_SOUND extends TMA_GEN {
@@ -790,6 +806,7 @@ function serializeActions(a:  TMA_GEN[][]) : ArrayBuffer{
             wr.write_type("uint32", 0);
         }
     })
+    wr.write_type("uint32",0);
     return wr.getBuffer();
 }
 
@@ -995,7 +1012,7 @@ export class WallConfiguration extends AssetConfiguration{
         if (this.repeat_anim) side.flags |=SideFlag.PRIM_ANIM;
         if (this.forward_dir) side.flags |= SideFlag.PRIM_FORV;
         if (this.ping_pong) side.flags |= SideFlag.PRIM_GAB;
-        if (!this.transparent) side.flags |=SideFlag.NOT_TRANSPARENT;
+        if (!this.transparent && (side.flags & SideFlag.PRIM_VIS)) side.flags |=SideFlag.NOT_TRANSPARENT;
     }
     adjust_flags_sec(side: TSIDE){
         side.flags &= ~(SideFlag.SEC_ANIM|SideFlag.SEC_FORV|SideFlag.SEC_GAB|SideFlag.SPEC);
@@ -1003,7 +1020,7 @@ export class WallConfiguration extends AssetConfiguration{
         if (this.repeat_anim) side.flags |=SideFlag.SEC_ANIM;
         if (this.forward_dir) side.flags |= SideFlag.SEC_FORV;
         if (this.ping_pong) side.flags |= SideFlag.SEC_GAB;
-        if (!this.transparent) side.flags |=SideFlag.NOT_TRANSPARENT;
+        if (!this.transparent && (side.flags & SideFlag.SEC_VIS)) side.flags |=SideFlag.NOT_TRANSPARENT;
         return side.flags;
     }
     get_anim() : number {
@@ -1252,11 +1269,12 @@ export class MapFile {
                 const place = idx * 4 +i;
                 const side = m.sides[idx*4+i];
                 const n = new MapSide();
+                side.flags = side.flags ^ (SideFlag.NOT_AUTOMAP|SideFlag.NOT_TRANSPARENT);
                 n.primary = w.add(WallConfiguration.from(side, m.pixmap_front,m.pixmap_left,m.pixmap_right, false));
                 n.secondary = w.add(WallConfiguration.from(side, m.pixmap_front,m.pixmap_left,m.pixmap_right, true));
                 n.arc = a.add(ArcConfiguration.from(side, m.pixmap_arc_left,m.pixmap_arc_right));
                 n.action = side.action;
-                n.flags = side.flags ^ (SideFlag.NOT_AUTOMAP|SideFlag.NOT_TRANSPARENT);
+                n.flags = side.flags;
                 n.target_sector = side.target_sector;
                 n.target_side = side.target_side & 0x3;                
                 n.niche = m.niches[place] || null;
@@ -1326,13 +1344,13 @@ export class MapFile {
             return sect.side.map((s,side)=>{
                 const out = new TSIDE;
                 out.action = s.action;
-                out.flags = s.flags;
+                out.flags = s.flags & ~SideFlag.NOT_TRANSPARENT;
                 out.prim = walls.to_id(s.primary);
                 out.sec = walls.to_id(s.secondary);
                 out.oblouk = arc.to_id(s.arc) | ((s.primary?.position || 0) << 5) | (s.item_can_be_placed_behind?0x80:0);
                 out.target_sector = s.target_sector;
                 out.target_side = s.target_side;
-                if (s.primary) {
+                if (s.primary && s.flags) {
                     s.primary.adjust_flags_prim(out);
                     out.prim_anim = s.primary.get_anim();
                     out.lclip = s.primary.lclip;                    
