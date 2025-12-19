@@ -6,7 +6,7 @@ import { ref, watch, onMounted, computed, defineEmits, shallowRef, onUnmounted }
 import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import CanvasView from './CanvasView.vue';
 import { PCXProfile, PCX } from '@/core/pcx';
-import StatusBar from '@/core/status_bar_control'
+import StatusBar from '@/components/statusBar.ts'
 import { EnemyFlags1, type EnemyDef } from '@/core/enemy_struct';
 
 const emit = defineEmits<{
@@ -32,7 +32,7 @@ let play_anim = false;
 
 
 async function onUpdateModel() {
-    StatusBar.onFinalSave();
+    StatusBar.final_save();
     if (filename.value) {
         const f = filename.value;
         if (f.endsWith(".SEQ")) {
@@ -51,12 +51,10 @@ async function onUpdateModel() {
     list_files.value = ffiles.map(f=>f.name);
 
     
-    StatusBar.registerSaveAndRevert(()=>{
-        save();
-    },()=>{
-        StatusBar.setChangedFlag(false);
+    StatusBar.register_save_and_revert({save: save, revert: ()=>{
+        StatusBar.set_changed(false);
         onUpdateModel();
-    })
+    }})
 
     try {
         const anim = await server.getDDLFile(selfile.value || "");
@@ -75,7 +73,7 @@ async function onUpdateModel() {
                     a[i+6][0].offset_x = props.def.adjusting[i][0];
                 }
             }            
-            StatusBar.setChangedFlag(true);
+            StatusBar.set_changed(true);
         }
 
         big.value = animations.value.big;
@@ -134,7 +132,7 @@ function insert_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined) {
         animations.value.animation[cur_phase.value].splice(cur_frame.value,0,animations.value.animation[cur_phase.value][cur_frame.value]);
         while (animations.value.animation[cur_phase.value].length > 16) animations.value.animation[cur_phase.value].pop();
-        StatusBar.setChangedFlag(true);
+        StatusBar.set_changed(true);
     }
     play_anim = false;
 }
@@ -142,7 +140,7 @@ function insert_frame() {
 function delete_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined && animations.value.animation[cur_phase.value].length>1) {
            animations.value.animation[cur_phase.value].splice(cur_frame.value,1);
-           StatusBar.setChangedFlag(true);
+           StatusBar.set_changed(true);
     }
     play_anim = false;
 }
@@ -206,7 +204,7 @@ function onChangeFace () {
             offset_x:cur_offset.value,
             offset_y:0
         };
-        StatusBar.setChangedFlag(true);
+        StatusBar.set_changed(true);
         onChangeFrame();
     }
     play_anim = false;
@@ -249,14 +247,14 @@ function sethit() {
     if (animations.value) {
         if (animations.value && animations.value.hit_pos == cur_frame.value) animations.value.hit_pos = null;
         else animations.value.hit_pos = cur_frame.value;
-        StatusBar.setChangedFlag(true);
+        StatusBar.set_changed(true);
     }
 }
 
 function changeBig() {
     if (animations.value) {
         animations.value.big =  big.value;
-        StatusBar.setChangedFlag(true);
+        StatusBar.set_changed(true);
     }
 }
 
@@ -265,7 +263,7 @@ watch([filename], onUpdateModel);
 watch([cur_phase], onChangePhase);
 watch([cur_frame], onChangeFrame);
 onMounted(onUpdateModel);
-onUnmounted(StatusBar.onFinalSave);
+onUnmounted(StatusBar.final_save);
 
 
 </script>

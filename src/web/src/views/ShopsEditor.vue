@@ -2,7 +2,7 @@
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import StatusBar from '@/core/status_bar_control'
+import StatusBar from '@/components/statusBar.ts'
 import { findFreeShopSlot, ProductFlags, shopsFromArrayBuffer, shopsToArrayBuffer, TProduct, TShop } from '@/core/shop_structs';
 import { itemsFromArrayBuffer, ItemTypeName, type ItemDef } from '@/core/items_struct';
 import HIFormat from '@/core/hiformat'
@@ -29,7 +29,7 @@ watch(current_shop_index,(nw)=>{
 });
 
 watch(shop_list, ()=>{
-    StatusBar.setChangedFlag(true);
+    StatusBar.set_changed(true);
 }, {deep:true});
 
 watch([current_shop,pic_preview], ()=>{
@@ -73,7 +73,7 @@ function init() {
                 shop_list.value = [];   
             }
             nextTick(()=>{
-                StatusBar.setChangedFlag(false);
+                StatusBar.set_changed(false);
             });
         })
         getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(buff=>{
@@ -99,7 +99,7 @@ function init() {
     });
 
 
-    StatusBar.registerSaveAndRevert(async ()=>{
+    StatusBar.register_save_and_revert({save: async ()=>{
         if (shop_list.value) {
             const shp:TShop[] = [];
              shop_list.value.forEach(v=>{
@@ -134,9 +134,10 @@ function init() {
             const buff = shopsToArrayBuffer(shp);
             return await server.putDDLFile("SHOPS.DAT", buff, AssetGroup.MAPS);
         }
-    },()=>{        
+        return true;
+    },revert: ()=>{        
         reload();
-    });
+    }});
 }
 onMounted(init);
 
@@ -195,7 +196,7 @@ async function deleteKeeper() {
     }
 }
 
-onUnmounted(StatusBar.onFinalSave);
+onUnmounted(StatusBar.final_save);
 
 </script>
 <template>

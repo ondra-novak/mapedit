@@ -4,7 +4,7 @@ import { Config, type DDLEntry, server } from "@/core/api";
 import { AssetGroup } from "@/core/asset_groups";
 import { dosname_sanitize } from "@/core/dosname";
 import { readFileToArrayBuffer } from "@/core/read_file";
-import StatusBar from "@/core/status_bar_control";
+import StatusBar from "@/components/statusBar.ts";
 import { messageBox, messageBoxAlert } from "@/utils/messageBox";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
@@ -334,7 +334,7 @@ function teleport_to() {
 .select-project.popup > div {
     width: 60%;
     min-width: 30rem;
-}
+}unset_current_sector();
 .select-project.popup .title {
     margin-bottom: 0.5rem;    
 }

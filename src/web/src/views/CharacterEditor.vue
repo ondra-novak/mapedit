@@ -2,7 +2,7 @@
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import StatusBar from '@/core/status_bar_control';
+import StatusBar from '@/components/statusBar.ts';
 import { createTHuman, humanDataFromArrayBuffer, humanDataToArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman, type THumanData } from '@/core/character_structs';
 import { PCX, PCXProfile } from '@/core/pcx';
 import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } from '@/core/items_struct';
@@ -147,7 +147,7 @@ function init() {
             } else {
                 postavy.value = [];
             }
-            nextTick(()=>StatusBar.setChangedFlag(false));
+            nextTick(()=>StatusBar.set_changed(false));
         })
         getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(buff=>{
             if (buff) items.value = itemsFromArrayBuffer(buff);
@@ -155,21 +155,21 @@ function init() {
         });
     }
     
-    StatusBar.registerSaveAndRevert(()=>{
+    StatusBar.register_save_and_revert({save:()=>{
         if (postavy.value) {
             humand_data.characters = postavy.value;
             const buff = humanDataToArrayBuffer(humand_data)
             server.putDDLFile("POSTAVY.DAT", buff, AssetGroup.MAPS);
             }
-        }, () => {
+        }, revert:() => {
             selected.value = undefined;
             reload();
-    });
+    }});
     reload();
 }
 
 onMounted(init);
-onUnmounted(StatusBar.onFinalSave);
+onUnmounted(StatusBar.final_save);
 
 function get_item_name(idx: number) : string{
     if (idx === undefined) return "";
@@ -283,7 +283,7 @@ function delete_item(event: Event, idx: number) {
 }
 
 watch(portraits, reload_portraits,{deep:true});
-watch(postavy,()=>{StatusBar.setChangedFlag(true);},{deep:true});
+watch(postavy,()=>{StatusBar.set_changed(true);},{deep:true});
 
 const  cur_inv_item = ref<string>("");
 const portraits_to_select = ref<HTMLElement[]>([]);

@@ -6,7 +6,7 @@ import { useBitmaskCheckbox2 } from '@/core/flags';
 import {type ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
 import { spellsFromArrayBuffer, SpellCommandsArgs ,type TKouzlo, SpellArgument, spellsToArrayBuffer } from '@/core/spell_structs';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import StatusBar from '@/core/status_bar_control'
+import StatusBar from '@/components/statusBar.ts'
 import { create_datalist } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
@@ -43,7 +43,7 @@ function init() {
                 spell_list.value = [];
             }
             nextTick(()=>{
-                StatusBar.setChangedFlag(false);
+                StatusBar.set_changed(false);
             })
         });
         getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(x=>{
@@ -58,13 +58,14 @@ function init() {
         all_animations.value = x.files.map(x=>x.name).filter(x=>x.toUpperCase().endsWith(".MGF"));
         all_sounds.value = x.files.filter(x=>x.group == AssetGroup.SOUNDS).map(x=>x.name);
     })
-    StatusBar.registerSaveAndRevert(async ()=>{
-    if (spell_list.value) {
-        const b = spellsToArrayBuffer(spell_list.value);
-        await server.putDDLFile("KOUZLA.DAT", b, AssetGroup.MAPS);
-    }
-    },()=>{
-        reload();
+    StatusBar.register_save_and_revert({save: async ()=>{
+        if (spell_list.value) {
+            const b = spellsToArrayBuffer(spell_list.value);
+            await server.putDDLFile("KOUZLA.DAT", b, AssetGroup.MAPS);
+        }
+        },revert: ()=>{
+            reload();
+        }
     })
 }
 
@@ -101,7 +102,7 @@ const shadow_drag_table = ref<HTMLTableElement|null>(null);
 const shadow_drag_content = ref<HTMLElement|null>(null);
 
 onMounted(init);
-onUnmounted(StatusBar.onFinalSave);
+onUnmounted(StatusBar.final_save);
 
 
 const [ cur_spell_trackon, chk_trackon ] = useBitmaskCheckbox2({
@@ -219,7 +220,7 @@ watch(cur_spell_trackon, ()=>{
     if (current_spell.value && cur_spell_trackon) current_spell.value.flags = cur_spell_trackon.value;
 });
 
-watch(spell_list, ()=>StatusBar.setChangedFlag(true),{deep:true});
+watch(spell_list, ()=>StatusBar.set_changed(true),{deep:true});
 
 const ds_spellAnim = create_datalist();
 const ds_spellSounds = create_datalist();

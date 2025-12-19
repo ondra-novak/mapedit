@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
-import StatusBar from '@/core/status_bar_control'
+import StatusBar from '@/components/statusBar.ts'
 import { server, type FileItem } from '@/core/api';
 import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
-import { shallowClone, type Document } from '@/utils/document';
+import { shallowClone, Document } from '@/utils/document';
 import  globalState from '@/utils/global';
 
 import svg_pointer from '@/assets/toolbar/pointer.svg'
@@ -32,9 +32,11 @@ const EditMode = {
     Enemies:4
 } as const;
 
+const map_name = ref<string>();
 const mapview = ref<HTMLElement>();
 const mapdraw :MapDraw=  new MapDraw();
 const stringtable = ref<string[]>([]);
+const map_document = new Document<MapFile>(new MapFile);
 const curmap = shallowRef<MapFile>(new MapFile());
 const settings = reactive(globalState("mapview_settings",{
     curlevel : 0 as number,
@@ -165,37 +167,41 @@ const SideFlagsNames_All = {
 
 
 function updateControls() {
-    control_state.can_redo = StatusBar.cur_map.can_redo();
-    control_state.can_undo = StatusBar.cur_map.can_undo();
+    control_state.can_redo = map_document.can_redo();
+    control_state.can_undo = map_document.can_undo();
 }
 
 function begin_edit() : MapFile{
-    return shallowClone(StatusBar.cur_map.get_current());        
+    return shallowClone(map_document.get_current());        
 }
 
 function end_edit(map : MapFile) {
-    StatusBar.cur_map.add_change(map);
-    curmap.value = StatusBar.cur_map.get_current();
+    map_document.add_change(map);
+    curmap.value = map_document.get_current();
     updateControls();
-    StatusBar.setChangedFlag(true);
+    StatusBar.set_changed(true);
 }
 
 function doUndo() {
-    if (StatusBar.cur_map.can_undo()) {
-        StatusBar.cur_map.do_undo();
-        curmap.value = StatusBar.cur_map.get_current();
+    if (map_document.can_undo()) {
+        map_document.do_undo();
+        curmap.value = map_document.get_current();
         updateControls();
         if (focus.value) updateFocusData(focus.value.sector, focus.value.side);
     }
 }
 
 function doRedo() {
-    if (StatusBar.cur_map.can_redo()) {
-        StatusBar.cur_map.do_redo();
-        curmap.value = StatusBar.cur_map.get_current();
+    if (map_document.can_redo()) {
+        map_document.do_redo();
+        curmap.value = map_document.get_current();
         updateControls();
         if (focus.value) updateFocusData(focus.value.sector, focus.value.side);
     }
+}
+
+function saveOnTeleport() {
+    return Promise.resolve(true);//TODO
 }
 
 function updateFocusData(sect: number, side: number) {
@@ -213,9 +219,9 @@ function updateFocusData(sect: number, side: number) {
                                }
                             };                
                                updateFocus();
-                StatusBar.setCurSectorSide(sect, side);
+                StatusBar.set_current_sector(sect,side, saveOnTeleport);
             } else {
-                StatusBar.setCurSectorSide(0, 0);
+                StatusBar.unset_current_sector();
                 focus.value = undefined;
             }
 
@@ -527,7 +533,7 @@ watch([()=>settings.edit_mode, curmap], ()=>{
     switch (settings.edit_mode) {
         case EditMode.Draw:
         case EditMode.Erase: mapcontainer.set_cursor("crosshair");
-             StatusBar.setCurSectorSide(0, 0);
+             StatusBar.unset_current_sector();
             break;
         default: 
             mapcontainer.set_cursor("default");
@@ -538,14 +544,14 @@ watch([()=>settings.edit_mode, curmap], ()=>{
 function onMapLoaded() {
 
     function reload(doc: Document<MapFile>) {
-        mapLoadedPalettes.value = StatusBar.getMapPalettes();
+        mapLoadedPalettes.value = globalState("map_palettes", ()=>new MapPalettes());
         curmap.value = doc.get_current();
         const start = curmap.value.info.start_sector;
         settings.curlevel = curmap.value.sectors[start].level;
         redraw();
         mapcontainer.zoom_reset();
         if (curmap.value.sectors.length) {
-            const sname = (StatusBar.cur_map_name.value || "").replace(/.MAP$/,".ENC");
+            const sname = (map_name.value || "").replace(/.MAP$/,".ENC");
             getDDLFileWithImport(server,sname,AssetGroup.MAPS).then(x=>{
                 if (x) {
                     const strings = enc2string(x).split('\n').map(x=>x.trim())
@@ -569,32 +575,32 @@ function onMapLoaded() {
         }
     }
 
-    StatusBar.registerSaveAndRevert(()=>{
+/*    StatusBar.register_save_and_revert(()=>{
         StatusBar.saveMap();
     }, async ()=>{
         const doc = await StatusBar.reloadMap();
         reload(doc);
         mapLoadedPalettes.value = StatusBar.getMapPalettes();
-    });    
+    });    */
     
-    reload(StatusBar.cur_map);
+    reload(map_document);
 }
 
 async function init() {
-    server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
+/*    server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
     StatusBar.onMapOpen(onMapLoaded);
     if (mapview.value)     {
         mapcontainer.add_to_DOM(mapview.value);        
     }    
-    if (!StatusBar.cur_map_name.value) {
+    if (!map_document_name.value) {
         StatusBar.openMapDialog();
         return;
     } else {
-        curmap.value = StatusBar.cur_map.get_current();
+        curmap.value = map_document.get_current();
     }
     redraw();
     updateControls();
-
+*/
 }
 
 function resetFloor() {
@@ -613,7 +619,7 @@ const edit_modes = [
 ]
 
 onMounted(init);
-onUnmounted(StatusBar.onFinalSave)
+onUnmounted(StatusBar.final_save)
 
 watch([()=>settings.edit_mode,focus],()=>{
     updateFocus();

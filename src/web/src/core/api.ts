@@ -1,6 +1,4 @@
-import { ref } from "vue";
 import type { AssetGroupType } from "./asset_groups";
-import Distributor from "./distributor";
 
 
 export interface FileItem {
@@ -29,11 +27,20 @@ export interface DDLFiles {
     stats: Stats;
 }
 
-export interface KeepAliveStatus {
+export class KeepAliveStatus {
+    connected: boolean = false;
+    exit_on_close:boolean = false;
+    keepalive_interval: number = 30000;
+    game_instances: number = 0;
+    current_ddl: string = ""
+}
+
+interface KeepAliveData {
     exit_on_close:boolean;
     keepalive_interval: number;
     game_instances: number;
     current_ddl: string;
+
 }
 
 export interface PutImageStatus {
@@ -51,10 +58,12 @@ export class Config {
 }
 
 export class ApiClient {
-    
 
-    keep_alive_event = ref<KeepAliveStatus|null>(null);
+    ka_listeners: ((x: KeepAliveStatus)=>void)[] = [];
+    last_ka = new KeepAliveStatus();
+
     keep_alive_interval = 5000;
+    last_keep_alive_status = {}
     connected: boolean = false;
 
     constructor() {
@@ -196,7 +205,7 @@ export class ApiClient {
         }));
     }
 
-    async keepalive() : Promise<KeepAliveStatus> {
+    async keepalive() : Promise<KeepAliveData> {
         const response = await fetch("api/keepalive");
         if (response.status != 200) {
             await this.handle_error(response, "Keep alive failed.")
@@ -207,10 +216,17 @@ export class ApiClient {
     async start_keepalive() {        
         try {
             const st = await this.keepalive();
+            
             this.keep_alive_interval = st.keepalive_interval;
-            this.keep_alive_event.value = st;
+            this.last_ka.connected = true;
+            this.last_ka.current_ddl = st.current_ddl;
+            this.last_ka.exit_on_close = st.exit_on_close;
+            this.last_ka.game_instances = st.game_instances;
+            this.last_ka.keepalive_interval = st.keepalive_interval;
+            const l = this.last_ka;
+            this.ka_listeners.forEach(x=>queueMicrotask(()=>x(l)));
         } catch (e) {
-            this.keep_alive_event.value = null;
+            this.last_ka.connected = false;
         }
         setTimeout(()=>this.start_keepalive(), this.keep_alive_interval);
     }
@@ -307,6 +323,14 @@ export class ApiClient {
             return false;
         }
         return true;
+    }
+
+    on_keep_alive(cb: (x:KeepAliveStatus)=>void) {
+        this.ka_listeners.push(cb);
+    }
+    off_keep_alive(cb: (x:KeepAliveStatus)=>void) {
+        const idx = this.ka_listeners.findIndex(x=>x === cb);
+        if (idx >= 0) this.ka_listeners.splice(idx,1);        
     }
 
 }

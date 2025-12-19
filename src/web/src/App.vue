@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import StatusBar from './views/StatusBar.vue';
+import StatusBar from './components/StatusBar.vue'
 import MessageBoxComponent from './utils/messageBoxComponent.vue';
 import MissingFiles from './components/tools/MissingFiles.vue';
 </script>

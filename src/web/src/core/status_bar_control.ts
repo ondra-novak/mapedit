@@ -24,18 +24,18 @@ class StatusBar {
     on_map_open=()=>{};
 
     stack: [SaveFn|null, RevertFn|null, boolean][] =  [];
-    onFinalSave = ()=>{this.onFinalSaveImpl()};
+    final_save = ()=>{this.final_saveImpl()};
 
 
-    registerSaveAndRevert (saveFn: SaveFn, revertFn: RevertFn): void  {
+    register_save_and_revert (saveFn: SaveFn, revertFn: RevertFn): void  {
         this.fnSave.value = saveFn
         this.fnRevert.value = revertFn
         this.changed.value = false
     }
-    setChangedFlag(flag: boolean): void {
+    set_changed(flag: boolean): void {
         this.changed.value = flag
     }
-    protected onFinalSaveImpl (): void {
+    protected final_saveImpl (): void {
         if (this.fnSave.value && this.changed.value) {
             this.fnSave.value();
         }

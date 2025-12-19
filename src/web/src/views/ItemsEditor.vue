@@ -8,7 +8,7 @@ import { PCX, PCXProfile, type PCXProfileType } from '@/core/pcx';
 import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
 import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
-import StatusBar from '@/core/status_bar_control'
+import StatusBar from '@/components/statusBar.ts'
 import { create_datalist } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
@@ -49,16 +49,10 @@ function init() {
         getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
             item_list.value = x?itemsFromArrayBuffer(x):[];
             selected_item.value = undefined;
-            nextTick(()=>StatusBar.setChangedFlag(false));
+            nextTick(()=>StatusBar.set_changed(false));
         });
     }
-    StatusBar.registerSaveAndRevert(()=>{
-        save();
-    },()=>{
-        reload();
-    });
-    reload();
-
+    StatusBar.register_save_and_revert({save, revert:reload});
 
 }
 
@@ -220,7 +214,7 @@ function saveItemData() {
         if (!key_mode.value) itm.keynum = 0;
         else if (key_mode.value < 0 && itm.keynum >=0) itm.keynum = -1;
         else if (key_mode.value > 0 && itm.keynum <=0) itm.keynum = 0;
-        StatusBar.setChangedFlag(true);
+        StatusBar.set_changed(true);
     }
 }
 
@@ -369,7 +363,7 @@ function save() {
 }
 
 onMounted(init);
-onUnmounted(StatusBar.onFinalSave);
+onUnmounted(StatusBar.final_save);
 
 const ds_graphics = create_datalist();
 const ds_sounds = create_datalist();
