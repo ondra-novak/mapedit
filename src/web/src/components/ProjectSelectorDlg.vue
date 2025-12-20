@@ -111,6 +111,7 @@ onMounted(init);
     <footer>
         <button :disabled="!is_valid_name" @click="project_selected(entered_name)">Create</button>
         <button class="left" :disabled="!any_marked" @click="delete_projects">Delete</button>
+
     </footer>
 
 </dialog>
@@ -145,6 +146,9 @@ onMounted(init);
 
 .lst > div > *:nth-child(4) {
     width: 15rem;
+    text-align: right;
+}
+dialog > .right {
     text-align: right;
 }
 

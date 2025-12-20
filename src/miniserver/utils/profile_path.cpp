@@ -1,9 +1,11 @@
 #include "profile_path.hpp"
 
+#include <cstddef>
 #include <filesystem>
 #include <cstdlib>  // getenv
 #include <string>
 #include <array>
+#include <system_error>
 #ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>  // SHGetKnownFolderPath
@@ -16,7 +18,7 @@ std::filesystem::path getUserDocumentsPath()
 {
 #ifdef _WIN32
     PWSTR pathTmp = nullptr;
-    HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents, 0, NULL, &pathTmp);
+    HRESULT hr = SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &pathTmp);
     if (SUCCEEDED(hr) && pathTmp) {
         fs::path documentsPath = fs::path(pathTmp);
         CoTaskMemFree(pathTmp);
@@ -27,7 +29,7 @@ std::filesystem::path getUserDocumentsPath()
         char* userProfile = nullptr;
         size_t len = 0;
         if (_dupenv_s(&userProfile, &len, "USERPROFILE") == 0 && userProfile) {
-            fs::path result = fs::path(userProfile) / "Documents";
+            fs::path result = fs::path(userProfile) / "AppData" / "Roaming";
             free(userProfile);
             return result;
         } else {
@@ -38,45 +40,15 @@ std::filesystem::path getUserDocumentsPath()
 #elif __APPLE__
     const char* home = std::getenv("HOME");
     if (home) {
-        return fs::path(home) / "Documents";
+        return fs::path(home) / "Library" / "Application Support";
     } else {
         return fs::current_path();
     }
 #else
-     // Pokus o získání cesty k Dokumentům pomocí xdg-user-dir
-    std::string command = "xdg-user-dir DOCUMENTS";
-    std::array<char, 128> buffer;
-    std::string result;
-    
-    // Otevření procesu pro čtení výstupu příkazu
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        // Pokud se příkaz nepovede spustit, vrátíme domovskou složku
-        return fs::path(std::getenv("HOME"));
-    }
-    
-    // Čtení výstupu příkazu
-    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
-        result += buffer.data();
-    }
-    
-    // Uzavření procesu
-    int status = pclose(pipe);
-    if (status == -1) {
-        return fs::path(std::getenv("HOME"));
-    }
-    
-    // Odstranění koncového znaku nového řádku
-    if (!result.empty() && result.back() == '\n') {
-        result.pop_back();
-    }
-    
-    // Kontrola, zda je výstup platnou cestou
-    if (result.empty() || !fs::exists(result)) {
-        return fs::path(std::getenv("HOME"));
-    }
-    
-    return fs::path(result);
+    const char *home = std::getenv("HOME");
+    if (home == NULL) throw std::system_error(errno, std::system_category(),"Current use has no home ($HOME)");
+    fs::path hpath(home);
+    return hpath / ".local" / "share";
     
 #endif
 }

@@ -29,7 +29,7 @@ export interface DDLFiles {
 
 export class KeepAliveStatus {
     connected: boolean = false;
-    exit_on_close:boolean = false;
+    need_configure:boolean = false;
     keepalive_interval: number = 30000;
     game_instances: number = 0;
     current_ddl: string = ""
@@ -38,6 +38,7 @@ export class KeepAliveStatus {
 interface KeepAliveData {
     exit_on_close:boolean;
     keepalive_interval: number;
+    need_configure:boolean;
     game_instances: number;
     current_ddl: string;
 
@@ -220,7 +221,7 @@ export class ApiClient {
             this.keep_alive_interval = st.keepalive_interval;
             this.last_ka.connected = true;
             this.last_ka.current_ddl = st.current_ddl;
-            this.last_ka.exit_on_close = st.exit_on_close;
+            this.last_ka.need_configure = st.need_configure;
             this.last_ka.game_instances = st.game_instances;
             this.last_ka.keepalive_interval = st.keepalive_interval;
         } catch (e) {
@@ -343,6 +344,30 @@ export class ApiClient {
     off_keep_alive(cb: (x:KeepAliveStatus)=>void) {
         const idx = this.ka_listeners.findIndex(x=>x === cb);
         if (idx >= 0) this.ka_listeners.splice(idx,1);        
+    }
+    async get_config():Promise<{game_dir:string, skeldal_ini:Record<string, any>} > {
+        return await (await fetch("api/config")).json();
+    }
+
+    async set_config(config: {
+        game_dir:string;
+        skeldal_ini:Record<string, any>
+    }) {
+        const response = await fetch(`api/config`, {
+            method: "PUT",
+            body: JSON.stringify(config),
+            headers: {
+                "Content-Type":"application/json"
+            }
+        });
+        if (response.status == 400) {
+            return false;
+        }
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed to store config")
+            return false;
+        }
+        return true;
     }
 
 }

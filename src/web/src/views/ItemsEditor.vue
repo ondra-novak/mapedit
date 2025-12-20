@@ -58,7 +58,7 @@ function init() {
         st.on_save(save);
         st.on_revert(reload);
     })
-    reload();
+    reload()
 }
 
 

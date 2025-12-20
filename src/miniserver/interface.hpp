@@ -5,6 +5,7 @@
 #include "server.hpp"
 #include "mgifcomp.hpp"
 #include "skeldal_exe.hpp"
+#include <filesystem>
 #include <shared_mutex>
 #include <thread>
 
@@ -24,12 +25,12 @@ public:
     std::function<bool( BasicRequest &)> get_handler();
 
 protected:
-    DDLManager _game;
+    std::unique_ptr<DDLManager> _game;
     std::shared_mutex _mx;
-    std::filesystem::path _maps;
     std::filesystem::path _app_dir;
     std::filesystem::path _assets_dir;
     std::filesystem::path _user_dir;
+    std::string _addrport;
     std::u8string _current_ddl;
     std::stop_source _stop;
     json::value _config;
@@ -60,6 +61,8 @@ protected:
     bool ddl_mpg_session_put(Request &req);
     bool ddl_active(Request &req);
     bool keep_alive(Request &req);
+    bool config_get(Request &req);
+    bool config_put(Request &req);
     bool preview_start(Request &req);
     bool preview_stop(Request &req);
     bool preview_teleport(Request &req);
@@ -82,13 +85,14 @@ protected:
  
     std::jthread _basic_timer;
 
-    SkeldalExeControl _game_control;
+    std::unique_ptr<SkeldalExeControl> _game_control;
  
     DDLManager getUserDDL() const;
 
     void load_config();
     void save_config();
 
+    bool init_game_dir(std::filesystem::path game_dir, json::value skeldal_ini);
 };
 
 

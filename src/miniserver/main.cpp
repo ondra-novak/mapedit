@@ -4,6 +4,10 @@
 #include "config.hpp"
 #include "interface.hpp"
 #include "utils/profile_path.hpp"
+#include "utils/getoptxx.h"
+#include <filesystem>
+#include <format>
+#include <cstdio>
 
 
 
@@ -48,56 +52,65 @@ void open_url(std::string url) {
     #endif
 }
 
-int entry_point(std::filesystem::path root_config) {
+void show_help() {
+    std::puts("mapedit_server [-p port][-b][-x][-w path][-u path][-h]\n\n"
+    "-p port     specify port (default: random port)\n"
+    "-b          do not open browser\n"
+    "-x          do not exit if no browser ping\n"
+    "-w path     path to web root (default: web)\n"
+    "-u path     specify user profile path (default: platform user profile)\n"
+    );    
+}
 
-    IniFile ini = load_config(root_config);
-    std::string addrport = ini.get("server","listen","localhost:0");
-    bool  open_browser = ini.get_bool("server","open_browser", true);
-    std::basic_string<char8_t> game_folder = ini.get("paths", "game_folder", u8"");
-    std::basic_string<char8_t> user_folder = ini.get("paths", "adventure_folder", u8"");
+int main(int argc, char ** argv) {
+    getopt_t opts;
+    int c = -1;
+    unsigned int port = 0;    
+    bool no_browser = false;
+    bool no_exit = false;
+    std::filesystem::path webroot = std::filesystem::current_path() / "web";
+    std::filesystem::path user_dir = getUserDocumentsPath()/"Skeldal_Mapedit";
+    while ((c = opts(argc, argv, "p:w:u:bxh")) != -1) {
+        switch (c) {
+            case 'p': port = static_cast<unsigned int>(std::strtoul(opts.optarg,nullptr,10));
+                      break;
+            case 'b': no_browser = true;
+                      break;
+            case 'x': no_exit = true;
+                      break;
+            case 'w': webroot = std::filesystem::current_path() / opts.optarg;
+                      break;
+            case 'u': user_dir = std::filesystem::current_path() / opts.optarg;
+                      break;
+            case 'h': show_help(); return 0;
+            default: std::fprintf(stderr, "Unknown switch -%c", c);return -1;
+        }
+    }   
 
-    server::Config cfg;
-    auto parent = root_config.parent_path();
-    cfg.addr_port = addrport;
-    cfg.app_dir = parent/"web";
-    cfg.asset_dir = parent/"web"/"assets";
-    cfg.game_ini = parent/"skeldal.ini";
-    cfg.game_folder = game_folder.empty()?parent.parent_path():parent/game_folder;
-    cfg.user_folder = user_folder.empty()
-            ?getUserDocumentsPath() / u8"Skeldal_Adventure":std::filesystem::current_path()/user_folder;
-    cfg.check_active = ini.get_bool("server","exit_on_close",true);
-
-    std::filesystem::create_directories(cfg.user_folder);
-
+    std::string addrport = std::format("127.0.0.1:{}", port);
     server::Server srv(addrport);
-    std::stop_source stp;
-    std::stop_token tkn = stp.get_token();
-
-    server::WebInterface ifc(cfg, stp);
     std::string url = "http://" + srv.get_listen_addr();
 
     std::cout <<  "Server running at: " << url << std::endl;
 
-    if (open_browser) {
+    if (!no_browser) {
         open_url(url);
     }
 
+    std::filesystem::create_directories(user_dir);
+
+    server::Config cfg;
+    cfg.addr_port = addrport;
+    cfg.app_dir = webroot;
+    cfg.asset_dir = webroot/"assets";
+    cfg.check_active = !no_exit;
+    cfg.user_folder = user_dir;
+
+    std::stop_source stp;
+    std::stop_token tkn = stp.get_token();
+
+    server::WebInterface ifc(cfg, stp);
     srv.serve(ifc.get_handler(), tkn);
     return 0;
-}
-
-int main(int argc, char ** argv) {
-
-    try {
-        if (argc < 1) throw std::runtime_error("Invalid arguments");
-        auto cfg = find_config(argv[0]);
-        entry_point(cfg);
-    } catch (const std::exception &e) {
-        std::cerr<<"ERROR: " << e.what()  << std::endl;
-    }
-
-
-    server::Server srv("localhost:0");    
 
 }
-

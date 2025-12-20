@@ -4,6 +4,7 @@ import StatusBar from './components/StatusBar.vue'
 import MessageBoxComponent from './utils/messageBoxComponent.vue';
 import MissingFiles from './components/tools/MissingFiles.vue';
 import ProjectSelectorDlg from './components/ProjectSelectorDlg.vue';
+import ServerConfigDlg from './components/ServerConfigDlg.vue';
 </script>
 
 <template>
@@ -34,6 +35,7 @@ import ProjectSelectorDlg from './components/ProjectSelectorDlg.vue';
 <MessageBoxComponent/>
 <MissingFiles />
 <ProjectSelectorDlg />
+<ServerConfigDlg />
 </template>
 
 

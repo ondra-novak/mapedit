@@ -1,25 +1,34 @@
 #include "interface.hpp"
+#include "ddlman.hpp"
 #include "handler_map.hpp"
 #include "mgifdecomp.hpp"
+#include "skeldal_exe.hpp"
+#include "json/value.h"
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <memory>
 #include <mutex>
 #include <json/serializer.h>
 #include <json/parser.h>
 #include <condition_variable>
+#include <optional>
+#include <string>
 #include <system_error>
 
 namespace server {
 
 WebInterface::WebInterface(Config cfg, std::stop_source stp)
-    :_game(cfg.game_folder/u8"SKELDAL.DDL")
-    ,_app_dir(cfg.app_dir)
+    :_app_dir(cfg.app_dir)
     ,_assets_dir(cfg.asset_dir)
     ,_user_dir(cfg.user_folder)
+    ,_addrport(cfg.addr_port)
     ,_stop(std::move(stp))
     ,_check_active(cfg.check_active)    
     ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
-    ,_game_control(cfg.game_folder, cfg.game_ini, cfg.addr_port,[this](std::string_view cmd){this->control(cmd);})
+    
+//    ,_game_control(cfg.game_folder, cfg.game_ini, cfg.addr_port,[this](std::string_view cmd){this->control(cmd);})
 {
     load_config();
 }
@@ -43,6 +52,8 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::PUT, "/api/active", &WebInterface::ddl_active},
     {Method::GET, "/api/active", &WebInterface::ddl_active},
     {Method::POST, "/api/control", &WebInterface::control},
+    {Method::GET, "/api/config", &WebInterface::config_get},
+    {Method::PUT, "/api/config", &WebInterface::config_put},
     {Method::GET, "/api/keepalive", &WebInterface::keep_alive},
     {Method::GET, "/assets/{}", &WebInterface::webserver_assets},
     {Method::PUT, "/api/mgf_session/{}", &WebInterface::ddl_mpg_session_put},
@@ -180,7 +191,10 @@ bool WebInterface::ddl_list(Request &req)
 
     auto user = getUserDDL();
 
-    std::vector<DDLManager::Item> game_files = _game.list();
+    
+
+    std::vector<DDLManager::Item> game_files;
+    if (_game)  game_files = _game->list();
     std::vector<DDLManager::Item> user_files = user.list();
     std::vector<DDLManager::Item> out_files;
 
@@ -230,7 +244,7 @@ bool WebInterface::ddl_get(Request &req)
     auto user = getUserDDL();
     auto f = user.get(req.path_vars[0]);
     if (!f) {
-        f = _game.get(req.path_vars[0]);
+        f = _game?_game->get(req.path_vars[0]):std::nullopt;
         if (!f) return false;
     }    
     return req.response({200},{
@@ -285,7 +299,7 @@ bool WebInterface::ddl_mpg_get(Request &req)
     auto user = getUserDDL();
     auto f = user.get(req.path_vars[0]);
     if (!f) {
-        f = _game.get(req.path_vars[0]);
+        f = _game?_game->get(req.path_vars[0]):std::nullopt;
         if (!f) return false;
     }    
     auto stream = decompress_mgf(f->data());
@@ -396,8 +410,8 @@ bool WebInterface::keep_alive(Request &req)
     if (!req.response({200,{}},{},json::value({
         {"keepalive_interval",std::chrono::duration_cast<std::chrono::milliseconds>(keepalive_interval).count()*9/10},
         {"game_instances",stream_count},
-        {"exit_on_close", _check_active},
-        {"current_ddl", _current_ddl}
+        {"current_ddl", _current_ddl},
+        {"need_configure", !_game}
     }))) return false;
     _last_seen = true;
     return true;
@@ -406,13 +420,15 @@ bool WebInterface::keep_alive(Request &req)
 bool WebInterface::preview_start(Request &req)
 {
     std::lock_guard _(_mx);
-    _game_control.start(_user_dir/_current_ddl);
+    if (!_game_control) return req.response({404, "Not configured"},{},"");
+    _game_control->start(_user_dir/_current_ddl);
     return req.response({202,"Accepted"},{},"");
 }
 
 bool WebInterface::preview_stop(Request &req)
 {
-    if (_game_control.stop()) {
+    if (!_game_control) return req.response({404, "Not configured"},{},"");
+    if (_game_control->stop()) {
         return req.response({202,"Accepted"},{},"");
     } else {
         return req.response({504,"Timeout"},{},"");
@@ -422,40 +438,44 @@ bool WebInterface::preview_stop(Request &req)
 bool WebInterface::preview_teleport(Request &req)
 {
     std::lock_guard _(_mx);
+    if (!_game_control) return req.response({404, "Not configured"},{},"");
     json::value jr = json::value::from_json(req.body);
     std::string map = jr["map"].as<std::string>();
     unsigned int sect = jr["sector"].as<unsigned int>();
     unsigned int side = jr["side"].as<unsigned int>();
 
     std::filesystem::path ddlpath(_user_dir/_current_ddl);
-    if (ddlpath != _game_control.get_current_ddlpath()) {
+    if (ddlpath != _game_control->get_current_ddlpath()) {
         return req.response({409,"Conflict"},{},"");
     }
 
-    _game_control.teleport_to(map,sect,side);
+    _game_control->teleport_to(map,sect,side);
     return req.response({202,"Accepted"},{},"");
 }
 
 bool WebInterface::preview_reload(Request &req)
 {
     std::lock_guard _(_mx);
-    _game_control.reload_map();
+    if (!_game_control) return req.response({404, "Not configured"},{},"");
+    _game_control->reload_map();
     return req.response({202,"Accepted"},{},"");
 }
 
 bool WebInterface::preview_console_show(Request &req)
 {
     std::lock_guard _(_mx);
+    if (!_game_control) return req.response({404, "Not configured"},{},"");
     json::value jr = json::value::from_json(req.body);
     bool sw = jr.as<bool>();
-    _game_control.console_show(sw);
+    _game_control->console_show(sw);
     return req.response({202,"Accepted"},{},"");
 }
 
 bool WebInterface::preview_console_exec(Request &req)
 {
     std::lock_guard _(_mx);
-    _game_control.console_exec(req.body);
+    if (!_game_control) return req.response({404, "Not configured"},{},"");
+    _game_control->console_exec(req.body);
     return req.response({202,"Accepted"},{},"");
 }
 
@@ -492,6 +512,28 @@ DDLManager WebInterface::getUserDDL() const
     return DDLManager(_user_dir/_current_ddl);
 }
 
+bool WebInterface::init_game_dir(std::filesystem::path game_dir, json::value skeldal_ini) {
+    auto full_dir =game_dir/"SKELDAL.DDL";
+    if (!std::filesystem::is_regular_file(full_dir))  return false;
+    std::filesystem::path ini = _user_dir/"skeldal.ini";    
+    {
+        std::ofstream txt(ini, std::ios::out|std::ios::trunc);
+        txt << "[video]\n" ;
+        for (const auto &v: skeldal_ini) {
+            txt << v.key() << "=";
+            if (v.type() == json::type::boolean) {
+                txt << (v.as<bool>()?"on":"off");
+            } else {
+                txt << v.as<std::string>();
+            }
+            txt << "\n";            
+        }        
+    }
+    _game = std::make_unique<DDLManager>(full_dir);
+    _game_control = std::make_unique<SkeldalExeControl>(game_dir,ini,_addrport,[this](auto s){this->control(s);});
+    return true;
+}
+
 void WebInterface::load_config()
 {
     try {
@@ -503,6 +545,11 @@ void WebInterface::load_config()
             _config = json::value::from_json(content);
         }
         _current_ddl = _config["project"].as<std::u8string>();
+        auto game_dir = _config["game_dir"].as<std::u8string>();
+        auto skeldal_ini = _config["skeldal_ini"].as<std::string>();
+        
+        init_game_dir(game_dir, skeldal_ini);
+
     } catch (...) {
         _config = json::type::null;
     }
@@ -558,7 +605,26 @@ void WebInterface::on_timer_tick()
     broadcast("\r\n\r\n");    
     if (_last_seen) {
         _last_seen = false;
-    } else if (_check_active)
+    } else if (_check_active) {
         _stop.request_stop();       
     }
+}
+
+bool WebInterface::config_get(Request &req) {
+    return req.response({200,"OK"}, {}, _config);
+
+}
+bool WebInterface::config_put(Request &req){ 
+    json::value v = json::value::from_json(req.body);
+    auto game_dir = v["game_dir"];
+    auto skeldal_ini = v["skeldal_ini"];
+    if (game_dir.defined() && init_game_dir(game_dir.as<std::u8string>(), skeldal_ini.get())) {
+        _config.set("game_dir",game_dir);
+        _config.set("skeldal_ini",skeldal_ini);
+        save_config();
+        return  req.response({202,"Accepted"},{},"");
+    }
+    return  req.response({400,"Bad request"},{},"");;
+}
+
 }
