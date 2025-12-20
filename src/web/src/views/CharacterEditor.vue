@@ -2,7 +2,7 @@
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import StatusBar from '@/components/statusBar.ts';
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts';
 import { createTHuman, humanDataFromArrayBuffer, humanDataToArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman, type THumanData } from '@/core/character_structs';
 import { PCX, PCXProfile } from '@/core/pcx';
 import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } from '@/core/items_struct';
@@ -27,7 +27,7 @@ const char_cache = new Map<number, Promise<PCX> >();
 const preview_box = ref<HTMLElement>();
 const add_char_info_box = ref<boolean>(false);
 let ioblouk :Promise<PCX>|undefined;
-
+let save_state: SaveRevertControl;
 
 
 
@@ -138,7 +138,7 @@ watch([selected_char,preview_box],()=>{
 watch([npcflags], ()=>{if (selected_char.value && npcflags.value !== undefined) selected_char.value.npcflags = npcflags.value;});
 watch([effects], ()=>{if (selected_char.value && effects.value !== undefined) selected_char.value.stats[CharacterStats.VLS_KOUZLA] = effects.value;});
 
-function init() {
+async function init() {
     function reload() {
         getDDLFileWithImport(server,"POSTAVY.DAT",AssetGroup.MAPS).then(buff=>{
             if (buff) {
@@ -147,29 +147,31 @@ function init() {
             } else {
                 postavy.value = [];
             }
-            nextTick(()=>StatusBar.set_changed(false));
+            nextTick(()=>save_state.set_changed(false));
         })
         getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(buff=>{
             if (buff) items.value = itemsFromArrayBuffer(buff);
             else items.value = [];                    
         });
     }
-    
-    StatusBar.register_save_and_revert({save:()=>{
+    save_state = await StatusBar.register_save_control();
+    save_state.on_save(()=>{
         if (postavy.value) {
             humand_data.characters = postavy.value;
             const buff = humanDataToArrayBuffer(humand_data)
             server.putDDLFile("POSTAVY.DAT", buff, AssetGroup.MAPS);
             }
-        }, revert:() => {
+        })
+    save_state.on_revert(() => {
             selected.value = undefined;
             reload();
-    }});
+    });
+
     reload();
 }
 
 onMounted(init);
-onUnmounted(StatusBar.final_save);
+onUnmounted(()=>save_state.unmount());
 
 function get_item_name(idx: number) : string{
     if (idx === undefined) return "";
@@ -283,7 +285,7 @@ function delete_item(event: Event, idx: number) {
 }
 
 watch(portraits, reload_portraits,{deep:true});
-watch(postavy,()=>{StatusBar.set_changed(true);},{deep:true});
+watch(postavy,()=>{save_state.set_changed(true);},{deep:true});
 
 const  cur_inv_item = ref<string>("");
 const portraits_to_select = ref<HTMLElement[]>([]);

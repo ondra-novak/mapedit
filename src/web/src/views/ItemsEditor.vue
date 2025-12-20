@@ -8,7 +8,7 @@ import { PCX, PCXProfile, type PCXProfileType } from '@/core/pcx';
 import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
 import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
-import StatusBar from '@/components/statusBar.ts'
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { create_datalist } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
@@ -29,6 +29,7 @@ const allAnimationsList = shallowRef<string[]>([]);
 
 const left_hand_place = ref<HTMLCanvasElement|null>(null);
 const right_hand_place = ref<HTMLCanvasElement|null>(null);
+let save_state: SaveRevertControl;
 
 function init() {
     server.getDDLFile("CHAR00.PCX").then(x=>{
@@ -49,11 +50,15 @@ function init() {
         getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
             item_list.value = x?itemsFromArrayBuffer(x):[];
             selected_item.value = undefined;
-            nextTick(()=>StatusBar.set_changed(false));
+            nextTick(()=>save_state.set_changed(false));
         });
     }
-    StatusBar.register_save_and_revert({save, revert:reload});
-
+    StatusBar.register_save_control().then(st=>{
+        save_state = st;
+        st.on_save(save);
+        st.on_revert(reload);
+    })
+    reload();
 }
 
 
@@ -214,7 +219,7 @@ function saveItemData() {
         if (!key_mode.value) itm.keynum = 0;
         else if (key_mode.value < 0 && itm.keynum >=0) itm.keynum = -1;
         else if (key_mode.value > 0 && itm.keynum <=0) itm.keynum = 0;
-        StatusBar.set_changed(true);
+        save_state.set_changed(true);
     }
 }
 
@@ -363,7 +368,7 @@ function save() {
 }
 
 onMounted(init);
-onUnmounted(StatusBar.final_save);
+onUnmounted(()=>save_state.unmount());
 
 const ds_graphics = create_datalist();
 const ds_sounds = create_datalist();

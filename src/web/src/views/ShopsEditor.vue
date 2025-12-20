@@ -2,7 +2,7 @@
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import StatusBar from '@/components/statusBar.ts'
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { findFreeShopSlot, ProductFlags, shopsFromArrayBuffer, shopsToArrayBuffer, TProduct, TShop } from '@/core/shop_structs';
 import { itemsFromArrayBuffer, ItemTypeName, type ItemDef } from '@/core/items_struct';
 import HIFormat from '@/core/hiformat'
@@ -23,13 +23,14 @@ const pic_preview = ref<HTMLElement>();
 const list_filter = ref<string>("");
 const add_product_input = ref<string>("");
 const add_kind_input = ref<string>("");
+let save_state : SaveRevertControl;
 
 watch(current_shop_index,(nw)=>{
     current_shop.value = (nw!==undefined && shop_list.value && shop_list.value[nw]) || undefined
 });
 
 watch(shop_list, ()=>{
-    StatusBar.set_changed(true);
+    save_state.set_changed(true);
 }, {deep:true});
 
 watch([current_shop,pic_preview], ()=>{
@@ -73,7 +74,7 @@ function init() {
                 shop_list.value = [];   
             }
             nextTick(()=>{
-                StatusBar.set_changed(false);
+                save_state.set_changed(false);
             });
         })
         getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(buff=>{
@@ -98,46 +99,47 @@ function init() {
         }
     });
 
-
-    StatusBar.register_save_and_revert({save: async ()=>{
-        if (shop_list.value) {
-            const shp:TShop[] = [];
-             shop_list.value.forEach(v=>{
-                const new_plist = v.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) == 0);
-                const types : TProduct[] = [];
-                const add_plist : TProduct[] = []
-                v.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) != 0)
-                    .forEach(t=>{
-                        const type = t.item 
-                        if (item_list.value) {
-                            const itms = item_list.value.filter(x=>x.druh == type && x.jmeno);
-                            itms.forEach((v, idx)=>{
-                                const p = new TProduct();
-                                p.item = idx;
-                                p.cena = v.cena;
-                                p.max_pocet = 10;
-                                p.pocet = 0;
-                                p.trade_flags = (t.trade_flags | ProductFlags.SHP_POPULATED) & ~ProductFlags.SHP_TYPE;
-                                add_plist.push(p);
-                            })
-                        }
-                        types.push(t);
-                    });
-                const nw = new TShop();
-                Object.assign(nw, v);
-                nw.list_size = new_plist.length;
-                new_plist.push(...types,...add_plist);
-                nw.products = new_plist.length;
-                nw.product_list = new_plist;
-                shp.push(nw);
-            });
-            const buff = shopsToArrayBuffer(shp);
-            return await server.putDDLFile("SHOPS.DAT", buff, AssetGroup.MAPS);
-        }
-        return true;
-    },revert: ()=>{        
-        reload();
-    }});
+    StatusBar.register_save_control().then(st=>{
+        save_state = st;
+        st.on_save(async ()=>{
+            if (shop_list.value) {
+                const shp:TShop[] = [];
+                shop_list.value.forEach(v=>{
+                    const new_plist = v.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) == 0);
+                    const types : TProduct[] = [];
+                    const add_plist : TProduct[] = []
+                    v.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) != 0)
+                        .forEach(t=>{
+                            const type = t.item 
+                            if (item_list.value) {
+                                const itms = item_list.value.filter(x=>x.druh == type && x.jmeno);
+                                itms.forEach((v, idx)=>{
+                                    const p = new TProduct();
+                                    p.item = idx;
+                                    p.cena = v.cena;
+                                    p.max_pocet = 10;
+                                    p.pocet = 0;
+                                    p.trade_flags = (t.trade_flags | ProductFlags.SHP_POPULATED) & ~ProductFlags.SHP_TYPE;
+                                    add_plist.push(p);
+                                })
+                            }
+                            types.push(t);
+                        });
+                    const nw = new TShop();
+                    Object.assign(nw, v);
+                    nw.list_size = new_plist.length;
+                    new_plist.push(...types,...add_plist);
+                    nw.products = new_plist.length;
+                    nw.product_list = new_plist;
+                    shp.push(nw);
+                });
+                const buff = shopsToArrayBuffer(shp);
+                return await server.putDDLFile("SHOPS.DAT", buff, AssetGroup.MAPS);
+            }
+            return true;
+        });
+        st.on_revert(reload);
+    });
 }
 onMounted(init);
 
@@ -196,7 +198,7 @@ async function deleteKeeper() {
     }
 }
 
-onUnmounted(StatusBar.final_save);
+onUnmounted(()=>save_state.unmount());
 
 </script>
 <template>

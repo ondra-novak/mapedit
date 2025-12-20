@@ -1,11 +1,13 @@
 #include "interface.hpp"
 #include "handler_map.hpp"
 #include "mgifdecomp.hpp"
+#include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <json/serializer.h>
 #include <json/parser.h>
 #include <condition_variable>
+#include <system_error>
 
 namespace server {
 
@@ -37,6 +39,7 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::POST, "/api/ddl/compact", &WebInterface::ddl_compact},
     {Method::GET, "/api/ddl", &WebInterface::ddl_list},
     {Method::GET, "/api/list", &WebInterface::all_ddl_list},
+    {Method::DELETE, "/api/list/{}", &WebInterface::all_ddl_list_delete},
     {Method::PUT, "/api/active", &WebInterface::ddl_active},
     {Method::GET, "/api/active", &WebInterface::ddl_active},
     {Method::POST, "/api/control", &WebInterface::control},
@@ -152,6 +155,14 @@ bool WebInterface::all_ddl_list(Request &req)
     return req.response({200,{}},{},json::value(result.begin(), result.end()));
 }
     
+
+bool WebInterface::all_ddl_list_delete(Request &req) {
+    auto name = req.path_vars[0];
+    auto full_name = _user_dir / name;
+    std::error_code ec;
+    std::filesystem::remove(full_name, ec);
+    return req.response({202,"Accepted"},{},"");
+}
 
 bool WebInterface::ddl_list(Request &req)
 {

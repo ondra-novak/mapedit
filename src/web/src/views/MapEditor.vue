@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
-import StatusBar from '@/components/statusBar.ts'
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { server, type FileItem } from '@/core/api';
 import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
@@ -110,7 +110,7 @@ const control_state = reactive({
 });
 
 const mapLoadedPalettes = ref(new MapPalettes);
-
+let save_state: SaveRevertControl;
 
 const SectorFlagsNames = {
     DarkFog: "Always fog to black",
@@ -179,7 +179,7 @@ function end_edit(map : MapFile) {
     map_document.add_change(map);
     curmap.value = map_document.get_current();
     updateControls();
-    StatusBar.set_changed(true);
+    save_state.set_changed(true);
 }
 
 function doUndo() {
@@ -587,6 +587,7 @@ function onMapLoaded() {
 }
 
 async function init() {
+    save_state = await StatusBar.register_save_control();
 /*    server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
     StatusBar.onMapOpen(onMapLoaded);
     if (mapview.value)     {
@@ -619,7 +620,7 @@ const edit_modes = [
 ]
 
 onMounted(init);
-onUnmounted(StatusBar.final_save)
+onUnmounted(()=>save_state.unmount())
 
 watch([()=>settings.edit_mode,focus],()=>{
     updateFocus();

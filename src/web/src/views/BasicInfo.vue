@@ -1,17 +1,12 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import StatusBar from '@/components/statusBar.ts'
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { dosname_sanitize } from '@/core/dosname';
 import { humanDataFromArrayBuffer, humanDataToArrayBuffer, Runes, type THumanData } from '@/core/character_structs';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import { string2keybcs } from '@/core/keybcs2';
-
-const missing_files : FileItem[] = [
-    {name:"POSTAVY.DAT",group:AssetGroup.MAPS,ovr:true},
-];
-
 
 
 class BasicInfoData {
@@ -25,6 +20,7 @@ class BasicInfoData {
 const basic_info = ref<BasicInfoData>(new BasicInfoData);
 const postavy_dat = ref<THumanData>()
 const runes = ref<Runes>(new Runes());
+let save_state: SaveRevertControl;
 
 function reload() {
     server.getDDLFile("_ADV.JSON").then(buff=>{
@@ -32,13 +28,13 @@ function reload() {
         const s = dec.decode(buff);
         const data = JSON.parse(s);
         Object.assign(basic_info.value, data);
-        nextTick(()=>StatusBar.set_changed(false));
+        nextTick(()=>save_state.set_changed(false));
     })
     getDDLFileWithImport(server,"POSTAVY.DAT",AssetGroup.MAPS).then(buff=>{
         if (buff) {
             postavy_dat.value = humanDataFromArrayBuffer(buff);
             runes.value = postavy_dat.value.runes;
-            nextTick(()=>StatusBar.set_changed(false));
+            nextTick(()=>save_state.set_changed(false));
         }
     })
 }
@@ -64,15 +60,17 @@ async function save() {
     }
 }
 
-function init() {
-    StatusBar.register_save_and_revert({save:save, revert:reload});
+async function init() {
+    save_state = await StatusBar.register_save_control();
+    save_state.on_save(save);
+    save_state.on_revert(reload);
     reload();
 }
 
 onMounted(init);
-onUnmounted(StatusBar.final_save);
+onUnmounted(()=>save_state.unmount());
 
-watch([basic_info, runes], ()=>StatusBar.set_changed(true),{deep:true});
+watch([basic_info, runes], ()=>save_state.set_changed(true),{deep:true});
 
 </script>
 <template>

@@ -1,8 +1,4 @@
 
-export interface ISaveRevert {
-    save: ()=>(Promise<boolean>|Promise<void>|boolean|void);
-    revert: ()=>void;
-};
 
 export interface TeleporToFlags {
     ghost_form: boolean
@@ -15,17 +11,26 @@ export interface IGameClientControl {
     teleport_to:(map_name: string, sector: number, side: number, flags: TeleporToFlags)=>void;
 };
 
+export interface SaveRevertControl {
+    on_save:(cb:()=>any)=>void;
+    on_revert:(cb:()=>any)=>void;
+    set_changed:(changed: boolean)=>void;
+    get_changed:()=>boolean;
+    do_save:()=>Promise<any>;
+    do_revert:()=>Promise<any>;
+    unmount:()=>void;    
+}
+
 export interface IStatusBar {
-    register_save_and_revert: (ifc: ISaveRevert)=>void;
-    set_changed:(changed:boolean)=>void;
+    register_save_control:()=>SaveRevertControl;
     set_project_switch: (name: string, on_click: ()=>void)=>void;
     set_map_switch: (name: string, on_click: ()=>void)=>void;  
     register_game_client_cntr: (ifc: IGameClientControl)=>void;
     set_current_sector:(sector: number, side: number, map_save_cb: ()=>Promise<boolean>)=> void;
     unset_current_sector:()=>void;
-    final_save:()=>void;
     update_connect_status:(status:boolean)=>void;
     update_client_status:(status:boolean)=>void;    
+    stop_game:()=>void;
 };
 
 function create_promise() {
@@ -53,19 +58,8 @@ class StatusBar {
      * If the previous one is marked as changed, it also calls save() on previous 
      * Newly registered interface is marked as not changed
      */
-    static register_save_and_revert(ifc: ISaveRevert) {
-        return conn.promise.then(st=>st.register_save_and_revert(ifc));
-    }
-    ///call this durin onUnmount
-    /**
-     * Performs save if changed and removes interface
-     */
-    static final_save() {
-        return conn.promise.then(st=>st.final_save());
-    }
-    ///Sets changed status
-    static set_changed(changed:boolean) {
-        return conn.promise.then(st=>st.set_changed(changed));
+    static register_save_control() {
+        return conn.promise.then(st=>st.register_save_control());
     }
     ///Sets name of project and also registers callback on click on the switch button
     static set_project_switch(name:string, on_click:()=>void) {
@@ -98,6 +92,9 @@ class StatusBar {
     }
     static update_client_status(status:boolean) {
         return conn.promise.then(st=>st.update_client_status(status));
+    }
+    static stop_game() {
+        return conn.promise.then(st=>st.stop_game());
     }
 
 };

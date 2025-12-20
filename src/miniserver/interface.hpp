@@ -48,6 +48,7 @@ protected:
  
     
     bool all_ddl_list(Request &req);
+    bool all_ddl_list_delete(Request &req);
     bool ddl_list(Request &req);
     bool ddl_get(Request &req);
     bool ddl_put(Request &req);

@@ -223,11 +223,11 @@ export class ApiClient {
             this.last_ka.exit_on_close = st.exit_on_close;
             this.last_ka.game_instances = st.game_instances;
             this.last_ka.keepalive_interval = st.keepalive_interval;
-            const l = this.last_ka;
-            this.ka_listeners.forEach(x=>queueMicrotask(()=>x(l)));
         } catch (e) {
             this.last_ka.connected = false;
         }
+        const l = this.last_ka;
+        this.ka_listeners.forEach(x=>queueMicrotask(()=>x(l)));
         setTimeout(()=>this.start_keepalive(), this.keep_alive_interval);
     }
 
@@ -323,6 +323,18 @@ export class ApiClient {
             return false;
         }
         return true;
+    }
+
+    async delete_ddl(ddl: string) {
+        const response = await fetch(`api/list/${encodeURIComponent(ddl)}`, {
+            method: "DELETE",
+        });
+        if (response.status !== 202) {
+            await this.handle_error(response, "Failed to delete file")
+            return false;
+        }
+        return true;
+
     }
 
     on_keep_alive(cb: (x:KeepAliveStatus)=>void) {

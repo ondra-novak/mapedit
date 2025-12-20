@@ -2,11 +2,11 @@
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { AnimationTypeIndex, AnimationTypeLetter, AnimationTypeMirror, SeqFile, type AnimationTypeIndexType } from '@/core/seqfile';
-import { ref, watch, onMounted, computed, defineEmits, shallowRef, onUnmounted } from 'vue';
+import { ref, watch, onMounted, computed,  shallowRef, onUnmounted } from 'vue';
 import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import CanvasView from './CanvasView.vue';
 import { PCXProfile, PCX } from '@/core/pcx';
-import StatusBar from '@/components/statusBar.ts'
+import StatusBar, {type SaveRevertControl} from '@/components/statusBar.ts'
 import { EnemyFlags1, type EnemyDef } from '@/core/enemy_struct';
 
 const emit = defineEmits<{
@@ -29,10 +29,10 @@ const cur_offset = ref<number>(0);
 const list_files = ref<string[]>([]);
 const big=ref<boolean>(false);
 let play_anim = false;
-
+let save_control : SaveRevertControl;
 
 async function onUpdateModel() {
-    StatusBar.final_save();
+    if (save_control.get_changed()) save();
     if (filename.value) {
         const f = filename.value;
         if (f.endsWith(".SEQ")) {
@@ -51,11 +51,6 @@ async function onUpdateModel() {
     list_files.value = ffiles.map(f=>f.name);
 
     
-    StatusBar.register_save_and_revert({save: save, revert: ()=>{
-        StatusBar.set_changed(false);
-        onUpdateModel();
-    }})
-
     try {
         const anim = await server.getDDLFile(selfile.value || "");
         animations.value = SeqFile.fromArrayBuffer(anim, stem);
@@ -73,7 +68,7 @@ async function onUpdateModel() {
                     a[i+6][0].offset_x = props.def.adjusting[i][0];
                 }
             }            
-            StatusBar.set_changed(true);
+            save_control.set_changed(true);
         }
 
         big.value = animations.value.big;
@@ -84,6 +79,14 @@ async function onUpdateModel() {
 
     onChangePhase();
 }   
+
+async function onInit() {
+    save_control = await StatusBar.register_save_control();
+    save_control.on_save(save);
+    save_control.on_revert(onUpdateModel);
+    await onUpdateModel();
+}
+
 
 function onChangePhase() {
     if (animations.value) {
@@ -132,7 +135,7 @@ function insert_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined) {
         animations.value.animation[cur_phase.value].splice(cur_frame.value,0,animations.value.animation[cur_phase.value][cur_frame.value]);
         while (animations.value.animation[cur_phase.value].length > 16) animations.value.animation[cur_phase.value].pop();
-        StatusBar.set_changed(true);
+        save_control.set_changed(true);
     }
     play_anim = false;
 }
@@ -140,7 +143,7 @@ function insert_frame() {
 function delete_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined && animations.value.animation[cur_phase.value].length>1) {
            animations.value.animation[cur_phase.value].splice(cur_frame.value,1);
-           StatusBar.set_changed(true);
+           save_control.set_changed(true);
     }
     play_anim = false;
 }
@@ -204,7 +207,7 @@ function onChangeFace () {
             offset_x:cur_offset.value,
             offset_y:0
         };
-        StatusBar.set_changed(true);
+        save_control.set_changed(true);
         onChangeFrame();
     }
     play_anim = false;
@@ -247,14 +250,14 @@ function sethit() {
     if (animations.value) {
         if (animations.value && animations.value.hit_pos == cur_frame.value) animations.value.hit_pos = null;
         else animations.value.hit_pos = cur_frame.value;
-        StatusBar.set_changed(true);
+        save_control.set_changed(true);
     }
 }
 
 function changeBig() {
     if (animations.value) {
         animations.value.big =  big.value;
-        StatusBar.set_changed(true);
+        save_control.set_changed(true);
     }
 }
 
@@ -262,8 +265,8 @@ function changeBig() {
 watch([filename], onUpdateModel);
 watch([cur_phase], onChangePhase);
 watch([cur_frame], onChangeFrame);
-onMounted(onUpdateModel);
-onUnmounted(StatusBar.final_save);
+onMounted(onInit);
+onUnmounted(()=>save_control.unmount());
 
 
 </script>

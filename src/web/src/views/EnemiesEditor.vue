@@ -11,7 +11,7 @@ import { itemsFromArrayBuffer, type ItemDef } from '@/core/items_struct';
 import { PCXProfile, PCX } from '@/core/pcx';
 import { SeqFile } from '@/core/seqfile';
 import { computed, onMounted, onUnmounted, reactive, ref, watch, type WatchHandle } from 'vue';
-import StatusBar from '@/components/statusBar.ts'
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
@@ -33,7 +33,7 @@ const appearence = ref<PCX>();
 const appearence_margin = ref<string>("");
 const palettes = ref<COLPaletteSet>();
 const edit_seq = ref<string>();
-
+let save_state: SaveRevertControl;
 
 async function  load_files() {
 
@@ -59,7 +59,7 @@ async function  load_files() {
     } 
 
 
-    StatusBar.set_changed(false);
+    save_state.set_changed(false);
     selected_enemy.value = undefined;
 }
 
@@ -104,22 +104,15 @@ function create_soundmap () {
     }
 }
 
-let set_changed_flag = false;
 
-function set_changed(x: boolean) {
-    set_changed_flag = x;
-    StatusBar.set_changed(x);
-}
 
-function reg_save() {
-    StatusBar.register_save_and_revert({save:save_all,revert:load_files})
-            .then(()=>StatusBar.set_changed(set_changed_flag));
-}
 
-function init() {
+async function init() {
+    save_state = await StatusBar.register_save_control();
+    save_state.on_save(save_all);
+    save_state.on_revert(load_files);
     load_sounds();
     load_files();
-    reg_save();
     
 
 }
@@ -145,7 +138,7 @@ async function save_all() {
 
 }
 
-onUnmounted(StatusBar.final_save);
+onUnmounted(()=>save_state.unmount());
 
 
 
@@ -343,7 +336,7 @@ function saveEnemyData() {
         while (enm.inv.length < 16) {
             enm.inv.push(0);
         }
-        StatusBar.set_changed(true);
+        save_state.set_changed(true);
     }
 
 }
@@ -410,19 +403,11 @@ watch([selected_enemy], loadEnemyData);
 
 function openAppearence() {
     if (selected_enemy.value && enemies.value) {        
-        if (!edit_seq.value) {
-            StatusBar.set_changed(false).then(()=> {                
-                edit_seq.value = enemies.value[selected_enemy.value || 0].mobs_name + '.SEQ';
-            });
-        }
+        edit_seq.value = enemies.value[selected_enemy.value || 0].mobs_name + '.SEQ';
     }
 }
 async function closeAppearence() {
-    if (edit_seq.value) {        
-        edit_seq.value = undefined;
-        await StatusBar.final_save();
-        queueMicrotask(reg_save);
-    }
+    edit_seq.value = undefined;
 }
 
 

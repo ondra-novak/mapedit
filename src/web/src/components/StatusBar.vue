@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import StatusBar, { type IGameClientControl, type ISaveRevert } from '@/components/statusBar.ts';
+import StatusBar, { type IGameClientControl, type SaveRevertControl } from '@/components/statusBar.ts';
 import { onMounted, ref, watch } from 'vue';
 
 const current_project = ref<string>();
@@ -7,9 +7,132 @@ const current_map = ref<string>();
 let current_project_click = ()=>{};
 let current_map_click = ()=>{};
 
-const save_ifc = ref<ISaveRevert>();
-const changed_flag = ref(false);
-const connect_status = ref(false);
+
+
+class SaveState {
+
+    #stack: SaveStateStack;
+    #on_save: (()=>any)|null =  null;
+    #on_revert: (()=>any)|null =  null;
+    #changed = false;
+
+    constructor(stack: SaveStateStack) {
+        this.#stack = stack;
+    }
+    on_save(cb:()=>any) {
+        this.#on_save = cb;
+    }
+    on_revert(cb:()=>any) {
+        this.#on_revert = cb;
+    }
+    async do_save() : Promise<any>{
+        if (this.#on_save) {
+            const res = await Promise.resolve(this.#on_save());
+            if (res == undefined || res) {
+                this.#changed = false;
+                this.#stack.notify_me(this);
+            }
+        }
+    }
+    async do_revert() : Promise<any> {        
+        if (this.#on_revert) {
+            await Promise.resolve(this.#on_revert());
+            this.#changed = false;
+            this.#stack.notify_me(this);
+        }
+    }
+    set_changed(chg: boolean) {
+        this.#changed = chg;
+        this.#stack.notify_me(this);
+    }
+    unmount() {
+        if (this.#changed && this.#on_save) {
+            this.#on_save();
+        }
+        this.#stack.remove_me(this);
+    }
+    can_save() : boolean {
+        return !!(this.#changed && this.#on_save);
+    }
+    can_revert():boolean {
+        return !!(this.#changed && this.#on_revert);
+    }
+    get_changed() {
+        return this.#changed
+    }
+}
+
+class SaveStateStack {
+
+    #stack: SaveState[] = [];
+    #notify: ()=>void;
+
+    constructor(notify: ()=>void) {
+        this.#notify = notify;
+    }
+
+    remove_me(me: SaveState) {
+        const idx = this.#stack.findIndex(x=>x === me);
+        if (idx >=0) {
+            this.#stack = [...this.#stack.slice(0,idx),...this.#stack.slice(idx+1)];
+        if (idx == this.#stack.length) this.#notify();
+        }
+    }
+    notify_me(me: SaveState) {
+        if (this.#stack[this.#stack.length-1]  == me) {
+            this.#notify();
+        }
+    }
+
+    create() : SaveState {
+        const s = new SaveState(this);
+        this.#stack.push(s);
+        this.#notify();
+        return s;
+    }
+
+    get_last() {
+        return this.#stack[this.#stack.length-1];
+    }
+
+    show_ui() {
+        return this.get_last() !== undefined;
+    }
+
+    can_save() {
+        const l = this.get_last();
+        return l && l.can_save();
+    }
+    can_revert() {
+        const l = this.get_last();
+        return l && l.can_revert();
+    }
+    do_save() {
+        const l = this.get_last();
+        return l && l.do_save();
+    }
+    do_revert() {
+        const l = this.get_last();
+        return l && l.do_revert();
+    }
+}
+
+
+
+const can_save=ref(false);
+const can_revert = ref(false);
+const show_save_ui = ref(false);
+
+let save_state_stack = new SaveStateStack(updateSaveUI);
+
+function updateSaveUI() {  
+    can_save.value = save_state_stack.can_save();
+    can_revert.value = save_state_stack.can_revert();
+    show_save_ui.value = save_state_stack.show_ui();
+}
+
+
+const connect_status = ref(true);
 const client_status = ref(false);
 const ghost_form = ref(false);
 const confirm_shown = ref(false);
@@ -20,49 +143,33 @@ type Location = {
     map_save_cb: ()=>Promise<boolean>;    
 }
 
+
 const location = ref<Location>();
 
 
 const game_client_cntr = ref<IGameClientControl>();
 
+function register_save_control() : SaveRevertControl{
+    return  save_state_stack.create();
 
-function remove_save_and_revert() {
-    if (save_ifc.value  && changed_flag.value) {
-        save_ifc.value.save();
-        save_ifc.value = undefined;        
-    }
 }
 
-function register_save_and_revert (ifc: ISaveRevert) {
-    remove_save_and_revert();
-    save_ifc.value = ifc;
-    changed_flag.value = false;
-}
-function set_changed(changed:boolean) {
-    changed_flag.value = changed;
-}
-function final_save() {
-    remove_save_and_revert();
-}
 
 function save_clicked() {
-    if (save_ifc.value) {
-        Promise.resolve(save_ifc.value.save()).then(b=>{            
-            if (b === undefined || b) changed_flag.value=false;
-        });
-    }
+    can_save.value = false;
+    can_revert.value = false;
+    save_state_stack.do_save();
 }
 
 function revert_clicked() {
-    if (save_ifc.value) {
-        save_ifc.value.revert();
-        changed_flag.value = false;
-    }
+    can_save.value = false;
+    can_revert.value = false;
+    save_state_stack.do_revert();
 }
 
 function set_project_switch (name: string, on_click: ()=>void) {
     current_project.value = name;
-    current_map_click = on_click;
+    current_project_click = on_click;
     unset_current_sector();
 }
 function set_map_switch (name: string, on_click: ()=>void) {
@@ -89,16 +196,15 @@ function unset_current_sector() {
 
 onMounted(()=>{
     StatusBar.attach_component({
-        register_save_and_revert,
-        set_changed,
+        register_save_control,
         set_project_switch,
         set_map_switch,
         register_game_client_cntr,
         unset_current_sector,
         set_current_sector,
-        final_save,
         update_connect_status,
-        update_client_status
+        update_client_status,
+        stop_game: stop_client
     })
 })
 
@@ -145,12 +251,20 @@ function show_confirm() {
             confirm_shown.value = false;
             stp.watch();
         }
-        stp.watch = watch([save_ifc,changed_flag,confirm_shown], dismiss);
+        stp.watch = watch([can_revert,can_revert,show_save_ui,confirm_shown], dismiss);
 
         window.addEventListener("click", dismiss);
     },50);
 }
 
+const error_dlg = ref<HTMLDialogElement>();
+watch(connect_status, ()=>{
+    if (!connect_status.value) {
+        error_dlg.value?.showModal();
+    } else {
+        error_dlg.value?.close();
+    }
+})
 
 </script>
 <template>
@@ -174,15 +288,21 @@ function show_confirm() {
             </template>
         </div>
         <div class="right">
-            <template v-if="save_ifc">
-                <button  :disabled="!changed_flag" @click="show_confirm">Revert</button>
-                <button  :disabled="!changed_flag" @click="save_clicked">Save</button>
+            <template v-if="show_save_ui">
+                <button  :disabled="!can_save" @click="show_confirm">Revert</button>
+                <button  :disabled="!can_revert" @click="save_clicked">Save</button>
                 <div class="revert-confirm" v-if="confirm_shown">
                     Confirm you want to revert changes <button @click="revert_clicked">Confirm</button>
                 </div>
             </template>
         </div>
     </div>
+    <dialog ref="error_dlg">
+        <header>Connection lost</header>
+        <p>Connection to backend server has been lost.</p>
+        <p>The backend server was probably killed or crashed</p>
+        <p>The application can no longer work, please close this window</p>
+    </dialog>
 </template>
 <style lang="css" scoped>
 .bar {
