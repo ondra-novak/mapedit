@@ -87,7 +87,9 @@ x-workspace {
     display:block;
     background-color: #ccc;
 }
-
+[hidden] {
+  display:none !important;
+}
 button {
   cursor: pointer;
 }

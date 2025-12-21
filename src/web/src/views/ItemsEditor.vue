@@ -12,7 +12,6 @@ import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { create_datalist } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
-
 const selected_item = ref<number>();
 
 const item_list = ref<ItemDef[]>([]);
@@ -31,6 +30,15 @@ const left_hand_place = ref<HTMLCanvasElement|null>(null);
 const right_hand_place = ref<HTMLCanvasElement|null>(null);
 let save_state: SaveRevertControl;
 
+
+function reload() {
+    getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
+        item_list.value = x?itemsFromArrayBuffer(x):[];
+        selected_item.value = undefined;
+        nextTick(()=>save_state.set_changed(false));
+    });
+}
+
 function init() {
     server.getDDLFile("CHAR00.PCX").then(x=>{
         const pcx = PCX.fromArrayBuffer(x)    
@@ -46,19 +54,17 @@ function init() {
     loadAllIcons((name:string)=>server.getDDLFile(name)).then(x=>{
         allIcons.value = x ;
     });
-    function reload() {
-        getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
-            item_list.value = x?itemsFromArrayBuffer(x):[];
-            selected_item.value = undefined;
-            nextTick(()=>save_state.set_changed(false));
-        });
-    }
+    reg_save();
+    reload()
+}
+
+function reg_save() {
     StatusBar.register_save_control().then(st=>{
         save_state = st;
         st.on_save(save);
         st.on_revert(reload);
     })
-    reload()
+
 }
 
 

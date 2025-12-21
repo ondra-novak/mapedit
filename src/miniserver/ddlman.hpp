@@ -72,6 +72,7 @@ public:
 
     bool exists(std::string_view name) const;
 
+    const auto &get_path() const {return _pathname;}
 
 protected:
     /// Path to the archive file.

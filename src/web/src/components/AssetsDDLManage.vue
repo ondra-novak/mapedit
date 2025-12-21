@@ -8,7 +8,7 @@ const button_disabled = ref<boolean>(true);
 
 async function  update_stats() : Promise<void>{
     button_disabled.value = true;
-    stats.value = (await server.getDDLFiles(999,"user")).stats;
+    stats.value = await server.getDDLStats();
     button_disabled.value = false;
 }
 

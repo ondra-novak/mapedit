@@ -9,7 +9,7 @@
 import { server } from '@/core/api';
 import { PCX, type PCXProfileType } from '@/core/pcx';
 import HIFormat from '@/core/hiformat.ts'
-import { defineProps, onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import type { AssetGroupType } from '@/core/asset_groups.ts';
 import {determineProfile} from '@/core/pcx_profle.ts'
 import type { RGBPalette } from '@/core/colors';

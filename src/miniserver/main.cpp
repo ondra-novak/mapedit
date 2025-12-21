@@ -91,7 +91,7 @@ int main(int argc, char ** argv) {
     server::Server srv(addrport);
     std::string url = "http://" + srv.get_listen_addr();
 
-    std::cout <<  "Server running at: " << url << std::endl;
+    std::cout << url << std::endl;
 
     if (!no_browser) {
         open_url(url);

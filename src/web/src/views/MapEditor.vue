@@ -18,10 +18,11 @@ import { messageBox } from '@/utils/messageBox';
 import { create_datalist } from '@/utils/datalist';
 import NicheEditor from './NicheEditor.vue';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
-import { enc2string, keybcs2string } from '@/core/keybcs2';
+import { enc2string, keybcs2string, string2keybcs } from '@/core/keybcs2';
 import type { MultiactionModelDef } from '@/components/MultiactionEditor.vue';
 import MultiactionEditor from '@/components/MultiactionEditor.vue';
 import { apply_array_diff, create_array_diff } from '@/utils/madiff';
+import MapSelectDlg from '@/components/MapSelectDlg.vue';
 const list_assets = ref<string[]>([]);
 
 const EditMode = {
@@ -32,12 +33,26 @@ const EditMode = {
     Enemies:4
 } as const;
 
-const map_name = ref<string>();
+class MapFileWithStringtable extends MapFile{
+
+    strtable: string[];
+
+    constructor(f?: MapFile, s?: string[]) {
+        super();
+        this.strtable = s || [];
+        if (f) Object.assign(this, f);        
+    }
+}
+
+const map_filename = ref<string>();
+const open_map_dlg = ref<boolean>(false);
+const props = defineProps<{active:boolean}>();
+
 const mapview = ref<HTMLElement>();
 const mapdraw :MapDraw=  new MapDraw();
-const stringtable = ref<string[]>([]);
-const map_document = new Document<MapFile>(new MapFile);
-const curmap = shallowRef<MapFile>(new MapFile());
+const map_document = new Document<MapFileWithStringtable>(new MapFileWithStringtable);
+const curmap = shallowRef<MapFileWithStringtable>(new MapFileWithStringtable());
+let original_string_table:string[] = [];
 const settings = reactive(globalState("mapview_settings",{
     curlevel : 0 as number,
     edit_mode: EditMode.Edit as number,
@@ -171,11 +186,11 @@ function updateControls() {
     control_state.can_undo = map_document.can_undo();
 }
 
-function begin_edit() : MapFile{
+function begin_edit() : MapFileWithStringtable{
     return shallowClone(map_document.get_current());        
 }
 
-function end_edit(map : MapFile) {
+function end_edit(map : MapFileWithStringtable) {
     map_document.add_change(map);
     curmap.value = map_document.get_current();
     updateControls();
@@ -200,8 +215,8 @@ function doRedo() {
     }
 }
 
-function saveOnTeleport() {
-    return Promise.resolve(true);//TODO
+async function saveOnTeleport() {
+    return saveMap();
 }
 
 function updateFocusData(sect: number, side: number) {
@@ -215,10 +230,10 @@ function updateFocusData(sect: number, side: number) {
                                side_def: wdef,
                                script: {
                                     actionList:wdef.actions.map(x=>toRaw(shallowClone(x))),
-                                    stringTable:stringtable.value
+                                    stringTable:curmap.value.strtable
                                }
                             };                
-                               updateFocus();
+                            updateFocus();
                 StatusBar.set_current_sector(sect,side, saveOnTeleport);
             } else {
                 StatusBar.unset_current_sector();
@@ -479,12 +494,6 @@ mapcontainer.onClickXY = onMapClickXY;
 mapcontainer.onSelectRect = onMapSelectRect;
 
 
-const required_files: FileItem[] = [
-    {group:AssetGroup.MAPS,name:"ITEMS.DAT",ovr:true},
-    {group:AssetGroup.MAPS,name:"SOUND.DAT",ovr:true},
-    {group:AssetGroup.MAPS,name:"ENEMY.DAT",ovr:true}
-];
-
 function updateFocus() {
     if (focus.value && (settings.edit_mode == EditMode.Edit||settings.edit_mode == EditMode.Items)) {
         mapdraw.drawFocusedWall(curmap.value, settings.curlevel, focus.value.sector, focus.value.side);
@@ -541,67 +550,119 @@ watch([()=>settings.edit_mode, curmap], ()=>{
 
     }
 });
-function onMapLoaded() {
 
-    function reload(doc: Document<MapFile>) {
-        mapLoadedPalettes.value = globalState("map_palettes", ()=>new MapPalettes());
-        curmap.value = doc.get_current();
-        const start = curmap.value.info.start_sector;
-        settings.curlevel = curmap.value.sectors[start].level;
-        redraw();
-        mapcontainer.zoom_reset();
-        if (curmap.value.sectors.length) {
-            const sname = (map_name.value || "").replace(/.MAP$/,".ENC");
-            getDDLFileWithImport(server,sname,AssetGroup.MAPS).then(x=>{
-                if (x) {
-                    const strings = enc2string(x).split('\n').map(x=>x.trim())
-                        .filter(x=>x.length && !x.startsWith(';'))
-                        .reduce((a,b)=>{
-                            const p = b.indexOf(' ');
-                            if (p == -1) return a;
-                            const idx = b.substring(0,p);
-                            const val = b.substring(p+1).trim();
-                            const idxval = parseInt(idx);
-                            if (isFinite(idxval) && idxval >= 0) {
-                                a[idxval] = val;
-                            }
-                            return a;
-                        },[] as string[]);
-                    stringtable.value = strings;
-                } else {
-                    stringtable.value = [];
-                }
-            })
-        }
-    }
-
-/*    StatusBar.register_save_and_revert(()=>{
-        StatusBar.saveMap();
-    }, async ()=>{
-        const doc = await StatusBar.reloadMap();
-        reload(doc);
-        mapLoadedPalettes.value = StatusBar.getMapPalettes();
-    });    */
+async function loadStringTable(mapname: string) {
+    const sname = mapname.replace(/.MAP$/,".ENC");
+    const txtname = mapname.replace(/.MAP$/,".TXT");
     
-    reload(map_document);
+    let txt:string;
+    try {
+        const buff = await server.getDDLFile(txtname);
+        txt = keybcs2string(buff);        
+    } catch (e) {
+        const buff = await getDDLFileWithImport(server,sname,AssetGroup.MAPS);
+        if (!buff) return [];
+        txt = enc2string(buff);
+    }
+    return txt.split('\n').map(x=>x.trim())
+            .filter(x=>x.length && !x.startsWith(';'))
+            .reduce((a,b)=>{
+                const p = b.indexOf(' ');
+                if (p == -1) return a;
+                const idx = b.substring(0,p);
+                const val = b.substring(p+1).trim();
+                const idxval = parseInt(idx);
+                if (isFinite(idxval) && idxval >= 0) {
+                    a[idxval] = val;
+                }
+                return a;
+            },[] as string[]);        
+
 }
 
-async function init() {
-    save_state = await StatusBar.register_save_control();
-/*    server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
-    StatusBar.onMapOpen(onMapLoaded);
-    if (mapview.value)     {
-        mapcontainer.add_to_DOM(mapview.value);        
-    }    
-    if (!map_document_name.value) {
-        StatusBar.openMapDialog();
-        return;
-    } else {
+async function loadMap (mapname: string)   {
+    try {
+        const buff = await server.getDDLFile(mapname);
+        const mapdata = MapFile.from(buff);            
+        let ss: string[] = [];
+        if (curmap.value.sectors.length) {
+            ss = await loadStringTable(mapname);        
+        }
+        original_string_table = ss;
+        map_document.reset(new MapFileWithStringtable(mapdata.map));
+        mapLoadedPalettes.value = mapdata.palette;
+
         curmap.value = map_document.get_current();
+        const start = curmap.value.info.start_sector;
+        settings.curlevel = curmap.value.sectors[start].level;
+        redraw();        
+        mapcontainer.zoom_reset();
+
+    } catch (e) {
+        map_document.reset(new MapFileWithStringtable);
     }
+    map_filename.value = mapname;
+    StatusBar.unset_current_sector();
+};
+
+
+async function reloadMap()  {
+    const name = map_filename.value;
+    if (name) {
+        return await loadMap(name);
+    }
+}
+
+async function saveStringTable(mapname: string, ss: string[]) {
+    const txtname = mapname.replace(/.MAP$/,".TXT");
+    const out = ss.reduce((a,txt,idx)=>{
+        a.push(`${idx} ${txt}`);
+        return a;
+    },[] as string[]);
+    out.push("-1");
+    out.push("")
+    const out2 = out.join("\n");
+    const buff = Uint8Array.from(string2keybcs(out2)).buffer;
+    return await server.putDDLFile(txtname, buff, AssetGroup.MAPS);
+}
+
+async function saveMap() {
+    const name = map_filename.value;
+    if (name) {
+        const map = map_document.get_current();
+        await server.putDDLFile(name, map.saveToArrayBuffer(), AssetGroup.MAPS);
+        if (original_string_table != map.strtable) {
+            await saveStringTable(name, map.strtable);
+            original_string_table = map.strtable;
+        }
+        return true;
+    } else {
+        return false;
+    }
+
+}
+
+function init_save_state() {
+    StatusBar.register_save_control().then(st=>{
+        save_state = st;
+        st.on_save(()=>{
+            saveMap();    
+        })
+        st.on_revert(()=>{
+            reloadMap();
+        });
+    });
+}
+
+function reload_all_lists() {
+    server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
     redraw();
     updateControls();
-*/
+}
+
+
+async function init() {        
+
 }
 
 function resetFloor() {
@@ -742,6 +803,9 @@ function applyChanges() {
                     }
                 }
             }
+            if (focus.value.script.stringTable) {
+                m.strtable = focus.value.script.stringTable;
+            }
             end_edit(m);
             updateFocusData(focus.value.sector, focus.value.side);
         }
@@ -789,12 +853,35 @@ function delete_cur_niche() {
 
 const ds_wallassets = create_datalist();
 watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
+watch(map_filename, (nw)=>{
+    if (nw) {StatusBar.set_map_switch(nw,()=>{
+            open_map_dlg.value = true;
+        });
+        loadMap(nw)
+
+    }
+})
+watch(()=>props.active, ()=>{
+    const a = props.active;
+    if (a) {
+        init_save_state();
+        reload_all_lists();
+    } else {
+        save_state.unmount();
+    }
+})
+watch(mapview,()=>{
+    if (mapview.value){
+        mapcontainer.add_to_DOM(mapview.value);        
+    }    
+})
 
 </script>
 
 <template>
 
-<x-workspace>
+<x-workspace :hidden="!props.active">
+<template v-if="map_filename">
 <div class="toolbar">
     <div :class="{active: layers_opened}" @click = "layers_opened = !layers_opened"><img src="@/assets/toolbar/layers.svg"></div>
     <div v-for="(v,idx) in edit_modes" @click="settings.edit_mode = idx" :class="{active: settings.edit_mode == idx, sep: idx == 0}" :title="v[1]"><img :src="v[0]"></div>
@@ -961,11 +1048,16 @@ watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
         <label><input type="checkbox" v-model="layers.items"><span>Items</span></label>
     </x-form>
 </div>
-</x-workspace>
 <NicheEditor v-if="curNiche != null" v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus!.side_def"></NicheEditor>
-
 </template>
-
+<template v-else>
+<div class="middle">
+    <button @click="open_map_dlg = true">Open map</button>
+</div>
+</template>
+</x-workspace>
+<MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
+</template>
 
 <style lang="css" scoped>
 x-workspace {

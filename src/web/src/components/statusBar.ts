@@ -9,6 +9,7 @@ export interface IGameClientControl {
     stop:() =>void;
     restart:()=>void;
     teleport_to:(map_name: string, sector: number, side: number, flags: TeleporToFlags)=>void;
+    configure:()=>void;
 };
 
 export interface SaveRevertControl {
@@ -29,7 +30,7 @@ export interface IStatusBar {
     set_current_sector:(sector: number, side: number, map_save_cb: ()=>Promise<boolean>)=> void;
     unset_current_sector:()=>void;
     update_connect_status:(status:boolean)=>void;
-    update_client_status:(status:boolean)=>void;    
+    update_client_status:(status:boolean)=>void;        
     stop_game:()=>void;
 };
 

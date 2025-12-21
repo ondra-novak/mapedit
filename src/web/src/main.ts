@@ -8,12 +8,11 @@ import autoresize from './directives/autoresize'
 import watch_range from './directives/watch_range'
 
 import 'vue-color/style.css';
-import init_game_control from './core/game_control'
 
 const app = createApp(App);
 app.use(router);
 app.directive('autoresize', autoresize);
 app.directive('watch-range', watch_range);
 app.mount('#app');
-init_game_control();
+
 

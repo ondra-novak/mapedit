@@ -1252,7 +1252,7 @@ export class MapFile {
     sectors: MapSector[] = [];
     info = new MAPGLOBAL;
 
-    static from(buff: ArrayBuffer) : [ MapFile, MapPalettes ] {
+    static from(buff: ArrayBuffer) {
         const w = new ConfigurationPalette<WallConfiguration>(WallConfiguration);
         const a = new ConfigurationPalette<ArcConfiguration>(ArcConfiguration);
         const f = new ConfigurationPalette<FloorCeilConfiguration>(FloorCeilConfiguration);
@@ -1313,7 +1313,7 @@ export class MapFile {
         p.ceil_palette = c;
         q.sectors = r;        
         q.info = m.info;
-        return [q,p];
+        return {map:q,palette:p};
     }
 
     saveToArrayBuffer() : ArrayBuffer {

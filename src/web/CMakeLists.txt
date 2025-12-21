@@ -20,4 +20,4 @@ add_custom_command(OUTPUT ${WEB_BUILD_DIR}/index.html
     COMMENT "Building web frontend with npm..."
 )
 
-add_custom_target(frontend DEPENDS ${WEB_BUILD_DIR}/index.html)
+add_custom_target(frontend ALL DEPENDS ${WEB_BUILD_DIR}/index.html)

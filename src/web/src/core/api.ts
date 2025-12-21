@@ -24,7 +24,6 @@ export interface DDLEntry {
 
 export interface DDLFiles {
     files: FileItem[];
-    stats: Stats;
 }
 
 export class KeepAliveStatus {
@@ -92,6 +91,13 @@ export class ApiClient {
             };
         });
         return json;
+    }
+
+    async getDDLStats(): Promise<Stats> {
+        const response = await fetch(`api/ddl/stats`,{
+            method:"POST"
+        });
+        return await response.json();
     }
 
     async getDDLFile(id: string): Promise<ArrayBuffer> {

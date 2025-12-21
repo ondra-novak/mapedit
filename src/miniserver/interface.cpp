@@ -46,6 +46,7 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::PUT, "/api/ddl/{}", &WebInterface::ddl_put},
     {Method::DELETE, "/api/ddl/{}", &WebInterface::ddl_delete},
     {Method::POST, "/api/ddl/compact", &WebInterface::ddl_compact},
+    {Method::POST, "/api/ddl/stats", &WebInterface::ddl_stats},
     {Method::GET, "/api/ddl", &WebInterface::ddl_list},
     {Method::GET, "/api/list", &WebInterface::all_ddl_list},
     {Method::DELETE, "/api/list/{}", &WebInterface::all_ddl_list_delete},
@@ -175,6 +176,22 @@ bool WebInterface::all_ddl_list_delete(Request &req) {
     return req.response({202,"Accepted"},{},"");
 }
 
+bool WebInterface::ddl_stats(Request &req) {
+    std::shared_lock _(_mx);    
+    auto user = getUserDDL();
+    auto stats = user.get_stats();
+
+    return req.response({200},{},json::value({
+            {"directory_space",stats.directory_space},
+            {"entries_reserved",stats.entries_reserved},
+            {"entries_used",stats.entries_used},
+            {"reserved_space",stats.reserved_space},
+            {"total_space",stats.total_space},
+            {"used_space",stats.used_space}
+    }));    
+}
+
+
 bool WebInterface::ddl_list(Request &req)
 {
     std::shared_lock _(_mx);    
@@ -219,22 +236,13 @@ bool WebInterface::ddl_list(Request &req)
             return false;
     }), out_files.end());
 
-    auto stats = user.get_stats();
     return req.response({200},{},json::value({
         {"files", json::value(out_files.begin(), out_files.end(), [&](const DDLManager::Item &val){
             auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
             bool ovr = iter != user_files.end() && iter->name == val.name;            
             if (ovr && iter->group) return json::value({val.name, iter->group, ovr});
             else return json::value({val.name, val.group, ovr});
-        })},
-        {"stats",{
-            {"directory_space",stats.directory_space},
-            {"entries_reserved",stats.entries_reserved},
-            {"entries_used",stats.entries_used},
-            {"reserved_space",stats.reserved_space},
-            {"total_space",stats.total_space},
-            {"used_space",stats.used_space}
-        }}
+        })}
     }));
 }
 
@@ -242,10 +250,22 @@ bool WebInterface::ddl_get(Request &req)
 {
     std::shared_lock _(_mx);    
     auto user = getUserDDL();
-    auto f = user.get(req.path_vars[0]);
+    auto name = req.path_vars[0];
+    auto f = user.get(name);
     if (!f) {
-        f = _game?_game->get(req.path_vars[0]):std::nullopt;
-        if (!f) return false;
+        if (_game) {
+            f = _game->get(name);
+            if (!f) {
+                auto p = _game->get_path();
+                auto rs = p.parent_path()/"maps"/name;
+                std::ifstream data(rs, std::ios::in|std::ios::binary);
+                if (!data) return false;
+                f.emplace();
+                std::copy(std::istreambuf_iterator<char>(data),std::istreambuf_iterator<char>(), std::back_inserter(*f));
+            }
+        } else {
+            return false;
+        }
     }    
     return req.response({200},{
         {"Content-Type","application/octet-stream"}
@@ -539,7 +559,7 @@ void WebInterface::load_config()
     try {
         std::ifstream cfgdata(_user_dir/".config", std::ios::in);
         if (!cfgdata) {
-            _config = json::type::null;
+            _config = json::object_view();
         } else {
             std::string content((std::istreambuf_iterator<char>(cfgdata)), std::istreambuf_iterator<char>());
             _config = json::value::from_json(content);
@@ -551,7 +571,7 @@ void WebInterface::load_config()
         init_game_dir(game_dir, skeldal_ini);
 
     } catch (...) {
-        _config = json::type::null;
+        _config = json::object_view();
     }
 
 

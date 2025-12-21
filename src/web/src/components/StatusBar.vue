@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 import StatusBar, { type IGameClientControl, type SaveRevertControl } from '@/components/statusBar.ts';
+import svg_gear from '@/assets/toolbar/gear.svg'
+
 import { onMounted, ref, watch } from 'vue';
 
 const current_project = ref<string>();
@@ -168,9 +170,11 @@ function revert_clicked() {
 }
 
 function set_project_switch (name: string, on_click: ()=>void) {
+    if (current_project.value != name) {
+        unset_current_sector();
+    }
     current_project.value = name;
     current_project_click = on_click;
-    unset_current_sector();
 }
 function set_map_switch (name: string, on_click: ()=>void) {
     current_map.value = name;
@@ -257,6 +261,14 @@ function show_confirm() {
     },50);
 }
 
+function gear_clicked() {
+    if (game_client_cntr.value) {
+        game_client_cntr.value.configure();
+        client_status.value = true;
+    }
+
+}
+
 const error_dlg = ref<HTMLDialogElement>();
 watch(connect_status, ()=>{
     if (!connect_status.value) {
@@ -270,8 +282,8 @@ watch(connect_status, ()=>{
 <template>
     <div class="bar">
         <div class="left">
-            <div class="project" v-if="current_project" @click="current_project_click"> {{ current_project }}</div>
-            <div class="map" v-if="current_map" @click="current_map_click"> {{ current_map }}</div>            
+            <div class="butt project" v-if="current_project" @click="current_project_click"> {{ current_project }}</div>
+            <div class="butt map" v-if="current_map" @click="current_map_click"> {{ current_map }}</div>            
             <template v-if="game_client_cntr">
                 <div class="game" :class="{running:client_status}"></div>
                 <template v-if="client_status">
@@ -286,6 +298,9 @@ watch(connect_status, ()=>{
                     </div>
                 </template>
             </template>
+            <div class="butt" @click="gear_clicked">
+                <img :src="svg_gear">
+            </div>
         </div>
         <div class="right">
             <template v-if="show_save_ui">
@@ -331,7 +346,6 @@ watch(connect_status, ()=>{
 }
 .left {
     display:flex;
-    gap: 0.5rem;
     align-items: stretch;
     height: 2rem;
     
@@ -344,10 +358,10 @@ watch(connect_status, ()=>{
     padding: 0 0.5rem;
 }
 
-.left > .project,.left > .map {
+.left > .butt {
     cursor: pointer;
 }
-.left > .project:hover,.left > .map:hover {
+.left > .butt:hover {
     cursor: pointer;;
     background-color: white;
 }
@@ -359,7 +373,20 @@ watch(connect_status, ()=>{
     content: "Map: ";
 }
 
-
+.butt > img {
+    width: 1rem;
+    vertical-align: text-top;
+   
+}
+.game::before {
+    content: "Game: ";
+}
+.game.running::after{
+    content: "running";
+}
+.game::after{
+    content: "stopped";
+}
 
 
 </style>

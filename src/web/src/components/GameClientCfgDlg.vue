@@ -1,14 +1,46 @@
 <script lang="ts" setup>
 import { server, type KeepAliveStatus } from '@/core/api';
 import { onMounted, reactive, ref, watch } from 'vue';
+import StatusBar from './statusBar.ts';
+import type { TeleporToFlags } from './statusBar';
 
-const shown = defineModel();
-
+const show_dlg_user = ref(false);
 const dlg = ref<HTMLDialogElement>();
 const show_dlg = ref<boolean>(false);
+let reg_ok = false;
 
-watch([show_dlg, shown],()=>{
-    if (show_dlg.value || shown.value) {
+function start() {
+    server.game_client_start();
+}
+
+function stop() {
+    server.game_client_stop();
+}
+function restart() {
+    server.game_client_reload();
+
+}
+
+function teleport_to(map_name: string, sector: number, side: number, flags: TeleporToFlags) {
+    server.game_client_teleport(map_name, sector, side);
+
+    const console_cmds = ["ghost-form","no-hassle","iron-skin","levitation"];
+    const sw = flags.ghost_form?"on":"off";
+    const cmd = console_cmds.map(n=> n + " " + sw).join("~");
+    server.game_client_console_exec(cmd);        
+}
+
+
+function configure() {
+    show_dlg_user.value = true;
+}
+
+
+
+
+
+watch([show_dlg, show_dlg_user],()=>{
+    if (show_dlg.value || show_dlg_user.value) {
         dlg.value?.showModal();
     } else {
         dlg.value?.close();
@@ -24,8 +56,22 @@ watch(dlg, async ()=>{
     }
 })
 
+
 function server_keep_alive(st:KeepAliveStatus) {
-    show_dlg.value = st.connected && st.need_configure;
+    show_dlg.value = st.connected && st.need_configure && st.current_ddl.length > 0;
+    StatusBar.update_client_status(st.game_instances>0);
+    StatusBar.update_connect_status(st.connected);    
+    if (!st.need_configure && !reg_ok) {
+            StatusBar.register_game_client_cntr({
+                start,
+                restart,
+                teleport_to,
+                stop,
+                configure
+
+            })
+            reg_ok = true;
+    }
 }
 
 
@@ -72,7 +118,7 @@ async function store_config() {
     const r = await server.set_config(cfg);
     if (r) {
         show_dlg.value = false;
-        shown.value = false;
+        show_dlg_user.value = false;
     } else {
         error_game_path.value = true;
     }
@@ -81,7 +127,7 @@ async function store_config() {
 </script>
 <template>
 <dialog ref="dlg">
-    <header>Backend configuration</header>
+    <header>Game client configuration</header>
     <div class="path">
         <div>Game folder</div>
         <div class="oneline"><input type="text" v-model="game_folder" @input="error_game_path = false"/><button @click="click_browse">Browse</button></div>
@@ -120,7 +166,7 @@ async function store_config() {
     </x-form>
     <footer>
         <button :disabled="game_folder.length == 0" @click="store_config">OK</button>
-        <button :disabled="show_dlg" @click="shown = false">Cancel</button>
+        <button :disabled="show_dlg" @click="show_dlg_user = false">Cancel</button>
     </footer>
 </dialog>
     
