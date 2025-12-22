@@ -1120,7 +1120,7 @@ export class FloorCeilConfiguration extends AssetConfiguration {
         return this.pixmaps.map(x=>[x]);
     }
     get_flags() {
-        if (this.mode == FloorCeilMode.ANIMATED) return 0x8 | (this.pixmaps.length & 0x7);
+        if (this.mode == FloorCeilMode.ANIMATED) return 0x8 | ((this.pixmaps.length-1) & 0x7);
         else return this.mode;
     }
     clone(): AssetConfiguration {
@@ -1478,7 +1478,8 @@ export class GlobalPaletteConfiguration<T extends AssetConfiguration> {
         this.list = Object.values(m);
     }
     
-
 }
+
+
 
 

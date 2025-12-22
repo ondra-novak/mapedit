@@ -23,6 +23,7 @@ import type { MultiactionModelDef } from '@/components/MultiactionEditor.vue';
 import MultiactionEditor from '@/components/MultiactionEditor.vue';
 import { apply_array_diff, create_array_diff } from '@/utils/madiff';
 import MapSelectDlg from '@/components/MapSelectDlg.vue';
+import { map_load_stringtable, map_save_stringtable } from '@/core/string_table';
 const list_assets = ref<string[]>([]);
 
 const EditMode = {
@@ -230,7 +231,7 @@ function updateFocusData(sect: number, side: number) {
                                side_def: wdef,
                                script: {
                                     actionList:wdef.actions.map(x=>toRaw(shallowClone(x))),
-                                    stringTable:curmap.value.strtable
+                                    stringTable:curmap.value.strtable.map(x=>toRaw(x))
                                }
                             };                
                             updateFocus();
@@ -551,56 +552,29 @@ watch([()=>settings.edit_mode, curmap], ()=>{
     }
 });
 
-async function loadStringTable(mapname: string) {
-    const sname = mapname.replace(/.MAP$/,".ENC");
-    const txtname = mapname.replace(/.MAP$/,".TXT");
-    
-    let txt:string;
-    try {
-        const buff = await server.getDDLFile(txtname);
-        txt = keybcs2string(buff);        
-    } catch (e) {
-        const buff = await getDDLFileWithImport(server,sname,AssetGroup.MAPS);
-        if (!buff) return [];
-        txt = enc2string(buff);
-    }
-    return txt.split('\n').map(x=>x.trim())
-            .filter(x=>x.length && !x.startsWith(';'))
-            .reduce((a,b)=>{
-                const p = b.indexOf(' ');
-                if (p == -1) return a;
-                const idx = b.substring(0,p);
-                const val = b.substring(p+1).trim();
-                const idxval = parseInt(idx);
-                if (isFinite(idxval) && idxval >= 0) {
-                    a[idxval] = val;
-                }
-                return a;
-            },[] as string[]);        
 
-}
-
-async function loadMap (mapname: string)   {
+async function loadMap(mapname: string)   {
     try {
         const buff = await server.getDDLFile(mapname);
         const mapdata = MapFile.from(buff);            
         let ss: string[] = [];
-        if (curmap.value.sectors.length) {
-            ss = await loadStringTable(mapname);        
+        if (mapdata.map.sectors.length) {
+            ss = await map_load_stringtable(mapname);            
         }
         original_string_table = ss;
-        map_document.reset(new MapFileWithStringtable(mapdata.map));
+        map_document.reset(new MapFileWithStringtable(mapdata.map,ss));
         mapLoadedPalettes.value = mapdata.palette;
 
-        curmap.value = map_document.get_current();
-        const start = curmap.value.info.start_sector;
-        settings.curlevel = curmap.value.sectors[start].level;
-        redraw();        
-        mapcontainer.zoom_reset();
 
     } catch (e) {
-        map_document.reset(new MapFileWithStringtable);
+        map_document.reset(new MapFileWithStringtable());
+        original_string_table = [];
     }
+    curmap.value = map_document.get_current();
+    const start = curmap.value.info.start_sector;
+    settings.curlevel = curmap.value.sectors[start].level;
+    redraw();        
+    mapcontainer.zoom_reset();
     map_filename.value = mapname;
     StatusBar.unset_current_sector();
 };
@@ -613,26 +587,13 @@ async function reloadMap()  {
     }
 }
 
-async function saveStringTable(mapname: string, ss: string[]) {
-    const txtname = mapname.replace(/.MAP$/,".TXT");
-    const out = ss.reduce((a,txt,idx)=>{
-        a.push(`${idx} ${txt}`);
-        return a;
-    },[] as string[]);
-    out.push("-1");
-    out.push("")
-    const out2 = out.join("\n");
-    const buff = Uint8Array.from(string2keybcs(out2)).buffer;
-    return await server.putDDLFile(txtname, buff, AssetGroup.MAPS);
-}
-
 async function saveMap() {
     const name = map_filename.value;
     if (name) {
         const map = map_document.get_current();
         await server.putDDLFile(name, map.saveToArrayBuffer(), AssetGroup.MAPS);
         if (original_string_table != map.strtable) {
-            await saveStringTable(name, map.strtable);
+            map_save_stringtable(name, map.strtable); 
             original_string_table = map.strtable;
         }
         return true;
@@ -854,18 +815,23 @@ function delete_cur_niche() {
 const ds_wallassets = create_datalist();
 watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
 watch(map_filename, (nw)=>{
-    if (nw) {StatusBar.set_map_switch(nw,()=>{
+    if (nw) {
+        StatusBar.set_map_switch(nw,()=>{
             open_map_dlg.value = true;
         });
         loadMap(nw)
-
     }
-})
+});
 watch(()=>props.active, ()=>{
     const a = props.active;
     if (a) {
         init_save_state();
         reload_all_lists();
+        if (!map_filename.value) {
+            StatusBar.set_map_switch("<click here>",()=>{
+                open_map_dlg.value = true;
+           });        
+        }
     } else {
         save_state.unmount();
     }
@@ -1051,9 +1017,7 @@ watch(mapview,()=>{
 <NicheEditor v-if="curNiche != null" v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus!.side_def"></NicheEditor>
 </template>
 <template v-else>
-<div class="middle">
-    <button @click="open_map_dlg = true">Open map</button>
-</div>
+<div class="open-map-hlp"><div></div></div>
 </template>
 </x-workspace>
 <MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
@@ -1266,6 +1230,26 @@ x-workspace > * {
     height: 100%;
     box-sizing: border-box;
     padding-top: 1.5rem;
+}
+.open-map-hlp {
+    position: absolute;
+    inset: 0;
+    background-color: #ccc;
+}
+.open-map-hlp > div{
+    position: absolute;
+    bottom: 0;
+    left:15rem;
+    background-color: transparent;
+}
+.open-map-hlp >div::before {
+    content: "↙";
+    font-size: 2rem;
+    vertical-align: top;
+}
+.open-map-hlp >div::after {
+    content: " Open a map";
+    vertical-align: top;
 }
 
 </style>

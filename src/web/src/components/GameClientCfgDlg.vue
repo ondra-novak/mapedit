@@ -165,7 +165,7 @@ async function store_config() {
         <label><span>Cursor scale</span><input type="number" v-watch-range min="1" max="1000" v-model="config.cursor_size"/></label>
     </x-form>
     <footer>
-        <button :disabled="game_folder.length == 0" @click="store_config">OK</button>
+        <button :disabled="!game_folder?.length" @click="store_config">OK</button>
         <button :disabled="show_dlg" @click="show_dlg_user = false">Cancel</button>
     </footer>
 </dialog>
