@@ -2,7 +2,6 @@
 #include "utils/stack_alloc.hpp"
 #include "utils/http_utils.hpp"
 
-#include <json/serializer.h>
 #include <string>
 #include <format>
 #include <stdexcept>
@@ -329,7 +328,7 @@ namespace server
         while (!tkn.stop_requested())
         {
             #ifdef _WIN32
-            SOCKET sock = accept(_mother.get(),0,0);
+                SOCKET sock = accept(_mother.get(),0,0);
             #else
             SOCKET sock = accept4(_mother.get(), 0, 0, SOCK_CLOEXEC);
             #endif
@@ -339,7 +338,7 @@ namespace server
                 if (e != EINTR)
                 {
                     if (!tkn.stop_requested()) {
-                        std::system_error(e, network_category(), "accept failed");
+                        throw std::system_error(e, network_category(), "accept failed");
                     }
                 }
             }
@@ -386,9 +385,9 @@ namespace server
         return send_response(code, {hdr}, sz, body_gen);        
     }
 
-    bool Response::operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const json::value &json)
+    bool Response::operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const Json &json)
     {
-        std::string jstr = json.to_json();
+        std::string jstr = json.to_string();
         return send_response(code, {hdr, {{"Content-Type", "application/json"}}},jstr.size(), [&](){return std::string_view(jstr);});        
     }
 

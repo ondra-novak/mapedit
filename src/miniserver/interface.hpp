@@ -33,7 +33,7 @@ protected:
     std::string _addrport;
     std::u8string _current_ddl;
     std::stop_source _stop;
-    json::value _config;
+    Json _config;
     bool _check_active = false;
     bool _last_seen = true;
 
@@ -92,7 +92,7 @@ protected:
     void load_config();
     void save_config();
 
-    bool init_game_dir(std::filesystem::path game_dir, json::value skeldal_ini);
+    bool init_game_dir(std::filesystem::path game_dir, const Json &skeldal_ini);
 };
 
 

@@ -3,15 +3,14 @@
 #include "handler_map.hpp"
 #include "mgifdecomp.hpp"
 #include "skeldal_exe.hpp"
-#include "json/value.h"
+#include "utils/json.hpp"
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <memory>
 #include <mutex>
-#include <json/serializer.h>
-#include <json/parser.h>
+#include "utils/json.hpp"
 #include <condition_variable>
 #include <optional>
 #include <string>
@@ -150,13 +149,13 @@ bool WebInterface::all_ddl_list(Request &req)
         return std::chrono::system_clock::to_time_t(sctp);
     };
 
-    std::vector<json::value> result;
+    std::vector<Json> result;
     auto iter = std::filesystem::directory_iterator(_user_dir);
     auto iter_end = std::filesystem::directory_iterator();
     while (iter != iter_end) {
         const auto &entry = *iter;
         if (entry.is_regular_file() && extension == utils::HeaderKey(entry.path().extension().string())) {
-            result.push_back({
+            result.push_back(Json{
                 {"name", entry.path().filename().string()},
                 {"size", entry.file_size()},
                 {"last_write", to_timestamp(entry.last_write_time())}
@@ -164,7 +163,7 @@ bool WebInterface::all_ddl_list(Request &req)
         }
         ++iter;
     }
-    return req.response({200,{}},{},json::value(result.begin(), result.end()));
+    return req.response({200,{}},{},Json(std::move(result)));
 }
     
 
@@ -181,7 +180,7 @@ bool WebInterface::ddl_stats(Request &req) {
     auto user = getUserDDL();
     auto stats = user.get_stats();
 
-    return req.response({200},{},json::value({
+    return req.response({200},{},Json({
             {"directory_space",stats.directory_space},
             {"entries_reserved",stats.entries_reserved},
             {"entries_used",stats.entries_used},
@@ -236,13 +235,18 @@ bool WebInterface::ddl_list(Request &req)
             return false;
     }), out_files.end());
 
-    return req.response({200},{},json::value({
-        {"files", json::value(out_files.begin(), out_files.end(), [&](const DDLManager::Item &val){
+    std::vector<Json> files;
+    files.reserve(out_files.size());
+    std::transform(out_files.begin(), out_files.end(), std::back_inserter(files), [&](const DDLManager::Item &val){
             auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
             bool ovr = iter != user_files.end() && iter->name == val.name;            
-            if (ovr && iter->group) return json::value({val.name, iter->group, ovr});
-            else return json::value({val.name, val.group, ovr});
-        })}
+            if (ovr && iter->group) return Json({val.name, iter->group, ovr});
+            else return Json({val.name, val.group, ovr});
+    });
+
+
+    return req.response({200},{},Json({
+        {"files", Json(std::move(files))}
     }));
 }
 
@@ -336,9 +340,9 @@ bool WebInterface::ddl_mpg_get(Request &req)
 bool WebInterface::ddl_mpg_create(Request &req)
 {
     std::lock_guard _(_mgfcomp_mx);
-    json::value jrq;
+    Json jrq;
     try {
-        jrq = json::value::from_json(req.body);
+        jrq = Json::from_string(req.body);
     } catch (std::exception &e) {
         return req.response({400,"Bad Request"},{{"Content-Type","text/plain"}}, e.what());        
     }
@@ -347,10 +351,10 @@ bool WebInterface::ddl_mpg_create(Request &req)
     auto transp = jrq["transparent"];    
     auto group = jrq["group"];
     std::string_view err = {};
-    if (fname.type() != json::type::string) err = "Missing or invalid 'filename'";
-    else if (frames.type() != json::type::number || frames.as<int>() < 1) err = "Missing or invalid 'frames'";
-    else if (group.type() != json::type::number || group.as<int>() < 0) err = "Missing or invalid 'group'";
-    else if (transp.type() != json::type::boolean) err = "Missing or invalid 'transparent'";
+    if (!fname.is_string()) err = "Missing or invalid 'filename'";
+    else if (!frames.is_number() || frames.as<int>() < 1) err = "Missing or invalid 'frames'";
+    else if (!group.is_number()  || group.as<int>() < 0) err = "Missing or invalid 'group'";
+    else if (!transp.is_bool() ) err = "Missing or invalid 'transparent'";
     if (!err.empty()) {
         return req.response({400,"Bad Request"},{{"Content-Type","text/plain"}}, err);        
     }
@@ -372,12 +376,12 @@ bool WebInterface::ddl_mpg_session_put(Request &req)
     if (action == "image") {        
         auto st = _mgfcomp.put_image_pcx(uuid, req.body);
         char need = static_cast<char>(st.need);
-        json::value status = {
+        Json status = {
             {"need", std::string_view(&need,1)},
             {"processed", st.processed},
             {"error", st.reason}
         };
-        return req.response({202}, {{"Content-Type","application/json"}}, status.to_json());        
+        return req.response({202}, {{"Content-Type","application/json"}}, status);        
     }
     if (action == "close") {
         auto r = _mgfcomp.close(uuid);
@@ -427,7 +431,7 @@ bool WebInterface::keep_alive(Request &req)
         std::lock_guard _(_stream_mx);
         stream_count = _streams.size();
     }
-    if (!req.response({200,{}},{},json::value({
+    if (!req.response({200,{}},{},Json({
         {"keepalive_interval",std::chrono::duration_cast<std::chrono::milliseconds>(keepalive_interval).count()*9/10},
         {"game_instances",stream_count},
         {"current_ddl", _current_ddl},
@@ -459,7 +463,7 @@ bool WebInterface::preview_teleport(Request &req)
 {
     std::lock_guard _(_mx);
     if (!_game_control) return req.response({404, "Not configured"},{},"");
-    json::value jr = json::value::from_json(req.body);
+    Json jr = Json::from_string(req.body);
     std::string map = jr["map"].as<std::string>();
     unsigned int sect = jr["sector"].as<unsigned int>();
     unsigned int side = jr["side"].as<unsigned int>();
@@ -485,7 +489,7 @@ bool WebInterface::preview_console_show(Request &req)
 {
     std::lock_guard _(_mx);
     if (!_game_control) return req.response({404, "Not configured"},{},"");
-    json::value jr = json::value::from_json(req.body);
+    auto jr = Json::from_string(req.body);
     bool sw = jr.as<bool>();
     _game_control->console_show(sw);
     return req.response({202,"Accepted"},{},"");
@@ -532,16 +536,16 @@ DDLManager WebInterface::getUserDDL() const
     return DDLManager(_user_dir/_current_ddl);
 }
 
-bool WebInterface::init_game_dir(std::filesystem::path game_dir, json::value skeldal_ini) {
+bool WebInterface::init_game_dir(std::filesystem::path game_dir, const Json &skeldal_ini) {
     auto full_dir =game_dir/"SKELDAL.DDL";
     if (!std::filesystem::is_regular_file(full_dir))  return false;
     std::filesystem::path ini = _user_dir/"skeldal.ini";    
     {
         std::ofstream txt(ini, std::ios::out|std::ios::trunc);
         txt << "[video]\n" ;
-        for (const auto &v: skeldal_ini) {
-            txt << v.key() << "=";
-            if (v.type() == json::type::boolean) {
+        for (const auto &[k,v]: skeldal_ini.as_object()) {
+            txt << k << "=";
+            if (v.is_bool()) {
                 txt << (v.as<bool>()?"on":"off");
             } else {
                 txt << v.as<std::string>();
@@ -559,10 +563,10 @@ void WebInterface::load_config()
     try {
         std::ifstream cfgdata(_user_dir/".config", std::ios::in);
         if (!cfgdata) {
-            _config = json::object_view();
+            _config = Json::Object();
         } else {
             std::string content((std::istreambuf_iterator<char>(cfgdata)), std::istreambuf_iterator<char>());
-            _config = json::value::from_json(content);
+            _config = Json::from_string(content);
         }
         _current_ddl = _config["project"].as<std::u8string>();
         auto game_dir = _config["game_dir"].as<std::u8string>();
@@ -571,7 +575,7 @@ void WebInterface::load_config()
         init_game_dir(game_dir, skeldal_ini);
 
     } catch (...) {
-        _config = json::object_view();
+        _config = Json::Object();
     }
 
 
@@ -584,7 +588,7 @@ void WebInterface::save_config()
     if (!cfgdata) {
         throw std::runtime_error("Failed to open config file:" + cfgpath.string());
     }
-    std::string jsonstr = _config.to_json();
+    std::string jsonstr = _config.to_string();
     cfgdata.write(jsonstr.data(), jsonstr.size());
 }
 
@@ -635,10 +639,10 @@ bool WebInterface::config_get(Request &req) {
 
 }
 bool WebInterface::config_put(Request &req){ 
-    json::value v = json::value::from_json(req.body);
-    auto game_dir = v["game_dir"];
-    auto skeldal_ini = v["skeldal_ini"];
-    if (game_dir.defined() && init_game_dir(game_dir.as<std::u8string>(), skeldal_ini.get())) {
+    auto v = Json::from_string(req.body);
+    const auto &game_dir = v["game_dir"];
+    const auto &skeldal_ini = v["skeldal_ini"];
+    if (!game_dir.is_null() && init_game_dir(game_dir.as<std::u8string>(), skeldal_ini)) {
         _config.set("game_dir",game_dir);
         _config.set("skeldal_ini",skeldal_ini);
         save_config();

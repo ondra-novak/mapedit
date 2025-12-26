@@ -5,7 +5,7 @@
 #include "utils/unique_handle.hpp"
 #include <queue>
 #include <future>
-#include <json/value.h>
+#include "utils/json.hpp"
 #include <vector>
 #include <utility>
 #include <span>
@@ -107,7 +107,7 @@ namespace server {
         [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const std::string &body) {return this->operator()(code, hdr, std::string_view(body));}
         [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::string_view body);
         [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::size_t sz, function_view<std::string_view()> body_gen);
-        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, const json::value &json);
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, const Json &json);
         [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, Stream &stream);        
 
         Socket release_socket() {

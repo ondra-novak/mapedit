@@ -10,13 +10,12 @@ file(GLOB_RECURSE WEB_SOURCES CONFIGURE_DEPENDS
     "${WEB_SRC_DIR}/*.scss"
 )
 
-# Custom target, který spustí npm run build
 add_custom_command(OUTPUT ${WEB_BUILD_DIR}/index.html
-    COMMAND ${CMAKE_COMMAND} -E env VITE_OUTPUT_DIR=${WEB_BUILD_DIR}  npm ci
-    COMMAND ${CMAKE_COMMAND} -E env VITE_OUTPUT_DIR=${WEB_BUILD_DIR}  npm run build
+    COMMAND ${CMAKE_COMMAND} -E env VITE_OUTPUT_DIR=${WEB_BUILD_DIR} ${CMDPREFIX} npm ci
+    COMMAND ${CMAKE_COMMAND} -E env VITE_OUTPUT_DIR=${WEB_BUILD_DIR} ${CMDPREFIX} npm run build
     WORKING_DIRECTORY ${WEB_SRC_DIR}
-    DEPENDS ${WEB_SOURCES}        # <<< důležité: rebuildne se jen při změně těchto souborů    
-    BYPRODUCTS ${WEB_BUILD_DIR}   # volitelné: pokud víte, kde jsou výstupy
+    DEPENDS ${WEB_SOURCES}
+    BYPRODUCTS ${WEB_BUILD_DIR}
     COMMENT "Building web frontend with npm..."
 )
 

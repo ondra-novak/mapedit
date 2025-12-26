@@ -52,7 +52,7 @@ watch(dlg, async ()=>{
     if (d) {
         const cfg = await server.get_config();
         game_folder.value = cfg.game_dir;
-        Object.assign(config, game_folder.value);
+        Object.assign(config, cfg.skeldal_ini);
     }
 })
 
