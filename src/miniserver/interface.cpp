@@ -570,7 +570,7 @@ void WebInterface::load_config()
         }
         _current_ddl = _config["project"].as<std::u8string>();
         auto game_dir = _config["game_dir"].as<std::u8string>();
-        auto skeldal_ini = _config["skeldal_ini"].as<std::string>();
+        const auto &skeldal_ini = _config["skeldal_ini"];
         
         init_game_dir(game_dir, skeldal_ini);
 

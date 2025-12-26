@@ -388,23 +388,6 @@ public:
     }
 
     Json(std::initializer_list<JsonBuilder> list):Json(JsonBuilder(list).build()) {}
-    /* {
-        bool isobj = std::all_of(list.begin(), list.end(), [](const Json &x){
-            if (!x.is_array()) return false;
-            auto &arr = x.as_array();            
-            return arr.size() == 2 && arr[0].is_string();
-        });
-        if (isobj) {
-            Json::Object obj;
-            for (const auto &x: list) {
-                auto &arr = x.as_array();
-                obj.emplace(arr[0].as_text(), arr[1]);
-            }
-            *this = std::move(obj);
-        } else {
-            *this = Json::Array(list.begin(), list.end());
-        }
-    }*/
 
     std::string to_string() const {
         std::vector<char> buff;
