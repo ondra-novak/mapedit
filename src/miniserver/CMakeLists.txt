@@ -7,6 +7,7 @@ add_executable(mapedit_server
     skeldal_exe.cpp
     mgifdecomp.cpp
     mgifcomp.cpp
+    wsrpc.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c

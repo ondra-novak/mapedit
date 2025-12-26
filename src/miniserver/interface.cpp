@@ -4,17 +4,23 @@
 #include "mgifdecomp.hpp"
 #include "skeldal_exe.hpp"
 #include "utils/json.hpp"
+#include <chrono>
 #include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <memory>
 #include <mutex>
 #include "utils/json.hpp"
+#include "wsrpc.hpp"
 #include <condition_variable>
 #include <optional>
+#include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <thread>
 
 namespace server {
 
@@ -29,9 +35,9 @@ WebInterface::WebInterface(Config cfg, std::stop_source stp)
     
 //    ,_game_control(cfg.game_folder, cfg.game_ini, cfg.addr_port,[this](std::string_view cmd){this->control(cmd);})
 {
+    _methods.register_methods<WebInterface>(this,methods);
     load_config();
 }
-
 
 
 std::function<bool( BasicRequest &)> WebInterface::get_handler() {
@@ -64,6 +70,7 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::POST, "/api/game/console_show", &WebInterface::preview_console_show},
     {Method::POST, "/api/game/console_exec", &WebInterface::preview_console_exec},
     {Method::GET, "/command", &WebInterface::command},
+    {Method::GET, "/ws", &WebInterface::websocket},
     {Method::GET, "/{}", &WebInterface::webserver},
     {Method::GET, "/", &WebInterface::webserver_index}
 };
@@ -137,6 +144,7 @@ bool WebInterface::serve_file(const std::filesystem::path &path, std::string_vie
         });
 
 }
+
 
 bool WebInterface::all_ddl_list(Request &req)
 {
@@ -424,6 +432,30 @@ bool WebInterface::ddl_active(Request &req)
     }
 }
 
+Json WebInterface::create_state() {
+    std::size_t stream_count;
+    {
+        std::lock_guard _(_stream_mx);
+        stream_count = _streams.size();
+    }
+    return Json({
+        {"game_instances",stream_count},
+        {"current_ddl", _current_ddl},
+        {"need_configure", !_game}
+    });
+}
+void WebInterface::send_state_update(WsRpc &rpc) {
+    rpc.send_notify("state", create_state());    
+}
+
+void WebInterface::publish_state() {
+    std::lock_guard _(_publish_mx);
+    auto state = create_state();
+    for (const auto &a: _subscribers) {
+        a->send_notify("state", state);
+    }
+}
+
 bool WebInterface::keep_alive(Request &req)
 {
     std::size_t stream_count;
@@ -507,8 +539,11 @@ bool WebInterface::command(Request &req)
 {
     Stream s;
     if (req.response({200,"OK"},{{"Content-Type","text/event-stream"}}, s)) {
-        std::lock_guard _(_stream_mx);
-        _streams.push_back(std::move(s));
+        {
+            std::lock_guard _(_stream_mx);
+            _streams.push_back(std::move(s));
+        }
+        publish_state();
         return true;
     }
 
@@ -516,23 +551,26 @@ bool WebInterface::command(Request &req)
 }
 
 void  WebInterface::broadcast(std::string_view data) {
-    std::lock_guard _(_stream_mx);
-    auto new_end = std::remove_if(_streams.begin(), _streams.end(), [&](Stream &s){
-        return !s(data);
-    });
-    _streams.erase(new_end, _streams.end());    
+    bool b = false;
+    {
+        std::lock_guard _(_stream_mx);
+        auto new_end = std::remove_if(_streams.begin(), _streams.end(), [&](Stream &s){
+            return !s.write(data);
+        });        
+        if (new_end != _streams.end()) {
+            b = true;
+            _streams.erase(new_end, _streams.end());    
+        }
+    }
+    if (b) {
+        publish_state();
+    }
+    
+
 }
 
 DDLManager WebInterface::getUserDDL() const
 {
-    /*
-    for (char c: name) {
-        if (!((c >= '0' && c <= '9')
-              || (c >= 'A' && c <='Z')
-              || (c >= 'a' && c <='z')
-              || (c == '_' || c == '-' || c =='.'))) throw std::runtime_error("DDL Archive name validation failed (unsupported characters)");
-    }
-              */
     return DDLManager(_user_dir/_current_ddl);
 }
 
@@ -650,5 +688,403 @@ bool WebInterface::config_put(Request &req){
     }
     return  req.response({400,"Bad request"},{},"");;
 }
+
+
+
+bool WebInterface::websocket(Request &req) {
+    auto stream = WsRpc::connect_ws_as_server(req);
+    if (!stream) return req.response({400},{},"websocket interface");
+    WsRpc ws(std::move(*stream), _methods);
+    send_state_update(ws);
+    {
+        std::lock_guard _(_publish_mx);
+        _subscribers.push_back(&ws);
+        ++clients;
+    }
+    try {
+        ws.run_service(_stop.get_token());    
+    } catch (std::exception &e) {
+        ws.send_notify("unhandled", e.what());
+    }
+    bool last = false;
+    {
+        std::lock_guard _(_publish_mx);
+        _subscribers.erase(_subscribers.begin(),
+            std::remove(_subscribers.begin(), _subscribers.end(), &ws));    
+        if (--clients == 0) last = true;
+    }
+    if (last) {
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::lock_guard _(_publish_mx);
+        if (clients == 0) {
+            if (_check_active) {
+                _stop.request_stop();
+            }
+        }
+    }
+    return true;    
+}
+
+void WebInterface::ws_ping(const WsRpc::Request &rq) {
+    rq.send_response(rq.params,rq.attachments);
+}
+
+void WebInterface::ws_all_ddl_list(const WsRpc::Request &req) {
+    constexpr utils::HeaderKey extension = ".DDL";
+
+    auto to_timestamp=[](std::filesystem::file_time_type ftime){
+        auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            ftime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now()
+        );
+        return std::chrono::system_clock::to_time_t(sctp);
+    };
+
+    std::vector<Json> result;
+    auto iter = std::filesystem::directory_iterator(_user_dir);
+    auto iter_end = std::filesystem::directory_iterator();
+    while (iter != iter_end) {
+        const auto &entry = *iter;
+        if (entry.is_regular_file() && extension == utils::HeaderKey(entry.path().extension().string())) {
+            result.push_back(Json{
+                {"name", entry.path().filename().string()},
+                {"size", entry.file_size()},
+                {"last_write", to_timestamp(entry.last_write_time())}
+            });
+        }
+        ++iter;
+    }
+    req.send_response(result);
+}
+void WebInterface::ws_all_ddl_list_delete(const WsRpc::Request &req) {
+    auto name = req.params[0].as<std::u8string>();
+    auto full_name = _user_dir / name;
+    std::error_code ec;
+    std::filesystem::remove(full_name, ec);    
+    req.send_response(true);
+}
+void WebInterface::ws_ddl_list(const WsRpc::Request &req) {
+    std::shared_lock _(_mx);    
+    std::optional<uint32_t> sel_group;
+    std::optional<bool> user_assets;
+    
+    const auto &jgroup = req.params[0]["group"];
+    const auto &jsrc = req.params[0]["source"];
+    if (jgroup.is_number()) {
+        sel_group = jgroup.as<uint32_t>();
+    } 
+    if (jsrc.is_string()) {
+        auto s = jsrc.as_text();
+        if (s == "user") user_assets = true;
+        if (s == "orig") user_assets = false;
+    }
+    
+    auto user = getUserDDL();
+
+    std::vector<DDLManager::Item> game_files;
+    if (_game)  game_files = _game->list();
+    std::vector<DDLManager::Item> user_files = user.list();
+    std::vector<DDLManager::Item> out_files;
+
+    auto cmp =[](const auto &a, const auto &b) {
+        return a.name.compare(b.name) < 0;
+    };
+
+    std::sort(game_files.begin(), game_files.end(), cmp);
+    std::sort(user_files.begin(), user_files.end(), cmp);
+
+    std::set_union(game_files.begin(), game_files.end(),
+                   user_files.begin(), user_files.end(),
+                   std::back_inserter(out_files),cmp);
+
+    out_files.erase(std::remove_if(out_files.begin(), out_files.end(), [&](const DDLManager::Item &val)->bool{
+            if (sel_group && val.group != *sel_group) return true;
+            if (user_assets) {
+                auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
+                bool ovr = iter != user_files.end() && iter->name == val.name;            
+                if (ovr != *user_assets) return true;
+            }
+            return false;
+    }), out_files.end());
+
+    std::vector<Json> files;
+    files.reserve(out_files.size());
+    std::transform(out_files.begin(), out_files.end(), std::back_inserter(files), [&](const DDLManager::Item &val){
+            auto iter = std::lower_bound(user_files.begin(), user_files.end(), val, cmp);
+            bool ovr = iter != user_files.end() && iter->name == val.name;            
+            if (ovr && iter->group) return Json({val.name, iter->group, ovr});
+            else return Json({val.name, val.group, ovr});
+    });
+
+    req.send_response({
+        {"files", Json(std::move(files))}
+    });
+
+}
+void WebInterface::ws_ddl_get(const WsRpc::Request &req) {
+    std::shared_lock _(_mx);    
+    auto user = getUserDDL();
+    auto name = req.params[0].as<std::string>();
+    auto f = user.get(name);
+    if (!f) {
+        if (_game) {
+            f = _game->get(name);
+            if (!f) {
+                auto p = _game->get_path();
+                auto rs = p.parent_path()/"maps"/name;
+                std::ifstream data(rs, std::ios::in|std::ios::binary);
+                if (!data) {
+                    req.send_error(404, "Not found");
+                    return;
+                }
+                f.emplace();
+                std::copy(std::istreambuf_iterator<char>(data),std::istreambuf_iterator<char>(), std::back_inserter(*f));
+            }
+        } else {
+            req.send_error(404, "Not found");
+            return;    
+        }
+    }        
+    auto files = std::span<const WsRpc::Attachment>({&*f,1});
+    req.send_response(nullptr, files);
+}
+void WebInterface::ws_ddl_put(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    auto user = getUserDDL();
+
+    auto name = req.params[0].as<std::string>();
+    auto group =  req.params[1].as<std::uint32_t>();
+    auto fexists = req.params[2].as<bool>();
+
+    if (req.attachments.size() != 1) {
+        req.send_error(400,"Missing attachment");
+        return;
+    }
+
+    const auto &data = req.attachments[0];
+    if (data.size() > 0x7FFFFFFF) {
+         req.send_error(413,"Content Too Large");    
+    } else if (fexists && user.exists(name)) {
+         req.send_error(409,"Exists");    
+    } else {
+        user.put(name, {data.data(),data.size()},group);        
+        req.send_response(true);         
+    }
+
+}
+void WebInterface::ws_ddl_delete(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    auto user = getUserDDL();
+    auto name = req.params[0].as<std::string>();
+    user.erase(name);
+    req.send_response(true);         
+}
+void WebInterface::ws_ddl_stats(const WsRpc::Request &req) {
+    std::shared_lock _(_mx);    
+    auto user = getUserDDL();
+    auto stats = user.get_stats();
+
+    return req.send_response({
+            {"directory_space",stats.directory_space},
+            {"entries_reserved",stats.entries_reserved},
+            {"entries_used",stats.entries_used},
+            {"reserved_space",stats.reserved_space},
+            {"total_space",stats.total_space},
+            {"used_space",stats.used_space}
+    });    
+
+}
+void WebInterface::ws_ddl_compact(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    auto user = getUserDDL();
+    user.compact();    
+    return req.send_response(true);
+
+}
+void WebInterface::ws_ddl_mpg_get(const WsRpc::Request &req) {
+    std::shared_lock _(_mx);       
+    auto user = getUserDDL();
+    auto name = req.params[0].as<std::string>();
+    auto f = user.get(name);
+    if (!f) {
+        f = _game?_game->get(name):std::nullopt;
+        if (!f) {
+            req.send_error(404, "Not found");
+            return;
+        }
+    }    
+    auto stream = decompress_mgf(f->data());
+    if (stream.empty()) {
+            req.send_error(409, "Can't decompress");
+    }else {
+        std::vector<char> stream_cpy(stream.begin(), stream.end());
+        auto files = std::span(&stream_cpy,1);
+        req.send_response(nullptr, files);
+    }
+
+}
+void WebInterface::ws_ddl_mpg_create(const WsRpc::Request &req) {
+    std::lock_guard _(_mgfcomp_mx);    
+    auto fname = req.params["filename"];
+    auto frames = req.params["frames"];
+    auto transp = req.params["transparent"];    
+    auto group = req.params["group"];
+    std::string_view err = {};
+    if (!fname.is_string()) err = "Missing or invalid 'filename'";
+    else if (!frames.is_number() || frames.as<int>() < 1) err = "Missing or invalid 'frames'";
+    else if (!group.is_number()  || group.as<int>() < 0) err = "Missing or invalid 'group'";
+    else if (!transp.is_bool() ) err = "Missing or invalid 'transparent'";
+    if (!err.empty()) {
+        req.send_error(400,err);
+        return;
+    }
+
+    auto uuid = _mgfcomp.create_mgif(fname.as<std::string>(), group.as<int>(), frames.as<unsigned int>(), transp.as<bool>());
+
+    req.send_response(uuid);
+}
+
+void WebInterface::ws_ddl_mpg_put_image(const WsRpc::Request &req) {
+    std::lock_guard _(_mgfcomp_mx);
+    std::string uuid = req.params[0].as<std::string>();
+    if (req.attachments.size() != 1) {
+        req.send_error(400, "Missing attachment");
+        return ;
+    }
+    const auto &data = req.attachments[0];
+    auto st = _mgfcomp.put_image_pcx(uuid, {data.data(),data.size()});
+    char need = static_cast<char>(st.need);
+    Json status = {
+        {"need", std::string_view(&need,1)},
+        {"processed", st.processed},
+        {"error", st.reason}
+    };
+    req.send_response(status);
+
+}
+void WebInterface::ws_ddl_mpg_close(const WsRpc::Request &req) {
+    std::lock_guard _(_mgfcomp_mx);
+    std::string uuid = req.params[0].as<std::string>();
+    auto r = _mgfcomp.close(uuid);
+    auto user = getUserDDL();
+    if (!r.creator ) {
+        req.send_error(410,"Gone");
+        return;
+    } else {
+        if (r.creator->getNeed() != MGIFCreator::nothing) {
+            req.send_error(204,"Not available");
+            return;
+        }
+        std::lock_guard __(_mx);
+        const auto &data = r.creator->get_data();
+        user.put(r.name, {reinterpret_cast<const char *>(data.data()),data.size()},r.group);
+        req.send_response(r.name);
+    }
+    
+}
+void WebInterface::ws_ddl_active(const WsRpc::Request &req) {
+    auto name = req.params[0].as<std::u8string>();
+    for (char c: name) {
+        if (!((c >= '0' && c <= '9')
+            || (c >= 'A' && c <='Z')
+            || (c >= 'a' && c <='z')
+            || (c == '_' || c == '-' || c =='.'))) {
+                req.send_error(400, "DDL Archive name validation failed (unsupported characters)");
+                return;
+            }                           
+    }
+    _current_ddl = name;
+    _config.set("project", _current_ddl);
+     save_config();        
+     publish_state();
+     req.send_response(true);
+}
+void WebInterface::ws_config_get(const WsRpc::Request &req) {
+    std::shared_lock _(_mx);
+    req.send_response(_config);
+}
+void WebInterface::ws_config_put(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    const auto &game_dir = req.params[0]["game_dir"];
+    const auto &skeldal_ini = req.params[0]["skeldal_ini"];
+    if (!game_dir.is_null() && init_game_dir(game_dir.as<std::u8string>(), skeldal_ini)) {
+        _config.set("game_dir",game_dir);
+        _config.set("skeldal_ini",skeldal_ini);
+        save_config();
+        req.send_response(true);
+        publish_state();
+    } else {
+        req.send_response(false);
+    }
+
+}
+void WebInterface::ws_preview_start(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    if (!_game_control) req.send_error(404, "Not configured");
+    _game_control->start(_user_dir/_current_ddl);
+   req.send_response(true);   
+
+}
+void WebInterface::ws_preview_stop(const WsRpc::Request &req) {
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+    } else if (_game_control->stop()) {
+        req.send_response(true);
+    } else {
+        req.send_error(504,"Timeout");
+    }
+
+}
+void WebInterface::ws_preview_teleport(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+        return;
+    }
+    std::string map = req.params["map"].as<std::string>();
+    unsigned int sect = req.params["sector"].as<unsigned int>();
+    unsigned int side = req.params["side"].as<unsigned int>();
+
+    std::filesystem::path ddlpath(_user_dir/_current_ddl);
+    if (ddlpath != _game_control->get_current_ddlpath()) {
+        return req.send_error(409,"Conflict");
+    }
+
+    _game_control->teleport_to(map,sect,side);
+    req.send_response(true);
+
+}
+void WebInterface::ws_preview_reload(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+        return;
+    }
+    _game_control->reload_map();
+    req.send_response(true);
+
+}
+void WebInterface::ws_preview_console_show(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+        return;
+    }
+    bool sw = req.params[0].as<bool>();
+    _game_control->console_show(sw);
+    req.send_response(true);
+
+}
+void WebInterface::ws_preview_console_exec(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+        return;
+    }
+    _game_control->console_exec(req.params[0].as<std::string>());
+    req.send_response(true);
+}
+
+
+
 
 }

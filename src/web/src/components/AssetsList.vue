@@ -96,7 +96,7 @@ watch([select_model], updateSelectModel);
 <template>
   <div class="flist">
     <div class="toolbar">
-      <select v-model="filterType">        
+      <select v-model.number="filterType">        
         <option :value="0">All</option>
         <option v-for="(label, key) of asset_groups" :key="key" :value="key">{{ label }}</option>
       </select>

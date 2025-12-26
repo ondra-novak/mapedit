@@ -56,22 +56,7 @@ namespace server {
         bool operator==(const HeaderRow &) const = default;
     };
 
-/*
-    class ResponseBody : public std::variant<std::string_view, std::unique_ptr<IReader>, json::value > {
-    public:
 
-        using super = std::variant<std::string_view, std::unique_ptr<IReader>, json::value >;
-        template<typename Fn>
-        requires(std::is_invocable_r_v<std::string_view, Fn>)
-        ResponseBody(std::size_t sz, Fn &&fn):super(std::unique_ptr<IReader>(std::make_unique<CBReader<Fn> >(sz, std::forward<Fn>(fn)))) {}
-        template<typename T>
-        requires(std::is_constructible_v<std::string_view, T>)
-        ResponseBody(T &&body):super(std::string_view(body)) {}
-        template<typename T>
-        requires(std::is_constructible_v<json::value, T> && !std::is_constructible_v<std::string_view, T>)
-        ResponseBody(T &&body):super(std::in_place_type<json::value>,std::forward<T>(body)) {}
-    };
-*/
     struct StatusCode {
         int code = {};
         std::string_view message = {};
@@ -83,10 +68,21 @@ namespace server {
     public:
         Stream() = default;
         Stream(Socket sock):_socket(std::move(sock)) {prepare_socket();}
-        bool operator()(std::string_view data);
+        bool write(std::string_view data);
+        void write_eof();
+        std::string_view read();
+        void put_back(std::string_view buff) {this->buff = buff;}
+        bool is_eof() const {return _read_eof;}
+        bool is_timeout() const {return _read_timeout;}
     protected:
         Socket _socket;
+        std::string_view buff = {};
+        std::unique_ptr<char[]> buff_ptr  ={};
         void prepare_socket();
+        bool _read_timeout = false;
+        bool _read_eof = false;
+
+        static constexpr std::size_t buffer_size = 4096;
 
     };
 
@@ -138,6 +134,8 @@ namespace server {
         std::string_view body;    
         std::size_t body_size;    
         Response response;
+
+        utils::HeaderValue header_get(utils::HeaderKey k) const;
     };
  
     class Server {

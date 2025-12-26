@@ -1,8 +1,9 @@
 <script lang="ts" setup>
-import { server, type KeepAliveStatus } from '@/core/api';
+import { server, type KeepAliveData } from '@/core/api';
 import { onMounted, reactive, ref, watch } from 'vue';
 import StatusBar from './statusBar.ts';
 import type { TeleporToFlags } from './statusBar';
+import type { WsRpcResult } from "@/core/wsrpc";
 
 const show_dlg_user = ref(false);
 const dlg = ref<HTMLDialogElement>();
@@ -56,11 +57,13 @@ watch(dlg, async ()=>{
     }
 })
 
+function on_connection_state_change(x:boolean) {
+    StatusBar.update_connect_status(x);
+}
 
-function server_keep_alive(st:KeepAliveStatus) {
-    show_dlg.value = st.connected && st.need_configure && st.current_ddl.length > 0;
+function on_state_change(x: WsRpcResult) {
+    const st = x.data as KeepAliveData;
     StatusBar.update_client_status(st.game_instances>0);
-    StatusBar.update_connect_status(st.connected);    
     if (!st.need_configure && !reg_ok) {
             StatusBar.register_game_client_cntr({
                 start,
@@ -72,11 +75,15 @@ function server_keep_alive(st:KeepAliveStatus) {
             })
             reg_ok = true;
     }
+    show_dlg.value = st.need_configure && !!st.current_ddl;
+
+    
 }
 
-
 function init() {
-    server.on_keep_alive(server_keep_alive);
+    server.on_connection_state_change(on_connection_state_change);
+    server.on("state", on_state_change);
+    
 }
 
 onMounted(init);

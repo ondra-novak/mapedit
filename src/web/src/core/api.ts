@@ -1,4 +1,6 @@
 import type { AssetGroupType } from "./asset_groups";
+import  WsRpcClient  from "./wsrpc"
+
 
 
 export interface FileItem {
@@ -26,15 +28,13 @@ export interface DDLFiles {
     files: FileItem[];
 }
 
-export class KeepAliveStatus {
-    connected: boolean = false;
-    need_configure:boolean = false;
-    keepalive_interval: number = 30000;
-    game_instances: number = 0;
-    current_ddl: string = ""
-}
+export interface PutImageStatus {
+    need: string;
+    processed: boolean;
+    error: string;
+};
 
-interface KeepAliveData {
+export interface KeepAliveData {
     exit_on_close:boolean;
     keepalive_interval: number;
     need_configure:boolean;
@@ -43,11 +43,6 @@ interface KeepAliveData {
 
 }
 
-export interface PutImageStatus {
-    need: string;
-    processed: boolean;
-    error: string;
-};
 
 interface ArrayBufferWithBuffer extends ArrayBuffer {
     buffer: ArrayBuffer;
@@ -57,18 +52,48 @@ export class Config {
     project = "";    
 }
 
-export class ApiClient {
+export class ApiClient extends WsRpcClient{
 
-    ka_listeners: ((x: KeepAliveStatus)=>void)[] = [];
+    
+    async getDDLFiles(group:number|null = null, source:string|null = null) : Promise<DDLFiles> {
+        const r:Record<string, any> = {};
+        if (group) r.group = group;
+        if (source) r.source = source;
+
+        const out =  (await this.call("list_files", [r],[])).data;
+        out.files = out.files.map((x:[string, string, boolean][])=>{
+            return {
+                name:x[0],
+                group: x[1],
+                ovr: x[2]
+            };
+        });
+        return out;
+    }
+
+    async getDDLStats(): Promise<Stats> {
+        return (await this.call("project_stats",[],[])).data;
+    }
+
+     async getDDLFile(id: string): Promise<ArrayBuffer> {
+        return (await this.call("file_get", [id], [])).attachments[0];
+/*        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`);
+        if (response.ok) {
+            const n = ((await response.bytes()).buffer);
+            return n
+        } else {
+            throw Error("Get File Status: " + response.status);
+        }*/
+    }
+
+
+/*    ka_listeners: ((x: KeepAliveStatus)=>void)[] = [];
     last_ka = new KeepAliveStatus();
 
     keep_alive_interval = 5000;
     last_keep_alive_status = {}
     connected: boolean = false;
-
-    constructor() {
-        this.start_keepalive();
-    }
+*/
 
 
     protected async handle_error(response:Response, message: string) {
@@ -76,81 +101,22 @@ export class ApiClient {
             throw new Error(`${message}. Status: ${response.status}. Message: ${text}`);
     }
 
-    // DDL
-    async getDDLFiles(group: number|null, source: string|null): Promise<DDLFiles> {
-        const arg1=group?`group=${group}`:"";
-        const arg2=source?`type=${source}`:"";
-        const query = [`api/ddl`, [arg1,arg2].join('&')].join('?');
-        const response = await fetch(query);
-        const json = await response.json();
-        json.files = json.files.map((x:[string, string, boolean][])=>{
-            return {
-                name:x[0],
-                group: x[1],
-                ovr: x[2]
-            };
-        });
-        return json;
-    }
 
-    async getDDLStats(): Promise<Stats> {
-        const response = await fetch(`api/ddl/stats`,{
-            method:"POST"
-        });
-        return await response.json();
-    }
-
-    async getDDLFile(id: string): Promise<ArrayBuffer> {
-        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`);
-        if (response.ok) {
-            const n = ((await response.bytes()).buffer);
-            return n
-        } else {
-            throw Error("Get File Status: " + response.status);
-        }
-    }
 
     async getDDLMGFFile(id: string): Promise<ArrayBuffer> {
-        const response = await fetch(`api/ddl/mgf/${encodeURIComponent(id)}`);
-        if (response.ok) {
-            const n = ((await response.bytes()).buffer);
-            return n
-        } else {
-            throw Error("Get File Status: " + response.status);
-        }
+        return (await this.call("mgf_get",[id],[])).attachments[0];
     }
 
     async putDDLFile(id: string, data: ArrayBuffer, group: number, fail_if_exists = false): Promise<boolean> {
-        const response = await fetch(`api/ddl/${encodeURIComponent(id)}?group=${group}&fexists=${fail_if_exists?1:0}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/octet-stream" },
-            body: data
-        });
-       if (response.status !== 202) {
-            if (response.status == 409) {
-                return false;
-            }
-            await this.handle_error(response, "Failed to upload file.")        
-       }
-       return true;
+        return (await (this.call("file_put", [id, group, fail_if_exists],[data]))).data;
     }    
 
-    async deleteDDLFile(id: string): Promise<void> {
-        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`, {
-            method: "DELETE"
-        });
-       if (response.status !== 202) {
-            await this.handle_error(response, "Failed to erase file.")
-       }
+    async deleteDDLFile(id: string): Promise<boolean> {
+        return (await (this.call("file_delete", [id],[]))).data;
     }
 
     async compactDDL(): Promise<any> {
-        const response = await fetch(`api/ddl/compact`, {
-            method: "POST"
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Compact failed.")
-        }
+        return (await (this.call("project_compact",[],[]))).data;
     }
 
     async mgfCreate(name: string, group: number, frames:number, transparent: boolean): Promise<string> {
@@ -196,186 +162,61 @@ export class ApiClient {
         return await response.text();
     } 
 
-    async getDownloadLink(id:string):Promise<string> {
-        return `api/ddl/${encodeURIComponent(id)}`;
-    }
 
     async listAllDDLs() : Promise<DDLEntry[]> {
-        const response   = await fetch("api/list") ;
-        if (response.status != 200) {
-            await this.handle_error(response, "List ddl failed.")
-        }
-        return ((await response.json()) as Record<string, any>[]).map(x=>({
+        return ((await this.call("project_list",[],[])).data as Record<string, any>[]).map(x=>({
             name: x.name,
             size: x.size,
             last_write: new Date(x.last_write*1000)
         }));
     }
 
-    async keepalive() : Promise<KeepAliveData> {
-        const response = await fetch("api/keepalive");
-        if (response.status != 200) {
-            await this.handle_error(response, "Keep alive failed.")
-        }
-        return await response.json();
-    }
-
-    async start_keepalive() {        
-        try {
-            const st = await this.keepalive();
-            
-            this.keep_alive_interval = st.keepalive_interval;
-            this.last_ka.connected = true;
-            this.last_ka.current_ddl = st.current_ddl;
-            this.last_ka.need_configure = st.need_configure;
-            this.last_ka.game_instances = st.game_instances;
-            this.last_ka.keepalive_interval = st.keepalive_interval;
-        } catch (e) {
-            this.last_ka.connected = false;
-        }
-        const l = this.last_ka;
-        this.ka_listeners.forEach(x=>queueMicrotask(()=>x(l)));
-        setTimeout(()=>this.start_keepalive(), this.keep_alive_interval);
-    }
-
-
 
     async game_client_start() : Promise<void>  {
-        const response = await fetch(`api/game/start`, {
-            method: "POST",
-            headers: {
-                "Content-Type":"application/json"
-            }
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed start game client")
-        }
+        return (await this.call("preview_start",[],[])).data;        
     }
 
     async game_client_stop() : Promise<void>  {
-        const response = await fetch(`api/game/stop`, {
-            method: "POST",
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed stop game client")
-        }
+        return (await this.call("preview_stop",[],[])).data;        
     }
 
     async game_client_reload() : Promise<void>  {
-        const response = await fetch(`api/game/reload`, {
-            method: "POST",
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed reload game client")
-        }
+        return (await this.call("preview_reload",[],[])).data;        
     }
 
     async game_client_show_console(show:boolean) : Promise<void>  {
-        const response = await fetch(`api/game/console_show`, {
-            method: "POST",
-            body: show?"true":"false",
-            headers: {
-                "Content-Type":"application/json"
-            }
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed reload show console")
-        }
+        return (await this.call("preview_console_show",[show],[])).data;
     }
 
     async game_client_console_exec(cmd:string) : Promise<void>  {
-        const response = await fetch(`api/game/console_exec`, {
-            method: "POST",
-            body: cmd,
-            headers: {
-                "Content-Type":"text/plain"
-            }
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed reload exec command on console")
-        }
+        return (await this.call("preview_console_exec",[cmd],[])).data;
     }
 
     async game_client_teleport(map: string, sector: number, side: number) : Promise<boolean> {
-        const response = await fetch(`api/game/teleport`, {
-            method: "POST",
-            body: JSON.stringify({
-                map: map,
-                sector: sector,
-                side: side
-            }),
-            headers: {
-                "Content-Type":"application/json"
-            }
-        });
-        if (response.status === 409) {
-            return false;
-        } else if (response.status !== 202) {
-            await this.handle_error(response, "Failed stop game client")
-            return false;
-        }
-        return true;
+        return (await (this.call("preview_teleport",[{map,sector,side}],[]))).data;
     }
 
     async set_current_ddl(ddl: string) {
-        const response = await fetch(`api/active`, {
-            method: "PUT",
-            body: ddl,
-            headers: {
-                "Content-Type":"text/plain"
-            }
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed to store config")
-            return false;
-        }
-        return true;
+        return (await this.call("project_set_active",[ddl],[])).data;
     }
 
     async delete_ddl(ddl: string) {
-        const response = await fetch(`api/list/${encodeURIComponent(ddl)}`, {
-            method: "DELETE",
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed to delete file")
-            return false;
-        }
-        return true;
-
+        return (await this.call("project_delete",[ddl],[])).data;
     }
 
-    on_keep_alive(cb: (x:KeepAliveStatus)=>void) {
-        this.ka_listeners.push(cb);
-    }
-    off_keep_alive(cb: (x:KeepAliveStatus)=>void) {
-        const idx = this.ka_listeners.findIndex(x=>x === cb);
-        if (idx >= 0) this.ka_listeners.splice(idx,1);        
-    }
     async get_config():Promise<{game_dir:string, skeldal_ini:Record<string, any>} > {
-        return await (await fetch("api/config")).json();
+        return (await (this.call("config_get",[],[]))).data;
     }
 
     async set_config(config: {
         game_dir:string;
         skeldal_ini:Record<string, any>
     }) {
-        const response = await fetch(`api/config`, {
-            method: "PUT",
-            body: JSON.stringify(config),
-            headers: {
-                "Content-Type":"application/json"
-            }
-        });
-        if (response.status == 400) {
-            return false;
-        }
-        if (response.status !== 202) {
-            await this.handle_error(response, "Failed to store config")
-            return false;
-        }
-        return true;
+        return (await (this.call("config_put",[config],[]))).data;
     }
 
 }
 
 export const server = new ApiClient();
+
+

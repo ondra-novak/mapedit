@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import { KeepAliveStatus, server, type DDLEntry } from '@/core/api';
+import { type KeepAliveData, server, type DDLEntry } from '@/core/api';
+import type { WsRpcResult } from "@/core/wsrpc";
 import { computed, onMounted, ref } from 'vue';
 import StatusBar from './statusBar.ts';
 import { useRouter } from 'vue-router';
@@ -24,22 +25,22 @@ function switch_project() {
     dlg.value?.showModal();    
 }
 
-function server_keep_alive(st:KeepAliveStatus) {
-    if (st.connected) {
-        if (st.current_ddl) {
-            cur_project = st.current_ddl;
-            StatusBar.set_project_switch(st.current_ddl, switch_project);
-        } else {
-            if (!force_switch.value) {
-                force_switch.value = true;
-                switch_project();
-            }
+function server_keep_alive(st:KeepAliveData) {
+    if (st.current_ddl) {
+        cur_project = st.current_ddl;
+        StatusBar.set_project_switch(st.current_ddl, switch_project);
+    } else {
+        if (!force_switch.value) {
+            force_switch.value = true;
+            switch_project();
         }
     }
 }
 
 async function init() {
-    server.on_keep_alive(server_keep_alive);
+    server.on("state",(x:WsRpcResult)=>{
+        server_keep_alive(x.data);
+    });
 }
 
 async function project_selected(name: string) {

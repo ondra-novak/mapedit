@@ -2,6 +2,10 @@
 #include "utils/stack_alloc.hpp"
 #include "utils/http_utils.hpp"
 
+#include <algorithm>
+#include <cerrno>
+#include <memory>
+#include <optional>
 #include <string>
 #include <format>
 #include <stdexcept>
@@ -9,6 +13,7 @@
 #include <thread>
 #include <format>
 #include <fcntl.h>
+#include <utility>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -19,17 +24,50 @@ constexpr int SOCK_CLOEXEC = 0;
 constexpr int MSG_NOSIGNAL = 0;
 constexpr int MSG_DONTWAIT = 0;
 constexpr int SHUT_RD = SD_RECEIVE;
+constexpr int SHUT_WR = SD_SEND;
+constexpr DWORD WOULDBLOCK = WSA_WOULDBLOCK;
 #pragma comment(lib, "ws2_32.lib")
+
+inline bool wait_read(SOCKET s, int timeout) {
+    pollfd fd = {};
+    fd.events = POLLIN;
+    fd.fd = s;
+    return poll(&fd,1,timeout) != 0;
+}
+inline bool wait_write(SOCKET s, int timeout) {
+    pollfd fd = {};
+    fd.events = POLLOUT;
+    fd.fd = s;
+    return poll(&fd,1,timeout) != 0;
+}
+
+
 
 #else 
 #include <poll.h>
 #include <sys/socket.h>
-#include <sys/timerfd.h>
+#include <poll.h>
 #include <unistd.h>
 #include <netdb.h>
 using SOCKET = int;
 constexpr SOCKET INVALID_SOCKET = -1;
 inline void closesocket(SOCKET s) {::close(s);}
+
+inline bool wait_read(SOCKET s, int timeout) {
+    pollfd fd = {};
+    fd.events = POLLIN;
+    fd.fd = s;
+    return poll(&fd,1,timeout) != 0;
+}
+inline bool wait_write(SOCKET s, int timeout) {
+    pollfd fd = {};
+    fd.events = POLLOUT;
+    fd.fd = s;
+    return poll(&fd,1,timeout) != 0;
+}
+constexpr int WOULDBLOCK = EWOULDBLOCK;
+
+
 #endif
 
 namespace server
@@ -454,14 +492,47 @@ namespace server
 
 
 
-    bool Stream::operator()(std::string_view data)
+    bool Stream::write(std::string_view data)
     {
         while (data.size()) {
             int r = ::send(_socket.get(), data.data(), static_cast<int>(data.size()), MSG_DONTWAIT|MSG_NOSIGNAL);
-            if (r < 1) return false;
+            if (r < 1) {
+                auto e = getLastNetError();
+                if (e == WOULDBLOCK && wait_write(_socket.get(), 1000)) continue;
+                return false;
+            }
+
             data = data.substr(r);
         }        
         return true;
+    }
+
+    void Stream::write_eof() {
+        ::shutdown(_socket.get(), SHUT_WR);
+    }
+
+    std::string_view Stream::read() {
+        _read_timeout = false;
+        if (!buff.empty() || _read_eof) return std::exchange(buff, {});
+        if (!buff_ptr) buff_ptr = std::make_unique<char[]>(buffer_size);
+        do {
+            int r = ::recv(_socket.get(), buff_ptr.get(), static_cast<int>(buffer_size), MSG_DONTWAIT|MSG_NOSIGNAL);
+            if (r < 0) {
+                auto e = getLastNetError();
+                if (e == WOULDBLOCK) {
+                    if (wait_read(_socket.get(), 30000)) continue;
+                    _read_timeout = true;
+                } else {
+                    _read_eof = true;
+                }
+                return {};
+            } else if (r == 0) {
+                _read_eof = true;
+                return {};
+            } else {
+                return {buff_ptr.get(), static_cast<std::size_t>(r)};
+            }
+        } while (true);
     }
 
     void Stream::prepare_socket()
@@ -473,67 +544,10 @@ namespace server
         #endif
     }
 
-    /*
-        bool Server::SendCallback::operator()(StatusCode status, std::initializer_list<HeaderRow> headers, ResponseBody body)
-        {
-            std::size_t req_size = 64 + status.message.size() + (std::holds_alternative<json::value>(body) ? (content_type.size() + application_json.size() + 4) : std::size_t(0));
-
-            for (const auto &[key, value] : headers)
-            {
-                req_size += key.size() + value.size() + 4;
-            };
-
-            req_size += 2;
-            return utils::stack_alloc<char>(req_size, [&](char *buffer)
-                                            {
-            char *iter = buffer;
-            iter = std::format_to(iter, "HTTP/1.1 {} {}\r\n", status.code, status.message);
-            for (const auto &[key, value]: headers) {
-                iter = std::format_to(iter, "{}: {}\r\n", static_cast<std::string_view>(key), value);
-            }
-            std::string json_data;
-            std::size_t content_length = 0;
-            if (std::holds_alternative<std::string_view>(body)) {
-                content_length = std::get<std::string_view>(body).size();
-            } else if (std::holds_alternative<json::value>(body)) {
-                const auto &js = std::get<json::value>(body);
-                json_data = js.to_json();
-                content_length = json_data.size();
-                iter = std::format_to(iter, "{}: {}\r\n", content_type, application_json);
-            } else {
-                content_length = std::get<std::unique_ptr<IReader> >(body)->size();
-            }
-
-            bool nobody = status.code == 204 || status.code == 304;
-
-            if (!nobody) {
-                iter = std::format_to(iter, "Content-Length: {}\r\n", content_length);
-            }
-            iter = std::format_to(iter, "\r\n");
-
-
-            if (!send_block(socket.get(), {buffer, iter})) return false;
-
-            if (nobody) {
-                complete = true;
-                return true;
-            }
-
-            if (std::holds_alternative<std::string_view>(body)) {
-                return complete =  send_block(socket.get(), std::get<std::string_view>(body));
-            } else if (std::holds_alternative<json::value>(body)) {
-                return complete =  send_block(socket.get(), json_data);
-            } else {
-                auto &rd = std::get<std::unique_ptr<IReader> >(body);
-                while (content_length) {
-                    auto s = rd->read().substr(0, content_length);
-                    if (!send_block(socket.get(), s)) return false;
-                    content_length -= s.size();
-                }
-                complete = true;
-                return true;
-            } });
-        }
-    */
-
+ 
+    utils::HeaderValue BasicRequest::header_get(utils::HeaderKey k) const {
+        auto iter = std::lower_bound(headers.begin(), headers.end(), HeaderRow{k, {}});
+        if (iter == headers.end() || iter->key != k) return std::nullopt;
+        return iter->value;
+    }
 }
