@@ -43,6 +43,10 @@ export interface KeepAliveData {
 
 }
 
+export interface DDLFileHistory {
+    revision: number;
+    timestamp: Date|null;
+}
 
 interface ArrayBufferWithBuffer extends ArrayBuffer {
     buffer: ArrayBuffer;
@@ -75,8 +79,20 @@ export class ApiClient extends WsRpcClient{
         return (await this.call("project_stats",[],[])).data;
     }
 
-     async getDDLFile(id: string): Promise<ArrayBuffer> {
-        return (await this.call("file_get", [id], [])).attachments[0];
+     async getDDLFile(id: string, rev = 0): Promise<ArrayBuffer> {
+        return (await this.call("file_get", [id, rev], [])).attachments[0];
+     }
+
+     async getDDLFileHistory(id: string): Promise<DDLFileHistory[]> {
+        const d = (await this.call("file_history",[id],[])).data as number[][];
+        return d.map(x=>{
+            const r = x[0];
+            const t = x[1];
+            return {
+                revision: r,
+                timestamp: t?new Date(t*1000):null
+            };
+        })
      }
 
 
@@ -165,8 +181,14 @@ export class ApiClient extends WsRpcClient{
         return (await (this.call("config_put",[config],[]))).data;
     }
 
-    get_download_link(id:string): string {
-        return `api/ddl/${encodeURIComponent(id)}`;
+    get_download_link(id:string, rev = 0): string {
+        let s =  `api/ddl/${encodeURIComponent(id)}`;
+        if (rev) s = s + `?rev=${rev}`;
+        return s;
+    }
+
+    async copy_files(from: string, to:string, to_group: AssetGroupType, from_rev = 0) : Promise<boolean> {
+        return (await this.call("file_copy",[from, to, to_group, from_rev],[])).data;
     }
 
 }

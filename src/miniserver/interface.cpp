@@ -123,30 +123,42 @@ bool WebInterface::serve_file(const std::filesystem::path &path, std::string_vie
 
 }
 
-bool WebInterface::ddl_get(Request &req)
-{
+std::optional<std::vector<char>  > WebInterface::file_get(std::string_view name, std::uint32_t rev) {
     std::shared_lock _(_mx);    
     auto user = getUserDDL();
-    auto name = req.path_vars[0];
-    auto f = user.get(name);
-    if (!f) {
+    auto f = user.get(name, static_cast<std::uint32_t>(rev));
+    if (!f && !rev) {
         if (_game) {
             f = _game->get(name);
             if (!f) {
                 auto p = _game->get_path();
                 auto rs = p.parent_path()/"maps"/name;
                 std::ifstream data(rs, std::ios::in|std::ios::binary);
-                if (!data) return false;
+                if (!data) return f;
                 f.emplace();
                 std::copy(std::istreambuf_iterator<char>(data),std::istreambuf_iterator<char>(), std::back_inserter(*f));
             }
         } else {
-            return false;
+            return f;
         }
     }    
+    return f;
+
+}
+
+bool WebInterface::ddl_get(Request &req)
+{
+
+    std::size_t rev = 0;
+    for (const auto &[k,v]: req.query) {
+        if (k == "rev") rev = std::stoull(v);
+    }
+    auto name = req.path_vars[0];
+    auto data = file_get(name, rev);
+    if (!data) return req.response({404},{},{});
     return req.response({200},{
         {"Content-Type","application/octet-stream"}
-    },std::string_view(f->data(), f->size()));
+    },std::string_view(data->data(), data->size()));
 }
 
 
@@ -427,35 +439,29 @@ void WebInterface::ws_ddl_list(const WsRpc::Request &req) {
 
 }
 void WebInterface::ws_ddl_get(const WsRpc::Request &req) {
-    std::shared_lock _(_mx);    
-    auto user = getUserDDL();
     auto name = req.params[0].as<std::string>();
-    auto f = user.get(name);
-    if (!f) {
-        if (_game) {
-            f = _game->get(name);
-            if (!f) {
-                auto p = _game->get_path();
-                auto rs = p.parent_path()/"maps"/name;
-                std::ifstream data(rs, std::ios::in|std::ios::binary);
-                if (!data) {
-                    req.send_error(404, "Not found");
-                    return;
-                }
-                f.emplace();
-                std::copy(std::istreambuf_iterator<char>(data),std::istreambuf_iterator<char>(), std::back_inserter(*f));
-            }
-        } else {
-            req.send_error(404, "Not found");
-            return;    
-        }
-    }        
-    auto files = std::span<const WsRpc::Attachment>({&*f,1});
-    req.send_response(nullptr, files);
+    auto rev = req.params[1].as<std::uint32_t>();
+    auto data = file_get(name, rev);
+    if (!data) {
+        req.send_error(404, "Not found");
+    } else {
+        auto files = std::span<const WsRpc::Attachment>({&*data,1});
+        req.send_response(nullptr, files);
+    }
 }
+
+bool WebInterface::file_put(std::string_view name, std::uint32_t group, bool fail_if_exists, std::string_view data) {
+    {
+        std::lock_guard _(_mx);
+        auto user = getUserDDL();
+        if (fail_if_exists && user.exists(name)) return false;
+        user.put(name, data, group);    
+    }
+    _publisher.publish("modified_file", name);
+    return true;
+}
+
 void WebInterface::ws_ddl_put(const WsRpc::Request &req) {
-    std::lock_guard _(_mx);
-    auto user = getUserDDL();
 
     auto name = req.params[0].as<std::string>();
     auto group =  req.params[1].as<std::uint32_t>();
@@ -469,11 +475,13 @@ void WebInterface::ws_ddl_put(const WsRpc::Request &req) {
     const auto &data = req.attachments[0];
     if (data.size() > 0x7FFFFFFF) {
          req.send_error(413,"Content Too Large");    
-    } else if (fexists && user.exists(name)) {
-         req.send_error(409,"Exists");    
     } else {
-        user.put(name, {data.data(),data.size()},group);        
-        req.send_response(true);         
+        bool p = file_put(name, group, fexists, {data.data(), data.size()});
+        if (!p) {
+            req.send_error(409,"Exists");    
+        } else {
+            req.send_response(true);         
+        }
     }
 
 }
@@ -689,6 +697,34 @@ void WebInterface::ws_preview_console_exec(const WsRpc::Request &req) {
     _game_control->console_exec(req.params[0].as<std::string>());
     req.send_response(true);
 }
+
+void WebInterface::ws_file_history(const WsRpc::Request &req) {
+    std::shared_lock _(_mx);
+    auto ddl = getUserDDL();
+    auto hist = ddl.get_history(req.params[0].as_text());
+    Json::Array res;
+    for (const auto &[rev, tp]: hist) {
+        res.push_back({rev, std::chrono::system_clock::to_time_t(tp)});
+    }
+    req.send_response(res);   
+}
+
+void WebInterface::ws_file_copy(const WsRpc::Request &req) {
+    auto source_name = req.params[0].as_text();
+    auto target_name = req.params[1].as_text();
+    auto target_group = req.params[2].as_unsigned_int();
+    auto source_rev = req.params[3].as_unsigned_int();
+    
+
+    auto data = file_get(source_name, source_rev);
+    if (!data) {
+        req.send_error(404, "Not found");
+    } else {
+        bool b = file_put(target_name, target_group, false, {data->data(), data->size()});
+        req.send_response(b);
+    }
+}
+
 }
 
 

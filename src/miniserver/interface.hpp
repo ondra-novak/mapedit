@@ -107,6 +107,8 @@ protected:
     void ws_preview_console_show(const WsRpc::Request &req);
     void ws_preview_console_exec(const WsRpc::Request &req);
     void ws_control(const WsRpc::Request &req);
+    void ws_file_history(const WsRpc::Request &req);    
+    void ws_file_copy(const WsRpc::Request &req);   
 
     void send_state_update(WsRpc &rpc);
 
@@ -118,6 +120,8 @@ protected:
         {"list_files",&WebInterface::ws_ddl_list},
         {"file_get",&WebInterface::ws_ddl_get},
         {"file_put",&WebInterface::ws_ddl_put},
+        {"file_history",&WebInterface::ws_file_history},
+        {"file_copy", &WebInterface::ws_file_copy},
         {"file_delete",&WebInterface::ws_ddl_delete},
         {"project_stats",&WebInterface::ws_ddl_stats},
         {"project_compact",&WebInterface::ws_ddl_compact},
@@ -140,6 +144,9 @@ protected:
     WsPublisher _publisher;
     void publish_state();
     Json create_state();
+
+    std::optional<std::vector<char>  >file_get(std::string_view name, std::uint32_t rev);
+    bool file_put(std::string_view name, std::uint32_t group, bool fail_if_exists, std::string_view data);
 };
 
 

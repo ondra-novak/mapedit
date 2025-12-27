@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <filesystem>
 #include <vector>
 #include <optional>
@@ -20,6 +21,13 @@ public:
     struct Item {
         std::string name;
         uint32_t group;
+    };
+
+    struct HistoryLink {
+        static constexpr uint32_t magic_number = 0x1234ABCD;
+        uint32_t magic;
+        uint32_t previous;
+        uint32_t timestamp;
     };
 
     /**
@@ -44,9 +52,10 @@ public:
     /**
      * @brief Retrieves the contents of a file from the archive.
      * @param name Name of the file to retrieve.
+     * @param rev revision. If 0, returns latest revision, otherwise tries to find specific revision
      * @return Optional containing file data if found, std::nullopt otherwise.
      */
-    std::optional<std::vector<char> > get(std::string_view name) const;
+    std::optional<std::vector<char> > get(std::string_view name, std::uint32_t rev = 0) const;
 
     /**
      * @brief Removes a file from the archive.
@@ -73,6 +82,8 @@ public:
     bool exists(std::string_view name) const;
 
     const auto &get_path() const {return _pathname;}
+
+    std::vector<std::pair<std::uint32_t, std::chrono::system_clock::time_point> > get_history(std::string_view name);
 
 protected:
     /// Path to the archive file.
@@ -110,4 +121,6 @@ protected:
     static std::optional<std::pair<DirItem, unsigned int> > find_file(std::istream &f, std::string_view name);
     static bool check_empty(std::iostream &f);
     static uint32_t find_free_space(std::iostream &f, std::size_t sz);
+    static void append_history_node(std::iostream &f, std::uint32_t old_offset);
+    static std::optional<std::pair<DirItem, std::chrono::system_clock::time_point> > get_previous_version(std::istream &f, const DirItem &entry);
 };

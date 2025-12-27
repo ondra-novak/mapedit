@@ -1,6 +1,9 @@
 #include "ddlman.hpp"
+#include <chrono>
 #include <cstring>
 #include <fstream>
+#include <optional>
+#include <system_error>
 
 constexpr std::string_view directory_mark = "$$DIR$$";
 
@@ -44,18 +47,27 @@ void DDLManager::put(std::string_view name, std::string_view data, uint32_t grou
             return ;
         }
     }
+    append_history_node(f, r->first.offset);
     unsigned int index = r->second;
     replace_entry(f, index, name, data, group);    
 }
 
-std::optional<std::vector<char>> DDLManager::get(std::string_view name) const
+std::optional<std::vector<char>> DDLManager::get(std::string_view name, std::uint32_t rev) const
 {
     std::optional<std::vector<char>> out;
     std::fstream f(_pathname, std::ios::in|std::ios::binary);
     if (!f) return out;
     auto fnfo = find_file(f, name);
     if (!fnfo) return out;
-    out.emplace(get_file(f, fnfo->first));
+    DirItem d = fnfo->first;
+    if (rev) {
+        while (d.offset != rev) {
+            auto h = get_previous_version(f, d);
+            if (!h) return out;
+            d = h->first;
+        }
+    }
+    out.emplace(get_file(f, d));
     return out;
 }
 
@@ -430,5 +442,46 @@ void DDLManager::DirItem::set_name(std::string_view new_name)
     std::copy(c.begin(), c.end(), std::begin(name));
 }
 
+void DDLManager::append_history_node(std::iostream &f, std::uint32_t old_offset) {
+    f.seekp(0, std::ios::end);
+    HistoryLink h;
+    h.magic = HistoryLink::magic_number;
+    h.previous = old_offset;
+    h.timestamp = static_cast<std::uint32_t>(
+            std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
+    f.write(reinterpret_cast<const char *>(&h), sizeof(h));
+}
 
+std::optional<std::pair<DDLManager::DirItem, std::chrono::system_clock::time_point> > 
+    DDLManager::get_previous_version(std::istream &f, const DirItem &entry) {
+    if (entry.offset < sizeof(HistoryLink)) return std::nullopt;
+    f.seekg(entry.offset - sizeof(HistoryLink), std::ios::beg);
+    HistoryLink node;
+    f.read(reinterpret_cast<char *>(&node), sizeof(node));
+    if (node.magic != node.magic_number) return std::nullopt;
+    if (node.previous < 16 || node.previous >= entry.offset) return std::nullopt;
+    DirItem ret = entry;
+    ret.offset = node.previous;
+    return std::pair(ret, std::chrono::system_clock::from_time_t(node.timestamp));
+}
 
+std::vector<std::pair<std::uint32_t, std::chrono::system_clock::time_point> > DDLManager::get_history(std::string_view name) {
+    std::vector<std::pair<std::uint32_t, std::chrono::system_clock::time_point> > out;
+    std::ifstream f(_pathname, std::ios::in|std::ios::binary);
+    if (!f) return out;
+
+    auto found = find_file(f, name);
+    if (!found) return out;
+    DirItem dinfo = found->first;
+    out.push_back({dinfo.offset, {}});
+
+    do {
+        auto hist = get_previous_version(f, dinfo);
+        if (!hist) break;
+        out.back().second = hist->second;
+        out.push_back({hist->first.offset, {}});
+        dinfo = hist->first;
+    } while (true);
+
+    return out;   
+}

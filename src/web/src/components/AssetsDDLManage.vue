@@ -30,12 +30,13 @@ onMounted(()=>{
 </script>
 
 <template>
-    <h2>Statistics</h2>
+    <h2>Statistics</h2> 
     <table>        <tbody>
         <tr><th>Directory entries</th><td>{{ stats?stats.entries_used:"-" }}</td><td></td></tr>
         <tr><th>Unused directory entries</th><td>{{ stats?stats.entries_reserved:"-" }}</td><td></td></tr>
         <tr><th>Total size</th><td>{{ stats?Math.round(stats.total_space / 1024):"-" }}</td><td>KiB</td></tr>
         <tr><th>Used space</th><td>{{ stats?Math.round(stats.used_space / 1024):"-" }}</td><td>KiB</td></tr>
+        <tr><th>Empty space or history</th><td>{{ stats?Math.round((stats.total_space -stats.used_space) / 1024):"-" }}</td><td>KiB</td></tr>
         <tr><th>Fragmentation</th><td>{{ stats?Math.round(100-(stats.used_space+stats.reserved_space)/stats.total_space*100):"-" }}</td><td>%</td></tr>
         </tbody>
     </table>
@@ -43,6 +44,7 @@ onMounted(()=>{
     <div class="at-center">
         <button :disabled="button_disabled" @click="run_compact">Compact</button>
     </div>
+    <p class="note">The "Compact" operation also deletes all historical versions of modified files.</p>
 </template>
 
         
@@ -61,6 +63,15 @@ table th {
 table td:nth-child(2) {
     text-align: right;
 }
+p.note {
+    text-align: center;
+    font-style: italic;
+}
+p.note::before {
+    content: "Note:";
+    font-weight: bold;
+}
+
 
 
 </style>

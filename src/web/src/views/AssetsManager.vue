@@ -2,7 +2,7 @@
 import AssetsPcxView from '@/components/AssetsPcxView.vue';
 import AssetsHiView from '@/components/AssetsHiView.vue';
 import AssetsList from '../components/AssetsList.vue'
-import { ref, watch, onMounted, computed, defineEmits, onUnmounted, getCurrentInstance } from 'vue';
+import { ref, watch } from 'vue';
 import { AssetGroup } from '@/core/asset_groups';
 import type {AssetGroupType}from '@/core/asset_groups';
 import { server, type FileItem } from '@/core/api';
@@ -16,6 +16,7 @@ import HexView from '@/components/HexView.vue';
 import AssetsToolMGF from '@/components/AssetsToolMGF.vue';
 import AssetsFontsViewer from '@/components/AssetsFontsViewer.vue';
 import TextsEditor from '@/components/TextsEditor.vue';
+import FileHistory from '@/components/FileHistory.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -38,6 +39,7 @@ const listOfTools = {
     "fonts":"Font",
     "strings":"Text editor",
     "upload":"Upload/Download",
+    "history":"File History",
     "hexview":"Hex viewer",
     "ddlinfo":"Manage DDL",
 };
@@ -106,7 +108,7 @@ watch([cur_file_model], ()=>{
     disable_delete.value = !cur_file_model.value.ovr;
     selected_file.value = cur_file_model.value.name;
     selected_group.value = cur_file_model.value.group;
-    if (selected_tool.value != "upload" && selected_tool.value != "hexview") {
+    if (selected_tool.value != "upload" && selected_tool.value != "hexview" && selected_tool.value != "history") {
         const tool = select_tool();
         selected_tool.value = tool || "";
     }
@@ -161,6 +163,7 @@ function tool_click(id:string) {
                     <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
                     <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
                     <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" @upload="onUploadDone"/>
+                    <FileHistory v-if="selected_tool == 'history'" v-model="selected_file" />
                     <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" @upload="onUploadDone"/>
                     <div v-if="selected_tool == editor_exists" class="goto-tool">
                         <div class="hint-link">Open editor</div>
