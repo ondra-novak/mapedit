@@ -163,7 +163,7 @@ function tool_click(id:string) {
                     <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" @upload="onUploadDone"/>
                     <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" @upload="onUploadDone"/>
                     <div v-if="selected_tool == editor_exists" class="goto-tool">
-                        <div class="hint-link"><RouterLink :to="`/${selected_tool.substring(1)}`">Open editor</RouterLink></div>
+                        <div class="hint-link">Open editor</div>
                     </div>
                     <div v-if="selected_tool == 'delete'" class="delete-file">
                         <p>Confirm you want to delete file:</p>

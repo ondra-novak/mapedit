@@ -37,13 +37,22 @@ class WsRpcClient {
     }
 
     call(method:string, params: any[], attachments: ArrayBuffer[]) {
-        return new Promise<WsRpcResult>((suc:(x:WsRpcResult)=>void, fail:(x:any)=>void)=>{
+        const r =  new Promise<WsRpcResult>((suc:(x:WsRpcResult)=>void, fail:(x:any)=>void)=>{
             const id = ++this.#idcnt;
             const msg = `${attachments.length}\n${id}\n${method}\n${JSON.stringify(params)}`;
             this.#tosend.push(msg, ... attachments);
             this.flush();
             this.#response_map.set(id, {suc,fail});
         });
+
+        if (process.env.NODE_ENV === "development") {
+            r.then(
+                (result) => console.log(`[RPC] ${method} success:`, params, result),
+                (error) => console.error(`[RPC] ${method} error :`, params, error)
+            );
+        }
+        return r;
+        
     }
 
     flush() {
@@ -140,12 +149,15 @@ class WsRpcClient {
 
         if (msg.id.startsWith('#')) {
             const channel = msg.id.substring(1);
+            const value: WsRpcResult = Object.freeze({data:msg.data,attachments:msg.attachments});
+
+            if (process.env.NODE_ENV === "development") {
+                console.log("[RPC] ", msg.id, value);             
+            }        
+
             const cb_list = this.#channels.get(channel)!;
             if (cb_list) {
-                cb_list.forEach(cb=>queueMicrotask(()=>cb({
-                    data: msg.data,
-                    attachments: msg.attachments
-                })));
+                cb_list.forEach(cb=>queueMicrotask(()=>cb(value)));
             }
             return;
 

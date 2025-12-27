@@ -7,6 +7,7 @@
 #include "mgifcomp.hpp"
 #include "skeldal_exe.hpp"
 #include "wsrpc.hpp"
+#include "publisher.hpp"
 #include <filesystem>
 #include <shared_mutex>
 #include <thread>
@@ -54,27 +55,7 @@ protected:
     bool serve_file(const std::filesystem::path &path, std::string_view name, Request &req);
  
     
-    bool all_ddl_list(Request &req);
-    bool all_ddl_list_delete(Request &req);
-    bool ddl_list(Request &req);
     bool ddl_get(Request &req);
-    bool ddl_put(Request &req);
-    bool ddl_delete(Request &req);
-    bool ddl_stats(Request &req);
-    bool ddl_compact(Request &req);
-    bool ddl_mpg_get(Request &req);
-    bool ddl_mpg_create(Request &req);
-    bool ddl_mpg_session_put(Request &req);
-    bool ddl_active(Request &req);
-    bool keep_alive(Request &req);
-    bool config_get(Request &req);
-    bool config_put(Request &req);
-    bool preview_start(Request &req);
-    bool preview_stop(Request &req);
-    bool preview_teleport(Request &req);
-    bool preview_reload(Request &req);
-    bool preview_console_show(Request &req);
-    bool preview_console_exec(Request &req);
 
 
     bool command(Request &req);
@@ -143,7 +124,7 @@ protected:
         {"mgf_get",&WebInterface::ws_ddl_mpg_get},
         {"mgf_create",&WebInterface::ws_ddl_mpg_create},
         {"mgf_put_image",&WebInterface::ws_ddl_mpg_put_image},
-        {"mgf_put_close",&WebInterface::ws_ddl_mpg_close},
+        {"mgf_close",&WebInterface::ws_ddl_mpg_close},
         {"project_set_active",&WebInterface::ws_ddl_active},
         {"config_get",&WebInterface::ws_config_get},
         {"config_put",&WebInterface::ws_config_put},
@@ -155,10 +136,8 @@ protected:
         {"preview_console_exec",&WebInterface::ws_preview_console_exec},
     };
 
-    std::mutex _publish_mx;
-    std::vector<WsRpc *> _subscribers;
-    unsigned int clients = 0;
 
+    WsPublisher _publisher;
     void publish_state();
     Json create_state();
 };

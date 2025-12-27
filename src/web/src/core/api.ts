@@ -77,30 +77,7 @@ export class ApiClient extends WsRpcClient{
 
      async getDDLFile(id: string): Promise<ArrayBuffer> {
         return (await this.call("file_get", [id], [])).attachments[0];
-/*        const response = await fetch(`api/ddl/${encodeURIComponent(id)}`);
-        if (response.ok) {
-            const n = ((await response.bytes()).buffer);
-            return n
-        } else {
-            throw Error("Get File Status: " + response.status);
-        }*/
-    }
-
-
-/*    ka_listeners: ((x: KeepAliveStatus)=>void)[] = [];
-    last_ka = new KeepAliveStatus();
-
-    keep_alive_interval = 5000;
-    last_keep_alive_status = {}
-    connected: boolean = false;
-*/
-
-
-    protected async handle_error(response:Response, message: string) {
-            const text = await response.text(); // Může obsahovat chybovou hlášku
-            throw new Error(`${message}. Status: ${response.status}. Message: ${text}`);
-    }
-
+     }
 
 
     async getDDLMGFFile(id: string): Promise<ArrayBuffer> {
@@ -120,48 +97,21 @@ export class ApiClient extends WsRpcClient{
     }
 
     async mgfCreate(name: string, group: number, frames:number, transparent: boolean): Promise<string> {
-        const response = await fetch(`api/ddl/mgf`, {
-            method: "POST",
-            body: JSON.stringify({
+        return (await this.call("mgf_create",[{            
                 filename: name,
                 frames: frames,
                 transparent: transparent,
                 group: group
-            }),
-            headers: {
-                "Content-Type":"application/json"
-            }
-        });
-        if (response.status !== 201) {
-            await this.handle_error(response, "mfgCreate failed.")
-        }
-        return await response.text()
+            }],[])).data;
     }
 
     async mgfPutImage(session: string, pcx_data: ArrayBuffer):Promise<PutImageStatus> {
-        const response = await fetch(`api/mgf_session/${session}?a=image`, {
-            method: "PUT",
-            body: pcx_data,
-            headers: {
-                "Content-Type":"application/octet-stream"
-            }
-        });
-        if (response.status !== 202) {
-            await this.handle_error(response, "mfgPutImage failed.")
-        }
-        return await response.json();
+        return (await this.call("mgf_put_image", [session],[pcx_data])).data;
     }
 
     async mgfClose(session: string): Promise<string> {
-        const response = await fetch(`api/mgf_session/${session}?a=close`, {
-            method: "PUT",
-        });
-        if (response.status !== 201) {
-            await this.handle_error(response, "mfgClose failed.")
-        }
-        return await response.text();
+        return (await this.call("mgf_close",[session],[])).data;
     } 
-
 
     async listAllDDLs() : Promise<DDLEntry[]> {
         return ((await this.call("project_list",[],[])).data as Record<string, any>[]).map(x=>({
@@ -213,6 +163,10 @@ export class ApiClient extends WsRpcClient{
         skeldal_ini:Record<string, any>
     }) {
         return (await (this.call("config_put",[config],[]))).data;
+    }
+
+    get_download_link(id:string): string {
+        return `api/ddl/${encodeURIComponent(id)}`;
     }
 
 }

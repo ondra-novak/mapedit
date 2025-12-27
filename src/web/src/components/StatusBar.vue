@@ -263,8 +263,7 @@ function show_confirm() {
 
 function gear_clicked() {
     if (game_client_cntr.value) {
-        game_client_cntr.value.configure();
-        client_status.value = true;
+        game_client_cntr.value.configure();        
     }
 
 }

@@ -46,7 +46,7 @@ async function do_upload() {
 
 async function updateModel() {
     if (filename.value) {
-        download_link.value = await server.getDownloadLink(filename.value);
+        download_link.value = server.get_download_link(filename.value);
     }
 }
 

@@ -8,6 +8,7 @@ add_executable(mapedit_server
     mgifdecomp.cpp
     mgifcomp.cpp
     wsrpc.cpp
+    publisher.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c
