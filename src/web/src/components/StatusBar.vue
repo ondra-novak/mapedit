@@ -196,7 +196,11 @@ function update_client_status(st:boolean) {
 function unset_current_sector() {
     location.value = undefined;
 }
-
+function invoke_teleport() {
+    if (client_status.value) {
+        teleport();
+    }
+}
 
 onMounted(()=>{
     StatusBar.attach_component({
@@ -208,7 +212,8 @@ onMounted(()=>{
         set_current_sector,
         update_connect_status,
         update_client_status,
-        stop_game: stop_client
+        stop_game: stop_client,
+        invoke_teleport,
     })
 })
 
@@ -220,8 +225,15 @@ function stop_client() {
 }
 
 function reload_client() {
-    if (game_client_cntr.value) {
-        game_client_cntr.value.restart();
+    const gcc = game_client_cntr.value;
+    const lc = location.value;
+    const cm = current_map.value;
+    if (gcc && lc && cm) {
+        lc.map_save_cb().then(cont=>{
+            if (cont) {
+                gcc.reload();
+            }
+        });
     }
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import {  ActionType, create_action_instance, SimpleActionType, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFJMP, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TELEPORT, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
+import {  ActionType, create_action_instance, directions, SimpleActionType, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFJMP, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TELEPORT, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
 import { readWavInfoFromBuffer } from '@/core/sound_info';
 import { create_datalist, type DataListHandle, type DataListItem } from '@/utils/datalist';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -10,7 +10,7 @@ import globalGetItems from '@/utils/global_item_list';
 import { SVGDrawing, SVGPath } from '@/utils/svg';
 import FactEditor from './FactEditor.vue';
 
-const directions = ["North ↑","East →","South ↓","West ←"];
+
 
 const ActionEvent = [
 ["On interaction",  0x4, "Interaction with the wall - mouse click or spacebar. If there is secondary wall defined, the player must click on the secondary wall"],

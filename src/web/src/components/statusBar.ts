@@ -7,7 +7,7 @@ export interface TeleporToFlags {
 export interface IGameClientControl {
     start:()=>void;
     stop:() =>void;
-    restart:()=>void;
+    reload:()=>void;
     teleport_to:(map_name: string, sector: number, side: number, flags: TeleporToFlags)=>void;
     configure:()=>void;
 };
@@ -32,6 +32,7 @@ export interface IStatusBar {
     update_connect_status:(status:boolean)=>void;
     update_client_status:(status:boolean)=>void;        
     stop_game:()=>void;
+    invoke_teleport:()=>void;
 };
 
 function create_promise() {
@@ -96,6 +97,9 @@ class StatusBar {
     }
     static stop_game() {
         return conn.promise.then(st=>st.stop_game());
+    }
+    static invoke_teleport() {
+        return conn.promise.then(st=>st.invoke_teleport());
     }
 
 };

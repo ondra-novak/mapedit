@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g transform="matrix(1, 0, 0, 1, -332.085419, -84.297722)">
+    <rect x="357.068" y="108.289" width="39.859" height="39.831" style="stroke: rgb(0, 0, 0); fill: none; stroke-width: 4px;"/>
+    <circle class="st0" cx="45.863" cy="56.452" r="8" style="fill: none; stroke: rgb(30, 30, 30); stroke-linecap: round; stroke-linejoin: round; stroke-miterlimit: 10; stroke-width: 2;" transform="matrix(4.495584, 0, 0, 4.522112, 170.578491, -127.059532)"/>
+    <line class="st0" x1="426.211" y1="177.966" x2="402.385" y2="153.999" style="fill: none; stroke: rgb(30, 30, 30); stroke-linecap: round; stroke-linejoin: round; stroke-miterlimit: 10; stroke-width: 9.018;"/>
+    <text style="white-space: pre; fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 28px;" x="369.163" y="135.649">n</text>
+  </g>
+</svg>

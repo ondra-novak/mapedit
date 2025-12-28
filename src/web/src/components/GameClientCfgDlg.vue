@@ -17,7 +17,7 @@ function start() {
 function stop() {
     server.game_client_stop();
 }
-function restart() {
+function reload() {
     server.game_client_reload();
 
 }
@@ -67,7 +67,7 @@ function on_state_change(x: WsRpcResult) {
     if (!st.need_configure && !reg_ok) {
             StatusBar.register_game_client_cntr({
                 start,
-                restart,
+                reload,
                 teleport_to,
                 stop,
                 configure

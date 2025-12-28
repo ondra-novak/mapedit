@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
-import { server, type FileItem } from '@/core/api';
-import { ArcConfiguration, AssetConfiguration, ConfigurationPalette, FloorCeilConfiguration, MapFile, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
+import { server } from '@/core/api';
+import { ArcConfiguration, FloorCeilConfiguration, GlobalMapPalettes, MapFile, MAPGLOBAL, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
 import { shallowClone, Document } from '@/utils/document';
-import  globalState from '@/utils/global';
 
 import svg_pointer from '@/assets/toolbar/pointer.svg'
 import svg_pencil from '@/assets/toolbar/pencil.svg'
@@ -17,13 +16,12 @@ import PalleteEditor from '@/components/PalleteEditor.vue';
 import { messageBox } from '@/utils/messageBox';
 import { create_datalist } from '@/utils/datalist';
 import NicheEditor from './NicheEditor.vue';
-import { getDDLFileWithImport } from '@/components/tools/missingFiles';
-import { enc2string, keybcs2string, string2keybcs } from '@/core/keybcs2';
 import type { MultiactionModelDef } from '@/components/MultiactionEditor.vue';
 import MultiactionEditor from '@/components/MultiactionEditor.vue';
 import { apply_array_diff, create_array_diff } from '@/utils/madiff';
 import MapSelectDlg from '@/components/MapSelectDlg.vue';
 import { map_load_stringtable, map_save_stringtable } from '@/core/string_table';
+import MapSettingsDlg from '@/components/MapSettingsDlg.vue';
 const list_assets = ref<string[]>([]);
 
 const EditMode = {
@@ -45,7 +43,7 @@ class MapFileWithStringtable extends MapFile{
     }
 }
 
-const map_filename = ref<string>();
+const map_filename = ref<string>("");
 const open_map_dlg = ref<boolean>(false);
 const props = defineProps<{active:boolean}>();
 
@@ -54,7 +52,7 @@ const mapdraw :MapDraw=  new MapDraw();
 const map_document = new Document<MapFileWithStringtable>(new MapFileWithStringtable);
 const curmap = shallowRef<MapFileWithStringtable>(new MapFileWithStringtable());
 let original_string_table:string[] = [];
-const settings = reactive(globalState("mapview_settings",{
+const settings = reactive({
     curlevel : 0 as number,
     edit_mode: EditMode.Edit as number,
     sector_type: SectorType.Normal as number,
@@ -63,7 +61,7 @@ const settings = reactive(globalState("mapview_settings",{
     floor:null as FloorCeilConfiguration| null,
     ceil:null as FloorCeilConfiguration | null,
     arc:null as ArcConfiguration | null,
-}));
+});
 
 
 type FocusItem = {
@@ -116,20 +114,25 @@ const selection = ref<number[]>();
 const link = ref<LinkRef>();
 const applyMode = ref<number>(ApplyMode.ACTIVE.v);
 const curNiche = ref<NicheDef|null>(null);
+const goto_sector_n = ref(1);
+const goto_sector_dlg = ref(false);
+const goto_sector_input = ref<HTMLInputElement>();
+const map_settings = ref<MAPGLOBAL>();
+const action_ui = ref(false);
+const wall_props = ref(false);
 
 let warn_empty_tool = true;
-const mapcontainer = globalState("mapcontainer",()=>new MapContainer);
+const mapcontainer = new MapContainer;
 const layers_opened = ref(false);
 const control_state = reactive({
     can_undo: false,
     can_redo: false
 });
 
-const mapLoadedPalettes = ref(new MapPalettes);
+const mapLoadedPalettes = ref(new GlobalMapPalettes);
 let save_state: SaveRevertControl;
 
 const SectorFlagsNames = {
-    DarkFog: "Always fog to black",
     Secret: "Secret",
     NoSummon: "No Teleport",
     Automapped: "Already automapped"
@@ -153,6 +156,7 @@ const SideFlagsNames_Visibility= {
     LEFT_ARC: "Left arc",
     RIGHT_ARC: "Right arc",
     TRUESEE: "True Seeing transp.",
+    AUTOANIM: "Animate Lever"
 };
 const SideFlagsNames_ActionBehavior= {
     COPY_ACTION: "Forward action",
@@ -162,7 +166,6 @@ const SideFlagsNames_ActionBehavior= {
 
 const SideFlagsNames_Actions = {
     PASS_ACTION: "Activate by pass",
-    AUTOANIM: "Animate Lever"
 };
 
 const SideFlagsNames_Changes = {
@@ -217,7 +220,12 @@ function doRedo() {
 }
 
 async function saveOnTeleport() {
-    return saveMap();
+    if (save_state.get_changed()) {
+        await saveMap();
+        save_state.set_changed(false);
+    }
+    return true;
+
 }
 
 function updateFocusData(sect: number, side: number) {
@@ -522,7 +530,7 @@ function redraw() {
     mapcontainer.set_map(mapdraw);    
 }
 
-const layers= reactive(globalState("layers",{
+const layers= reactive({
     grid: true,
     sector_basic: true,
     sector_features: true,
@@ -533,8 +541,8 @@ const layers= reactive(globalState("layers",{
     arrows: true,
     ext_arrows: true,
     enemies: true,
-    items: true
-}));
+    items: true,
+});
 
 watch([()=>settings.curlevel, curmap], ()=>{
     redraw();
@@ -563,7 +571,7 @@ async function loadMap(mapname: string)   {
         }
         original_string_table = ss;
         map_document.reset(new MapFileWithStringtable(mapdata.map,ss));
-        mapLoadedPalettes.value = mapdata.palette;
+        mapLoadedPalettes.value.merge(mapdata.palette);
 
 
     } catch (e) {
@@ -621,9 +629,16 @@ function reload_all_lists() {
     updateControls();
 }
 
+function open_map_prompt() {
+        if (!map_filename.value) {
+        StatusBar.set_map_switch("<click here>",()=>{
+            open_map_dlg.value = true;
+        });        
+    }
+}
 
 async function init() {        
-
+    open_map_prompt();
 }
 
 function resetFloor() {
@@ -642,7 +657,7 @@ const edit_modes = [
 ]
 
 onMounted(init);
-onUnmounted(()=>save_state.unmount())
+onUnmounted(()=>save_state?.unmount())
 
 watch([()=>settings.edit_mode,focus],()=>{
     updateFocus();
@@ -656,6 +671,7 @@ function applyChanges() {
     if (focus.value) {
         const changesSector : ((s:MapSector)=>void)[] = [];
         const changesSide : ((s:MapSide)=>void)[] = [];
+        let any_change = false;
 
         const old_sec = curmap.value.sectors[focus.value.sector];
         const nw_sec = focus.value.sector_def;
@@ -704,6 +720,7 @@ function applyChanges() {
         }
 
         if (changesSector.length || changesSide.length) {
+            any_change = true;
             const m  = begin_edit();
             m.sectors = shallowClone(m.sectors)
             if (changesSector.length) {
@@ -767,8 +784,11 @@ function applyChanges() {
             if (focus.value.script.stringTable) {
                 m.strtable = focus.value.script.stringTable;
             }
-            end_edit(m);
-            updateFocusData(focus.value.sector, focus.value.side);
+            if (any_change) {
+                end_edit(m);
+                updateFocusData(focus.value.sector, focus.value.side);
+                StatusBar.invoke_teleport();
+            }
         }
     }
 }
@@ -811,6 +831,64 @@ function delete_cur_niche() {
     save_niche(null);
     curNiche.value = null;
 }
+function goto_sector_open(ev: Event) {
+    if (goto_sector_dlg.value) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    if (focus.value) goto_sector_n.value = focus.value.sector;
+    goto_sector_dlg.value = true;
+}
+
+function goto_sector_find() {
+    const s = goto_sector_n.value;
+    const m = curmap.value;
+    if (s && m) {
+        const l = m.sectors[s].level;
+        settings.curlevel = l;
+        updateFocusData(s, focus.value?.side || 0);
+        updateFocus();
+    }
+    setTimeout(()=>goto_sector_dlg.value = false,1);
+}
+
+function open_map_settings() {
+    map_settings.value = curmap.value.info;
+    queueMicrotask(()=>{
+        const w = watch(map_settings,()=>{
+            if (map_settings.value) {
+                const map = begin_edit();
+                map.info = map_settings.value;
+                end_edit(map);
+                queueMicrotask(()=>{
+                    map_settings.value = undefined;
+                });
+            }
+            w.stop();
+        });
+    });
+}
+
+watch(goto_sector_input,()=>{
+    const el = goto_sector_input.value;
+    if (el) {
+        const close = (ev:Event)=>{
+            const target = ev.target as HTMLElement
+            const p = el.parentElement;            
+            if (target.parentElement == el.parentElement) return;
+            goto_sector_dlg.value = false;
+            window.removeEventListener("click",close);
+        };
+        el.focus();
+        el.select();
+        el.addEventListener("keydown",(e:KeyboardEvent)=>{
+            if (e.key == "Enter") {
+                goto_sector_find();
+            }
+        });
+        window.addEventListener("click",close);
+    }
+})
+
 
 const ds_wallassets = create_datalist();
 watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
@@ -819,7 +897,7 @@ watch(map_filename, (nw)=>{
         StatusBar.set_map_switch(nw,()=>{
             open_map_dlg.value = true;
         });
-        loadMap(nw)
+        loadMap(nw)        
     }
 });
 watch(()=>props.active, ()=>{
@@ -827,11 +905,7 @@ watch(()=>props.active, ()=>{
     if (a) {
         init_save_state();
         reload_all_lists();
-        if (!map_filename.value) {
-            StatusBar.set_map_switch("<click here>",()=>{
-                open_map_dlg.value = true;
-           });        
-        }
+        open_map_prompt();
     } else {
         save_state.unmount();
     }
@@ -859,6 +933,12 @@ watch(mapview,()=>{
     <div @click="mapcontainer.zoom_rel(-0.2)"><img src="@/assets/toolbar/zoom_out.svg"></div>
     <div class="sep" @click="doUndo":class="{disabled: !control_state.can_undo}"><img src="@/assets/toolbar/undo.svg"></div>
     <div :class="{disabled: !control_state.can_redo}" @click="doRedo"><img src="@/assets/toolbar/redo.svg"></div>
+    <div class="sep" @click="ev=>goto_sector_open(ev)":class="{disabled: settings.edit_mode == EditMode.Draw || settings.edit_mode == EditMode.Erase}"><img src="@/assets/toolbar/srch_sec.svg">
+        <div v-if="goto_sector_dlg" class="gotosec">
+            <input type="number" ref="goto_sector_input" v-model="goto_sector_n" v-watch-range min="1" :max="curmap.sectors.length-1"><button @click="goto_sector_find">Go</button>
+        </div>
+    </div>
+    <div class="sep" @click="open_map_settings"><img src="@/assets/toolbar/gear.svg"></div>
 </div>
 <div class="middle">
     <div class="middle-split">
@@ -896,13 +976,13 @@ watch(mapview,()=>{
                 <option :value="SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC">Set arcs</option>                
             </select></label>
         </x-form></div>
-        <div class="h"><span class="title">Wall</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="true" v-model="settings.wall" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></div>
-        <div class="h"><span class="title">Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="true" v-model="settings.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></div>
-        <div class="h"><span class="title">Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model="settings.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></div>
-        <div class="h"><span class="title">Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model="settings.ceil"  type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Wall</span><PalleteEditor v-model:palette="mapLoadedPalettes.wall_palette" :listview="true" v-model:selection="settings.wall" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Arc</span><PalleteEditor v-model:palette="mapLoadedPalettes.arc_palette" :listview="true" v-model:selection="settings.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Floor</span><PalleteEditor v-model:palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model:selection="settings.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Ceil</span><PalleteEditor v-model:palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model:selection="settings.ceil"  type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></div>
     </div>
 </div>
-<div class="right side" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0">
+<div class="right side" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0 && wall_props">
         <div v-for="(s,n) of SideFlagsNames_All" :key="n"><span class="title">{{ s.t }}</span>
         <x-form>
             <label v-for="(v,k) of s.f" :key="k">
@@ -912,7 +992,7 @@ watch(mapview,()=>{
             <label v-if="n == 'side_barriers'"><input type="checkbox" v-model="focus.side_def.item_can_be_placed_behind">Item can be placed behind wall</input></label>
         </x-form>
         </div>
-        <div><span class="title">Action</span>
+        <div v-if="action_ui || focus.side_def.action"><span class="title">Action</span>
         <x-form>
             <div class="label"><span>Target</span><div>            
                 <button :disabled="(link?.side || 0) == -1" @click="focus.side_def.target_sector=link?.sector || 0;focus.side_def.target_side = link?.side || 0"> Side {{ focus.side_def.target_sector }}:{{focus.side_def.target_side }} </button>
@@ -934,7 +1014,11 @@ watch(mapview,()=>{
                     <span> {{ v }}</span>
                 </label>
             </x-form>
-
+        </div>
+        <div class="actui">
+            <x-form>
+                <label><input type="checkbox" v-model="action_ui"><span>Show old action UI</span></label>
+            </x-form>
         </div>
 
 </div>                        
@@ -944,8 +1028,8 @@ watch(mapview,()=>{
             <label><span>Type</span><select v-model="focus.sector_def.type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
             </select></label>
-            <label><span>Ceil</span><PalleteEditor :palette="mapLoadedPalettes.ceil_palette" :listview="false" v-model="focus.sector_def.ceil" type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></label>
-            <label><span>Floor</span><PalleteEditor :palette="mapLoadedPalettes.floor_pallete" :listview="false" v-model="focus.sector_def.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></label>
+            <label><span>Ceil</span><PalleteEditor v-model:palette="mapLoadedPalettes.ceil_palette" :listview="false" v-model:selection="focus.sector_def.ceil" type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></label>
+            <label><span>Floor</span><PalleteEditor v-model:palette="mapLoadedPalettes.floor_pallete" :listview="false" v-model:selection="focus.sector_def.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></label>
             <label v-for="(v,k) of SectorFlagsNames" :key="k">
                 <input type="checkbox" @change="focus.sector_def.flags^=SectorFlags2[k]" :checked="(focus.sector_def.flags & SectorFlags2[k])!=0">
                 <span> {{ v }}</span>
@@ -961,14 +1045,18 @@ watch(mapview,()=>{
         </div>
         <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }} [{{ focus.sector * 4 + focus.side }}]</span>
         <x-form>
-        <label><span>Primary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.primary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
-        <label><span>Secondary</span><PalleteEditor :palette="mapLoadedPalettes.wall_palette" :listview="false" v-model="focus.side_def.secondary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
-        <label><span>Arc</span><PalleteEditor :palette="mapLoadedPalettes.arc_palette" :listview="false" v-model="focus.side_def.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></label>
+        <label><span>Primary</span><PalleteEditor v-model:palette="mapLoadedPalettes.wall_palette" :listview="false" v-model:selection="focus.side_def.primary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
+        <label><span>Secondary</span><PalleteEditor v-model:palette="mapLoadedPalettes.wall_palette" :listview="false" v-model:selection="focus.side_def.secondary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
+        <label><span>Arc</span><PalleteEditor v-model:palette="mapLoadedPalettes.arc_palette" :listview="false" v-model:selection="focus.side_def.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></label>
         <div class="label"><span>Exit</span><div>
             <button :disabled="!link" @click="focus.sector_def.exit[focus.side] = link?.sector || 0">Sector {{ focus.sector_def.exit[focus.side] }}</button>
             <button :disabled="focus.sector_def.exit[focus.side] == 0" @click="focus.sector_def.exit[focus.side] = 0">X</button>
         </div>
-    </div>
+        </div>
+        <div>
+            <button @click="wall_props = !wall_props" class="wallprops" :class="{open:wall_props}">Flags</button>
+        </div>
+
         </x-form>
         </div>
         <div class="maevents"><span class="title">Scripts (Multiactions)</span>
@@ -1021,6 +1109,7 @@ watch(mapview,()=>{
 </template>
 </x-workspace>
 <MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
+<MapSettingsDlg v-model="map_settings"></MapSettingsDlg>
 </template>
 
 <style lang="css" scoped>
@@ -1047,6 +1136,7 @@ x-workspace > * {
     background: linear-gradient(90deg, white, #ccc);
     border-radius: 2rem 0 0 2rem;
     cursor: pointer;
+    position: relative;
 }
 
 .toolbar > *.active,.toolbar > *:active {
@@ -1250,6 +1340,41 @@ x-workspace > * {
 .open-map-hlp >div::after {
     content: " Open a map";
     vertical-align: top;
+}
+.gotosec {
+    position: absolute;
+    background-color: white;
+    width: 9rem;
+    z-index: 1;
+    left: 3rem;
+    top: 0;
+    padding: 0.2rem;
+    border: 1px solid;
+    box-shadow: 3px 3px 6px black;
+}
+.gotosec input {
+    width: 5rem;
+    text-align: center;
+}
+.right.side .actui {
+    flex-grow: 0;
+}
+.wallprops {
+    position: relative;
+    padding: 0.5rem 0.5rem 0.5rem 1.2rem 
+}
+.wallprops::before {
+    display: block;
+    position: absolute;
+    content: "«";
+    font-size: 1.5rem;
+    inset: 0;
+    margin: auto;
+    text-align: left;
+
+}
+.wallprops.open::before {
+    content: "»";
 }
 
 </style>

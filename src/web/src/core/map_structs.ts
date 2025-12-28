@@ -214,7 +214,7 @@ class TMAP_LAYOUT extends WithSchema {
     }};;
 };
 
-class MAPGLOBAL extends WithSchema {
+export class MAPGLOBAL extends WithSchema {
 
     back_fnames:string[]=new Array(4).fill("");
     mapname:string="";
@@ -1024,9 +1024,11 @@ export class WallConfiguration extends AssetConfiguration{
         return side.flags;
     }
     get_anim() : number {
-        if (this.anim_frames > 1 && this.anim_frames <= 16) {
-            const r = this.repeat_anim?Math.round(Math.random()*(this.anim_frames-1)):0;
-            return (r << 4) | (this.anim_frames-1);
+        let anim_frames = this.graphics.length;
+        if (this.alternate) anim_frames = anim_frames/2;
+        if (anim_frames > 1 && anim_frames <= 16) {
+            const r = this.repeat_anim?Math.min(Math.round(Math.random()*(anim_frames)),anim_frames-1):0;
+            return (r << 4) | (anim_frames-1);
         } else {
             return 0;
         }
@@ -1084,6 +1086,8 @@ export class FloorCeilConfiguration extends AssetConfiguration {
     pixmaps:string[] = [""];
     mode : number = FloorCeilMode.SINGLE;
     button: boolean = false;
+    fog_to_black: boolean = false;
+    is_ceil: boolean = false;
     
     static from(sector: TSECTOR, layout: TMAP_LAYOUT, lists: string[], is_ceil: boolean) : FloorCeilConfiguration|null{
         const ret = new FloorCeilConfiguration;
@@ -1099,6 +1103,8 @@ export class FloorCeilConfiguration extends AssetConfiguration {
         const animation = (f & 0x8) != 0;
         let frames = (f & 0x7)+1;
         ret.mode = f & 0x7;
+        ret.is_ceil = is_ceil;
+        ret.fog_to_black = !is_ceil && !!(layout.flags & SectorFlags2.DarkFog );
         if (animation) {
             ret.mode = FloorCeilMode.ANIMATED;
         } else {
@@ -1113,7 +1119,7 @@ export class FloorCeilConfiguration extends AssetConfiguration {
     }
 
     get_key() {        
-        return [this.pixmaps[0],this.mode.toString(),this.pixmaps.length.toString(36)].join("");
+        return [this.pixmaps[0],this.mode.toString(),this.pixmaps.length.toString(36),this.fog_to_black?"F":"N"].join("");
     }
 
     get_pixmaps(): string[][] {
@@ -1122,6 +1128,9 @@ export class FloorCeilConfiguration extends AssetConfiguration {
     get_flags() {
         if (this.mode == FloorCeilMode.ANIMATED) return 0x8 | ((this.pixmaps.length-1) & 0x7);
         else return this.mode;
+    }
+    get_flags2() {
+        return this.fog_to_black?SectorFlags2.DarkFog:0;
     }
     clone(): AssetConfiguration {
         const nw =  Object.assign(new FloorCeilConfiguration(), this);
@@ -1229,7 +1238,9 @@ class ConfigurationSaveMap {
             const id = v[1];
             const pxms = v[0];
             pxms.forEach((x,idx)=>{
-                lst.push([x[type], idx+id]);
+                let c = x[type];
+                if (!c) c= "EMPTY.PCX";
+                lst.push([c, idx+id]);
             });
         }
         lst.sort((a,b)=>a[1] - b[1]);
@@ -1362,10 +1373,8 @@ export class MapFile {
                 if (s.secondary) {
                     s.secondary.adjust_flags_sec(out);
                     out.sec_anim = s.secondary.get_anim();
-                    if (s.secondary.allow_offset) {
-                        out.xsec = s.secondary.offset_x>>1;
-                        out.ysec = s.secondary.offset_y>>1;                        
-                    }                    
+                    out.xsec = s.secondary.offset_x>>1;
+                    out.ysec = s.secondary.offset_y>>1;                        
                 }
                 out.flags ^= SideFlag.NOT_AUTOMAP| SideFlag.NOT_TRANSPARENT
                 return out;
@@ -1377,7 +1386,7 @@ export class MapFile {
             out.x = s.x;
             out.y = s.y;
             out.layer = s.level;
-            out.flags = s.flags;
+            out.flags = (s.flags & ~SectorFlags2.DarkFog) | (s.floor?.get_flags2() || 0);
             return out;
         })
 
@@ -1481,5 +1490,23 @@ export class GlobalPaletteConfiguration<T extends AssetConfiguration> {
 }
 
 
+export class GlobalMapPalettes {
+    wall_palette = new GlobalPaletteConfiguration<WallConfiguration>();
+    arc_palette = new GlobalPaletteConfiguration<ArcConfiguration>();
+    floor_pallete = new GlobalPaletteConfiguration<FloorCeilConfiguration>();
+    ceil_palette = new GlobalPaletteConfiguration<FloorCeilConfiguration>();
+
+    merge(p: MapPalettes) {
+        this.wall_palette.merge(p.wall_palette);
+        this.arc_palette.merge(p.arc_palette);
+        this.floor_pallete.merge(p.floor_pallete);
+        this.ceil_palette.merge(p.ceil_palette);
+        
+    }
+    
+}
+
+
+export const directions = ["North ↑","East →","South ↓","West ←"];
 
 

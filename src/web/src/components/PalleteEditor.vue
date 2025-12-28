@@ -9,37 +9,28 @@ import { AssetGroup } from '@/core/asset_groups';
 import type { DataListHandle } from '@/utils/datalist';
 
 const props = defineProps<{
-    palette: ConfigurationPalette<AssetConfiguration>,
     type: string,
     listview: boolean,
     wall_assets: DataListHandle
 }>();
 
 
-const model = defineModel<AssetConfiguration|null>()
+const model = defineModel<AssetConfiguration|null>("selection");
+const palette = defineModel<GlobalPaletteConfiguration<AssetConfiguration> >("palette");
 const model_index = ref<number>(-1);
-const global_palette = reactive(
-    globalState<GlobalPaletteConfiguration<AssetConfiguration> >(`palette_${props.type}`,new GlobalPaletteConfiguration<AssetConfiguration>)
-);
 
 const cur_wall = ref<WallConfiguration>();
 const cur_arc = ref<ArcConfiguration>();
 const cur_floorceil = ref<FloorCeilConfiguration>();
 const cur_frame = ref<number>(0);
-const pcx_cache = globalState("palette_wall_cache", new Map<string, PCX>(), true);
 
 
 const preview_place = ref<HTMLElement>();
 
 async function getImage(image:string) {
     if (!image) image = "EMPTY.PCX";
-    let img = pcx_cache.get(image);
-    if (!img) {
-        const buff = await server.getDDLFile(image);        
-        img = PCX.fromArrayBuffer(buff);
-        pcx_cache.set(image, img);
-    }
-    return img;
+    const buff = await server.getDDLFile(image);        
+    return PCX.fromArrayBuffer(buff);
 }
 
 watch([cur_wall, cur_frame, preview_place],async ()=>{
@@ -99,8 +90,8 @@ function getEditedConf(): AssetConfiguration | null{
 }
 
 function deleteItem() {
-    if (model_index.value >=0) {
-        global_palette.list.splice(model_index.value,1);
+    if (model_index.value >=0 && palette.value) {
+        palette.value.list.splice(model_index.value,1);
         model_index.value = -1;
         model.value = null;
     }
@@ -109,6 +100,7 @@ function deleteItem() {
 
 
 function updateItem() {
+    if (!palette.value) return;
     if (cur_floorceil.value 
             && cur_floorceil.value.mode != FloorCeilMode.ANIMATED 
             && cur_floorceil.value.pixmaps.length != (cur_floorceil.value.button?2:1)*FloorCeilModeRequiredFrames[cur_floorceil.value.mode]) {
@@ -118,33 +110,32 @@ function updateItem() {
 
     const a = getEditedConf();
     if (a) {
-        const idx = model_index.value < 0?global_palette.list.findIndex(x=>x.get_key() == a.get_key()):model_index.value;
+        const idx = model_index.value < 0?palette.value.list.findIndex(x=>x.get_key() == a.get_key()):model_index.value;
         if (idx < 0) {
-            global_palette.list.unshift(a);
+            palette.value.list.unshift(a);
         } else {
-            global_palette.list[idx] = a;
+            palette.value.list[idx] = a;
         }
         model_index.value = idx;
+        model.value = a;
     }
     closeDlg();
 }
 
 function cloneItem() {
     const a = getEditedConf();
-    if (a) {
-        nextTick(()=>{
-            if (cur_wall.value) cur_wall.value = a as WallConfiguration;
-            else if (cur_arc.value) cur_arc.value = a as ArcConfiguration;
-            else if (cur_floorceil.value) cur_floorceil.value = a as FloorCeilConfiguration;
-
-        })
+    if (a && palette.value) {
+        palette.value.list.unshift(a);
+        model.value = a;
+        model_index.value = 0;
+        showDetail();
     }
 }
 
-watch([model],()=>{
-    if (model.value) {
+watch([model,palette],()=>{
+    if (model.value && palette.value) {
         const k = model.value.get_key();
-        model_index.value = global_palette.list.findIndex(x=>x.get_key() == k);
+        model_index.value = palette.value.list.findIndex(x=>x.get_key() == k);
     } else {
         model_index.value = -1;
     }
@@ -163,7 +154,7 @@ watch([model_index],()=>{
             cur_floorceil.value = new FloorCeilConfiguration();
         }
     }  else {
-        model.value = global_palette.list[idx] || null;
+        model.value = palette.value?.list[idx] || null;
     }
 })
 
@@ -201,12 +192,11 @@ function delFrame() {
 }
 
 function paletteUpdate() {
-    global_palette.merge(props.palette);
-    if (model.value) {
-        model_index.value = global_palette.list.findIndex(x=>x.get_key() == model.value?.get_key());
+    if (model.value && palette.value) {
+        model_index.value = palette.value.list.findIndex(x=>x.get_key() == model.value?.get_key());
         if (model_index.value == -1) {
-            model_index.value = global_palette.list.length;
-            global_palette.list.push(model.value);
+            model_index.value = palette.value.list.length;
+            palette.value.list.push(model.value);
         }
     }
 }
@@ -216,7 +206,7 @@ function init() {
     
 }
 
-watch(()=>props.palette, ()=>{
+watch([model,palette], ()=>{
     paletteUpdate();
 })
 
@@ -226,7 +216,7 @@ onMounted(init);
 <select v-model="model_index" :size="props.listview?2:1" @dblclick="showDetail" @keydown="(ev)=>{if (ev.key=='Enter') {showDetail();ev.preventDefault();}}">
     <option value="-1">(none)</option>
     <option value="-2">Add new...</option>
-    <option v-for="(val, k) of global_palette.list" :key="k" :value="k"> {{ val.get_name() }}</option>
+    <option v-for="(val, k) of palette?.list" :key="k" :value="k"> {{ val.get_name() }}</option>
 </select>
 <Teleport to="body">
 <div class="popup-lb" v-if="cur_wall || cur_floorceil || cur_arc">
@@ -256,10 +246,10 @@ onMounted(init);
                         <label><input  type="checkbox" v-model="cur_wall.ping_pong"><span>Ping ping animation</span></label>
                         <label><input  type="checkbox" v-model="cur_wall.forward_dir"><span>Animate forward</span></label>
                         <label><input  type="checkbox" v-model="cur_wall.secondary_front"><span>If secondary, draw as sector's backdrop</span></label>
-                        <label><input  type="checkbox" v-model="cur_wall.allow_offset"><span>Allow offset (secondary)</span></label>
                         <label><span>Offset [X,Y]</span>
                             <div><input type="number" :disabled="!cur_wall.allow_offset" v-model="cur_wall.offset_x" v-watch-range min="-255" max="+255">
-                            <input type="number" :disabled="!cur_wall.allow_offset"v-model="cur_wall.offset_y" v-watch-range min="-255" max="+255"></div></label>
+                            <input type="number" v-model="cur_wall.offset_y" v-watch-range min="-255" max="+255"></div></label>
+                        <label><input  type="checkbox" v-model="cur_wall.allow_offset"><span>Use offset when viewed from the side (secondary)</span></label>
                         <label><span>Primary wall position</span><select v-model="cur_wall.position">
                             <option :value="0">Normal (default)</option>
                             <option :value="1">Above</option>
@@ -304,7 +294,10 @@ onMounted(init);
                             <option :value="4">Four directions (4 frames)</option>
                             <option :value="5">Four directions alternating (8 frames)</option>
                         </select></label>
-                        <label><input type="checkbox" v-model="cur_floorceil.button" /><span>Button off/on (x2 frames)</span></label>
+                        <template v-if="!cur_floorceil.is_ceil">
+                            <label><input type="checkbox" v-model="cur_floorceil.button" /><span>Button off/on (x2 frames)</span></label>
+                            <label><input type="checkbox" v-model="cur_floorceil.fog_to_black" /><span>Interior (fog to black) </span></label>
+                        </template>
                     </x-form>
                 </x-section>
             </div>
