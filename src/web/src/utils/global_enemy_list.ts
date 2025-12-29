@@ -2,17 +2,17 @@ import { getDDLFileWithImport } from "@/components/tools/missingFiles";
 import { server } from "@/core/api";
 import {type WsRpcResult } from "@/core/wsrpc";
 import { AssetGroup } from "@/core/asset_groups";
-import { itemsFromArrayBuffer, type ItemDef } from "@/core/items_struct";
+import { enemyFromArrayBuffer, type EnemyDef } from "@/core/enemy_struct";
 
-let item_list : Promise<ItemDef[]>|null = null;
+let item_list : Promise<EnemyDef[]>|null = null;
 
-async function globalGetItems() {
+async function globalGetEnemies() {
 
     if (!item_list) {
-        item_list = getDDLFileWithImport(server, "ITEMS.DAT", AssetGroup.MAPS)
-               .then(x=>x?itemsFromArrayBuffer(x):[],x=>[]);     
+        item_list = getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS)
+               .then(x=>x?enemyFromArrayBuffer(x):[],x=>[]);     
         const inv = (x: WsRpcResult)=>{
-            if (x.data == "ITEMS.DAT") {
+            if (x.data == "ENEMY.DAT") {
                 item_list = null;
                 server.off("modified", inv);
             }
@@ -22,4 +22,4 @@ async function globalGetItems() {
     return await item_list;
 }
 
-export default globalGetItems;
+export default globalGetEnemies;

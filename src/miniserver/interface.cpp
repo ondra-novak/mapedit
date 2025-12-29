@@ -312,11 +312,6 @@ void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
     broadcast("\r\n\r\n");    
-    if (_last_seen) {
-        _last_seen = false;
-    } else if (_check_active) {
-        _stop.request_stop();       
-    }
 }
 
 
@@ -457,7 +452,7 @@ bool WebInterface::file_put(std::string_view name, std::uint32_t group, bool fai
         if (fail_if_exists && user.exists(name)) return false;
         user.put(name, data, group);    
     }
-    _publisher.publish("modified_file", name);
+    _publisher.publish("modified", name);
     return true;
 }
 

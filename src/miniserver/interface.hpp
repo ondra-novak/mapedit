@@ -38,7 +38,6 @@ protected:
     std::stop_source _stop;
     Json _config;
     bool _check_active = false;
-    bool _last_seen = true;
 
     WsRpc::MethodMap _methods;
 
