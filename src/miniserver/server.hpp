@@ -67,18 +67,17 @@ namespace server {
     class Stream {
     public:
         Stream() = default;
-        Stream(Socket sock):_socket(std::move(sock)) {prepare_socket();}
+        Stream(Socket sock):_socket(std::move(sock)) {}
         bool write(std::string_view data);
         void write_eof();
         std::string_view read();
-        void put_back(std::string_view buff) {this->buff = buff;}
+        void put_back(std::string_view buff) {this->_buff = buff;}
         bool is_eof() const {return _read_eof;}
         bool is_timeout() const {return _read_timeout;}
     protected:
         Socket _socket;
-        std::string_view buff = {};
-        std::unique_ptr<char[]> buff_ptr  ={};
-        void prepare_socket();
+        std::string_view _buff = {};
+        std::unique_ptr<char[]> _buff_ptr  ={};
         bool _read_timeout = false;
         bool _read_eof = false;
 

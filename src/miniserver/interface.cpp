@@ -154,7 +154,7 @@ bool WebInterface::ddl_get(Request &req)
         if (k == "rev") rev = std::stoull(v);
     }
     auto name = req.path_vars[0];
-    auto data = file_get(name, rev);
+    auto data = file_get(name, static_cast<uint32_t>(rev));
     if (!data) return req.response({404},{},{});
     return req.response({200},{
         {"Content-Type","application/octet-stream"}

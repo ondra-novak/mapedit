@@ -25,22 +25,26 @@ constexpr int MSG_NOSIGNAL = 0;
 constexpr int MSG_DONTWAIT = 0;
 constexpr int SHUT_RD = SD_RECEIVE;
 constexpr int SHUT_WR = SD_SEND;
-constexpr DWORD WOULDBLOCK = WSA_WOULDBLOCK;
+constexpr int SHUT_RDWR = SD_BOTH;
+constexpr DWORD WOULDBLOCK = WSAEWOULDBLOCK;
 #pragma comment(lib, "ws2_32.lib")
 
 inline bool wait_read(SOCKET s, int timeout) {
-    pollfd fd = {};
+    WSAPOLLFD fd = {};
     fd.events = POLLIN;
     fd.fd = s;
-    return poll(&fd,1,timeout) != 0;
+    return  WSAPoll(&fd,1,timeout) != 0;
 }
 inline bool wait_write(SOCKET s, int timeout) {
-    pollfd fd = {};
+    WSAPOLLFD fd = {};
     fd.events = POLLOUT;
     fd.fd = s;
-    return poll(&fd,1,timeout) != 0;
+    return WSAPoll(&fd,1,timeout) != 0;
 }
-
+inline void set_nonblock(SOCKET s) {
+    u_long mode = 1;
+    ioctlsocket(s, FIONBIO, &mode);
+} 
 
 
 #else 
@@ -65,6 +69,11 @@ inline bool wait_write(SOCKET s, int timeout) {
     fd.fd = s;
     return poll(&fd,1,timeout) != 0;
 }
+inline void set_nonblock(SOCKET s) {
+    u_long mode = 1;
+    ioctl(s, FIONBIO, &mode);
+} 
+
 constexpr int WOULDBLOCK = EWOULDBLOCK;
 
 
@@ -177,6 +186,7 @@ namespace server
                 if (listen(sockfd, SOMAXCONN) == 0)
                 {
                     freeaddrinfo(result);
+                    set_nonblock(sockfd);
                     return sockfd;
                 }
             }
@@ -196,9 +206,16 @@ namespace server
         while (!data.empty())
         {
             int r = send(socket, data.data(), static_cast<int>(data.size()), MSG_NOSIGNAL);
-            if (r <= 0)
-                return false;
-            data = data.substr(r);
+            if (r <= 0) {
+                auto e = getLastNetError();
+                if (r && e == WOULDBLOCK) {
+                    if (!wait_write(socket, 1000)) return false;
+                } else {
+                    return false;
+                }
+            }  else {                
+                data = data.substr(r);
+            }
         }
         return true;
     }
@@ -299,13 +316,17 @@ namespace server
             while (true)
             {
                 auto sz = read_buffer.size();
-                read_buffer.resize(sz + 4096);
+                read_buffer.resize(sz + 4096);                
                 int r = recv(socket.get(), read_buffer.data() + sz, static_cast<int>(read_buffer.size() - sz), MSG_NOSIGNAL);
                 if (r < 0)
                 {
                     int e = getLastNetError();
-                    if (e != EINTR)
+                    if (e == WOULDBLOCK) {
+                        if (!wait_read(socket.get(),2000)) return false;
+                        read_buffer.resize(sz);
+                    } else if (e != EINTR) {
                         return false;
+                    }
                 }
                 else if (r == 0)
                 {
@@ -329,9 +350,13 @@ namespace server
                                 iter = std::copy(read_buffer.data()+s, read_buffer.data()+s+remain_size, buffer);
                                 while (iter != end) {
                                     int r = recv(sck, iter, static_cast<int>(end - iter), MSG_NOSIGNAL);
-                                    if (r < 0) {
+                                    if (r < 0) {                                        
                                         int e = getLastNetError();
-                                        if (e != EINTR) return false;
+                                        if (e == WOULDBLOCK) {
+                                            if (!wait_read(sck,2000)) return false;
+                                        } else if (e != EINTR) {
+                                            return false;
+                                        }
                                     } else if (r == 0) {
                                         return false;
                                     } else {
@@ -358,11 +383,6 @@ namespace server
 
     void Server::serve(Handler callback, std::stop_token tkn)
     {
-        std::stop_callback stpcb(tkn,[&]{
-            shutdown(_mother.get(), SHUT_RD);
-        });
-
-
         while (!tkn.stop_requested())
         {
             #ifdef _WIN32
@@ -373,6 +393,10 @@ namespace server
             if (sock == -1)
             {
                 int e = getLastNetError();
+                if (e == WOULDBLOCK) {
+                    wait_read(_mother.get(), 2000);
+                    continue;
+                } 
                 if (e != EINTR)
                 {
                     if (!tkn.stop_requested()) {
@@ -384,7 +408,7 @@ namespace server
             std::thread thr([this, callback, sock, tkn] {
 
                 std::stop_callback stpcb(tkn,[sock]{
-                    shutdown(sock, SHUT_RD);
+                    shutdown(sock, SHUT_RDWR);
                 });
 
                 Socket socket(sock, {});
@@ -513,10 +537,10 @@ namespace server
 
     std::string_view Stream::read() {
         _read_timeout = false;
-        if (!buff.empty() || _read_eof) return std::exchange(buff, {});
-        if (!buff_ptr) buff_ptr = std::make_unique<char[]>(buffer_size);
+        if (!_buff.empty() || _read_eof) return std::exchange(_buff, {});
+        if (!_buff_ptr) _buff_ptr = std::make_unique<char[]>(buffer_size);
         do {
-            int r = ::recv(_socket.get(), buff_ptr.get(), static_cast<int>(buffer_size), MSG_DONTWAIT|MSG_NOSIGNAL);
+            int r = ::recv(_socket.get(), _buff_ptr.get(), static_cast<int>(buffer_size), MSG_NOSIGNAL);
             if (r < 0) {
                 auto e = getLastNetError();
                 if (e == WOULDBLOCK) {
@@ -530,19 +554,11 @@ namespace server
                 _read_eof = true;
                 return {};
             } else {
-                return {buff_ptr.get(), static_cast<std::size_t>(r)};
+                return {_buff_ptr.get(), static_cast<std::size_t>(r)};
             }
         } while (true);
     }
 
-    void Stream::prepare_socket()
-    {
-        #ifdef _WIN32
-            SOCKET s = _socket.get();
-            u_long mode = 1;
-            ioctlsocket(s, FIONBIO, &mode);
-        #endif
-    }
 
  
     utils::HeaderValue BasicRequest::header_get(utils::HeaderKey k) const {
