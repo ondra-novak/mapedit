@@ -24,8 +24,8 @@ public:
         std::string id;
         std::string method_name;
 
-        void send_response(const Json &result, std::span<const Attachment> attachments = {}) const {
-            owner.send_response(false, id, true, result, attachments);
+        void send_response(const Json &result, std::span<const Attachment> att = {}) const {
+            owner.send_response(false, id, true, result, att);
         }
         void send_error(int code, std::string_view message ) const {
             owner.send_error(id, code, message);

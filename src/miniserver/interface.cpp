@@ -155,7 +155,7 @@ bool WebInterface::ddl_get(Request &req)
         if (k == "rev") rev = std::stoull(v);
     }
     auto name = req.path_vars[0];
-    auto data = file_get(name, rev);
+    auto data = file_get(name, static_cast<uint32_t>(rev));
     if (!data) return req.response({404},{},{});
     return req.response({200},{
         {"Content-Type","application/octet-stream"}
@@ -313,11 +313,6 @@ void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
     broadcast("\r\n\r\n");    
-    if (_last_seen) {
-        _last_seen = false;
-    } else if (_check_active) {
-        _stop.request_stop();       
-    }
 }
 
 
@@ -458,7 +453,7 @@ bool WebInterface::file_put(std::string_view name, std::uint32_t group, bool fai
         if (fail_if_exists && user.exists(name)) return false;
         user.put(name, data, group);    
     }
-    _publisher.publish("modified_file", name);
+    _publisher.publish("modified", name);
     return true;
 }
 

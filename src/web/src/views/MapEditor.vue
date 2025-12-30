@@ -22,7 +22,12 @@ import { apply_array_diff, create_array_diff } from '@/utils/madiff';
 import MapSelectDlg from '@/components/MapSelectDlg.vue';
 import { map_load_stringtable, map_save_stringtable } from '@/core/string_table';
 import MapSettingsDlg from '@/components/MapSettingsDlg.vue';
+import { ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
+import { getDDLFileWithImport } from '@/components/tools/missingFiles';
+import { enemyFromArrayBuffer, type EnemyDef } from '@/core/enemy_struct';
 const list_assets = ref<string[]>([]);
+const item_list = ref<ItemDef[]>([]);
+const enemy_list = ref<EnemyDef[]>([]);
 
 const EditMode = {
     Edit:0,
@@ -120,6 +125,8 @@ const goto_sector_input = ref<HTMLInputElement>();
 const map_settings = ref<MAPGLOBAL>();
 const action_ui = ref(false);
 const wall_props = ref(false);
+const active_enemy = ref(-1);
+const focused_enemies = ref(new Set<number>());
 
 let warn_empty_tool = true;
 const mapcontainer = new MapContainer;
@@ -488,13 +495,29 @@ function modifySelection(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
     }
 }
 
+function enumerate_enemies() {
+    const sel = selection.value;
+    const s = new Set<number>();
+    const m = curmap.value;
+    if (sel && m) {
+        sel.forEach(x=>{
+            const e = m.sectors[x].enemy;
+            if (e) s.add(e.enemy_index);
+        });
+    }
+    focused_enemies.value = s;    
+}
+
 
 function onMapSelectRect(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
     switch (settings.edit_mode) {
         case EditMode.Draw: if (control) eraseRect(rc); else drawRect(rc); break;
         case EditMode.Erase: if (control) drawRect(rc); else eraseRect(rc);break;
-        case EditMode.Edit:
+        case EditMode.Edit: modifySelection(rc, shift, control);break;
         case EditMode.Enemies:  modifySelection(rc, shift, control);
+                                enumerate_enemies();
+                                break;
+        break
             
     }    
 }
@@ -625,6 +648,12 @@ function init_save_state() {
 
 function reload_all_lists() {
     server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
+    getDDLFileWithImport(server, "ITEMS.DAT", AssetGroup.MAPS)
+               .then(x=>x?itemsFromArrayBuffer(x):[],x=>[])
+               .then(x=>item_list.value = x);
+    getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS)
+               .then(x=>x?enemyFromArrayBuffer(x):[],x=>[])
+               .then(x=>enemy_list.value = x);
     redraw();
     updateControls();
 }
@@ -1086,6 +1115,23 @@ watch(mapview,()=>{
 
     </div>
 </div>
+<div class="right edit" v-if="settings.edit_mode == EditMode.Enemies">
+    <div class="enlist">
+        <div class="lst">
+            <div v-for="(e,idx) of enemy_list" :class="{active: active_enemy == idx, insel: focused_enemies.has(idx)}" @click="active_enemy=idx">
+                {{ e.name }}
+            </div>
+        </div>
+        <div class="cntr">
+            <button>↑</button>
+            <button>→</button>
+            <button>↓</button>
+            <button>←</button>
+            <button>x</button>
+        </div>
+    </div>
+</div>
+
 <div class="layers" v-if="layers_opened">
     <button class="close" @click="layers_opened=false"></button>
     <x-form>
@@ -1375,6 +1421,51 @@ x-workspace > * {
 }
 .wallprops.open::before {
     content: "»";
+}
+
+.enlist {
+    min-height: 100%;
+    box-sizing: border-box;
+    padding-bottom: 3rem;
+    position: relative;
+}
+
+.enlist .lst {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 2rem;
+    overflow: auto;
+}
+
+.enlist .cntr {
+    position: absolute;
+    bottom: 0;
+    display:flex;    
+    left: 0;
+    right: 0;
+}
+
+.enlist .cntr > * {
+    flex-grow: 1;
+    height: 2rem;
+}
+
+.enlist .lst > .active {
+    background-color: white;
+}
+.enlist .lst > .insel {
+    font-weight: bold;
+}
+.enlist .lst > *::before {
+    display:inline-block;
+    content: "";
+    width: 1rem
+}
+
+.enlist .lst > *.insel::before {
+    content: "*";
 }
 
 </style>

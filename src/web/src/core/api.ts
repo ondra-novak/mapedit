@@ -48,10 +48,6 @@ export interface DDLFileHistory {
     timestamp: Date|null;
 }
 
-interface ArrayBufferWithBuffer extends ArrayBuffer {
-    buffer: ArrayBuffer;
-}
-
 export class Config {
     project = "";    
 }
