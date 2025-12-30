@@ -1,3 +1,19 @@
+set(GENERATED_H ${CMAKE_BINARY_DIR}/webpage_content.hpp)
+
+
+add_custom_command(
+    OUTPUT ${GENERATED_H}
+    COMMAND web2cpp ${CMAKE_BINARY_DIR}/web > ${GENERATED_H}
+    DEPENDS frontend web2cpp
+    COMMENT "Generating webpage"
+)
+
+set_source_files_properties(
+    webpage.cpp
+    PROPERTIES
+        OBJECT_DEPENDS ${GENERATED_H}
+)
+
 add_executable(mapedit_server 
     main.cpp 
     server.cpp 
@@ -9,6 +25,7 @@ add_executable(mapedit_server
     mgifcomp.cpp
     wsrpc.cpp
     publisher.cpp
+    webpage.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c

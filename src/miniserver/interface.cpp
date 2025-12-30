@@ -5,6 +5,7 @@
 #include "skeldal_exe.hpp"
 #include "utils/json.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -14,7 +15,9 @@
 #include <mutex>
 #include "utils/json.hpp"
 #include "wsrpc.hpp"
+#include "webpage.hpp"
 #include <condition_variable>
+#include <numeric>
 #include <optional>
 #include <shared_mutex>
 #include <string>
@@ -25,9 +28,7 @@
 namespace server {
 
 WebInterface::WebInterface(Config cfg, std::stop_source stp)
-    :_app_dir(cfg.app_dir)
-    ,_assets_dir(cfg.asset_dir)
-    ,_user_dir(cfg.user_folder)
+    :_user_dir(cfg.user_folder)
     ,_addrport(cfg.addr_port)
     ,_stop(std::move(stp))
     ,_check_active(cfg.check_active)    
@@ -86,41 +87,41 @@ constexpr std::string_view  extension_to_mime(const std::string_view & ext) {
     return "application/octet-stream";
 }
 
+static const std::string root_dir = "/";
+static const std::string assets_dir = "/assets/";
+
 bool WebInterface::webserver(Request &req)
 {
-    return serve_file(_app_dir, req.path_vars[0], req);
+    return serve_file(root_dir+req.path_vars[0], req);
 }
 
 bool WebInterface::webserver_index(Request &req)
 {
-    return serve_file(_app_dir, "index.html", req);
+    return serve_file(root_dir+"index.html", req);
 }
 
 bool WebInterface::webserver_assets(Request &req)
 {
-        return serve_file(_assets_dir, req.path_vars[0], req);
+        return serve_file(assets_dir+req.path_vars[0], req);
 }
 
-bool WebInterface::serve_file(const std::filesystem::path &path, std::string_view name, Request &req)
+bool WebInterface::serve_file(std::string_view path, Request &req)
 {
-        std::shared_lock _(_mx);    
-        if (name.find_first_of("/\\") != name.npos) return false;
-        auto p = path/name;
-        auto ext = p.extension();
-        auto mime = extension_to_mime(ext.string());
-        std::error_code ec;
-        auto sz = std::filesystem::file_size(p, ec);
-        if (ec != std::error_code{}) return false;
-        std::ifstream f(p, std::ios::in|std::ios::binary);
-        if (!f) return false;
-        char buff[8192];
-        return req.response({200,"OK"},{{"Content-Type",mime}}, sz,[&]{
-            f.read(buff,sizeof(buff));
-            auto cnt =  f.gcount();
-            if (cnt == 0) return std::string_view(" ");
-            else return std::string_view(buff,cnt);
-        });
+        auto dot = path.rfind('.');
+        if (dot == path.npos) return false;
+        auto ext = path.substr(dot);
+        auto mime = extension_to_mime(ext);
 
+        auto f = webarchive::find_file(path);
+        if (f.empty()) return false;
+
+        std::size_t sz = std::accumulate(f.begin(), f.end(), std::size_t(0),
+            [](std::size_t a, std::string_view b){return a + b.size();});
+        
+        return req.response({200},{{"Content-Type",mime}}, sz, [f,i=size_t(0)]() mutable->std::string_view {
+            if (i < f.size()) return f[i++];
+            return {};
+        });
 }
 
 std::optional<std::vector<char>  > WebInterface::file_get(std::string_view name, std::uint32_t rev) {

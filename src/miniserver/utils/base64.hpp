@@ -1,6 +1,5 @@
 #pragma once
-#include <iterator>
-
+#include <string_view>
 
 class base64_t {
 public:

@@ -30,8 +30,6 @@ public:
 protected:
     std::unique_ptr<DDLManager> _game;
     std::shared_mutex _mx;
-    std::filesystem::path _app_dir;
-    std::filesystem::path _assets_dir;
     std::filesystem::path _user_dir;
     std::string _addrport;
     std::u8string _current_ddl;
@@ -52,7 +50,7 @@ protected:
     bool websocket(Request &req);
  
 
-    bool serve_file(const std::filesystem::path &path, std::string_view name, Request &req);
+    bool serve_file(std::string_view path, Request &req);
  
     
     bool ddl_get(Request &req);

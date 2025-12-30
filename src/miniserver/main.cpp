@@ -68,7 +68,6 @@ int main(int argc, char ** argv) {
     unsigned int port = 0;    
     bool no_browser = false;
     bool no_exit = false;
-    std::filesystem::path webroot = std::filesystem::current_path() / "web";
     std::filesystem::path user_dir = getUserDocumentsPath()/"Skeldal_Mapedit";
     while ((c = opts(argc, argv, "p:w:u:bxh")) != -1) {
         switch (c) {
@@ -77,8 +76,6 @@ int main(int argc, char ** argv) {
             case 'b': no_browser = true;
                       break;
             case 'x': no_exit = true;
-                      break;
-            case 'w': webroot = std::filesystem::current_path() / opts.optarg;
                       break;
             case 'u': user_dir = std::filesystem::current_path() / opts.optarg;
                       break;
@@ -101,8 +98,6 @@ int main(int argc, char ** argv) {
 
     server::Config cfg;
     cfg.addr_port = addrport;
-    cfg.app_dir = webroot;
-    cfg.asset_dir = webroot/"assets";
     cfg.check_active = !no_exit;
     cfg.user_folder = user_dir;
 

@@ -19,7 +19,8 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-
+include_directories(AFTER ${CMAKE_BINARY_DIR})
 
 add_subdirectory(src/miniserver)
+add_subdirectory(src/webarch)
 add_subdirectory(src/web)
