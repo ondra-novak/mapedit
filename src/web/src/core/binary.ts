@@ -161,13 +161,50 @@ export class BinaryIterator {
 
 }
 
+export class BinaryBuilder {
+     #buf = new Uint8Array(1024);
+     #length = 0;
+
+     #grow(min: number) {
+        let cap = this.#buf.length;
+        while (cap < min) cap *= 2;
+
+        const n = new Uint8Array(cap);
+        n.set(this.#buf);
+        this.#buf = n;
+    }
+
+    write(buff: ArrayBuffer|ArrayLike<number>|number) {
+        if (typeof buff == "number") {
+            let l = this.#length;
+            if (l >= this.#buf.length) {
+                this.#grow(l+1);
+            }
+            this.#buf.set([buff],l)
+            this.#length = l+1;
+            return;
+        }
+
+        const u8 = new Uint8Array(buff);
+        const needed = this.#length + u8.length;
+
+        if (needed > this.#buf.length) {
+            this.#grow(needed);
+        }
+
+        this.#buf.set(u8, this.#length);
+        this.#length += u8.length;
+    }
+
+    toUint8Array(): Uint8Array {
+        return this.#buf.subarray(0, this.#length);
+    }
+}
+
 export class BinaryWriter {
 
-    buffer: number[];
+    buffer: BinaryBuilder = new BinaryBuilder();
 
-    constructor() {
-        this.buffer = [];
-    }
 
     write_array(type:string | Schema, dimensions:number[], item:any) {
         if (dimensions.length == 0) {
@@ -206,48 +243,46 @@ export class BinaryWriter {
             const encodedChars = string2keybcs(value);
             for (let i = 0; i < length; i++) {
                 const charCode = i < encodedChars.length ? encodedChars[i] : 0;
-                this.buffer.push(charCode);
+                this.buffer.write(charCode);
             }
         } else {
             switch (type) {
                 case 'int8':
-                    this.buffer.push(value & 0xff);
+                    this.buffer.write(value & 0xff);
                     break;
                 case 'uint8':
-                    this.buffer.push(value & 0xff);
+                    this.buffer.write(value & 0xff);
                     break;
                 case 'int16':
-                    this.buffer.push(value & 0xff, (value >> 8) & 0xff);
+                    this.buffer.write([value & 0xff, (value >> 8) & 0xff]);
                     break;
                 case 'uint16':
-                    this.buffer.push(value & 0xff, (value >> 8) & 0xff);
+                    this.buffer.write([value & 0xff, (value >> 8) & 0xff]);
                     break;
                 case 'int32':
-                    this.buffer.push(
+                    this.buffer.write([
                         value & 0xff,
                         (value >> 8) & 0xff,
                         (value >> 16) & 0xff,
-                        (value >> 24) & 0xff
-                    );
+                        (value >> 24) & 0xff]);
                     break;
                 case 'uint32':
-                    this.buffer.push(
+                    this.buffer.write([
                         value & 0xff,
                         (value >> 8) & 0xff,
                         (value >> 16) & 0xff,
-                        (value >> 24) & 0xff
-                    );
+                        (value >> 24) & 0xff]);
                     break;
                 case 'float32': {
                     const float32Array = new Float32Array([value]);
                     const uint8Array = new Uint8Array(float32Array.buffer);
-                    this.buffer.push(...uint8Array);
+                    this.buffer.write(uint8Array);
                     break;
                 }
                 case 'float64': {
                     const float64Array = new Float64Array([value]);
                     const uint8Array = new Uint8Array(float64Array.buffer);
-                    this.buffer.push(...uint8Array);
+                    this.buffer.write(uint8Array);
                     break;
                 }
                 default:
@@ -266,16 +301,17 @@ export class BinaryWriter {
     write_stringz(text : string) : void{
         const encoder = new TextEncoder();
         const encodedText = encoder.encode(text);
-        this.buffer.push(...encodedText, 0); // Append the encoded text followed by a null terminator
+        this.buffer.write(encodedText);
+        this.buffer.write(0); // Append the encoded text followed by a null terminator
     }
 
     getBuffer() : ArrayBuffer{
-        return new Uint8Array(this.buffer).buffer;
+        return new Uint8Array(this.buffer.toUint8Array()).buffer;
     }
 
     write_buffer(buff : ArrayBuffer) {
         const s = new Uint8Array(buff);
-        this.buffer.push(...s);
+        this.buffer.write(s);
     }
 }
 

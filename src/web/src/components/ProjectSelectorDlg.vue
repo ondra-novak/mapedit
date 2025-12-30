@@ -90,7 +90,7 @@ onMounted(init);
 
 </script>
 <template>
-<dialog ref="dlg">
+<dialog ref="dlg" class="white">
     <header>Select project<button v-if="!force_switch" class="close" @click="dlg?.close()"></button></header>    
     <template  v-if="list_of_projects?.length">
     <div class="lst">        

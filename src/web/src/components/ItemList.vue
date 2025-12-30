@@ -8,11 +8,13 @@ import { onMounted, ref, watch} from 'vue';
 const itmlist = defineModel<number[]>();
 const item_templates = ref<ItemDef[]>();
 const cur_inv_item = ref<string>("");
+const put_inside = ref(false);
 
 
 const props = defineProps<{
     filter?: (item: ItemDef) => boolean;
     limit?: number;
+    inside?: boolean;
 }>();
 
 
@@ -22,6 +24,7 @@ function delete_item(event: Event, idx: number) {
         event.stopPropagation();
         event.preventDefault();
     }
+    put_inside.value = false;
 }
 
 function set_item_by_name(event: Event, arr:number[], pos:number) {
@@ -54,7 +57,8 @@ function set_item_by_name(event: Event, arr:number[], pos:number) {
 function get_item_name(idx: number) : string{
     if (idx === undefined) return "";
     if (item_templates.value) {
-        const v = item_templates.value[idx];
+        const adjidx = idx<0?(-idx-2):idx;
+        const v = item_templates.value[adjidx];
         if (v) return v.jmeno;                
         else return `#${idx}`;
     } else {
@@ -62,11 +66,17 @@ function get_item_name(idx: number) : string{
     }
 }
 
+function is_inside(idx: number) {
+    return idx < 0;
+}
+
 function add_item_to_inv(event: Event) {
     const c : number[] = [];
     set_item_by_name(event,c,0);
     if (c[0] && itmlist.value) {
-        itmlist.value = [...itmlist.value, c[0] ];
+        let v = c[0];
+        if (put_inside.value && itmlist.value.length) v = (-v-2);
+        itmlist.value = [...itmlist.value, v ];
         (event.target as HTMLInputElement).value="";
         cur_inv_item.value = "";
     }
@@ -116,12 +126,13 @@ watch(item_templates, ()=>datalist.update());
 
 </script>
 <template>
-<div class="itemlist"><div v-if="item_templates" v-for="(v,idx) of itmlist" :title="`#${v}`">{{ get_item_name(v) }}<button @click="$event=>delete_item($event, idx)">×</button></div>
+<div class="itemlist"><div v-if="item_templates" v-for="(v,idx) of itmlist" :title="`#${v}`" :class="{inside: is_inside(v)}">{{ get_item_name(v) }}<button @click="$event=>delete_item($event, idx)">×</button></div>
         <div> {{  cur_inv_item }}
         <input v-if="typeof props.limit != 'number' || !itmlist || itmlist.length < props.limit" type="text" v-model="cur_inv_item" :list="datalist.id" placeholder="add item" 
         @keydown="$event=>add_item_to_inv_enter($event)" @change="$event=>add_item_to_inv($event)">
         </div>
 </div>
+<div v-if="props.inside && itmlist?.length"><input type="checkbox" v-model="put_inside"><span>put inside</span></div>
 </template>
 <style lang="css" scoped>
 
@@ -150,5 +161,11 @@ watch(item_templates, ()=>datalist.update());
     min-width: 5rem;
     border: 0;
     height: 1.5rem;
+}
+.inside {
+    font-style: italic;
+}
+.inside::before  {
+    content: "...";
 }
 </style>

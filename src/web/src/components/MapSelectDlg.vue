@@ -107,7 +107,7 @@ async function copy_selected() {
 
 </script>
 <template>
-    <dialog ref="dlg">
+    <dialog ref="dlg" class="white">
         <header>Load map<button class="close" @click="shown = false"></button></header>
         <div class="lst">
             <div v-for="(_,x) of maplist" :key="x">

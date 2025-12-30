@@ -8,11 +8,12 @@ import { ref, watch } from 'vue';
 const curNiche = defineModel<NicheDef|null>();
 const niche_preview = ref<HTMLElement>();
 const niche_pos = ref<HTMLElement>();
+const dlg = ref<HTMLDialogElement>();
 let drag_start: {x:number, y:number, src_x:number, src_y:number, src_w:number, src_h:number}|null = null;
 
 
 const props = defineProps<{
-    side: MapSide
+    side: MapSide|null
 }>();
 
 const emit = defineEmits<{
@@ -83,34 +84,42 @@ function init_niche_preview() {
 }
 
 watch(niche_preview,update_preview)
-watch(props.side,update_preview);
+watch(()=>props.side,update_preview);
 watch(curNiche,update_niche_preview, {deep:true});
 watch(niche_pos,init_niche_preview);
-
+watch(curNiche,()=>{
+    if (curNiche.value) {
+        dlg.value?.showModal();
+    } else {
+        dlg.value?.close();
+    }
+})
 
 </script>
 
 <template>
-<div class="popup-lb niche" v-if="curNiche">
+<dialog ref="dlg">
+    <header><span> Edit niche</span>
     <button class="close" @click="emit('cancel')"></button>
-    <div>
+    </header>
         <div class="preview">
             <div ref="niche_preview" class="cnv"></div>
             <div ref="niche_pos" class="rc"></div>
         </div>
         <x-section>
-            <x-form>
+            <x-form v-if="curNiche">
             <label><span>Position (X,Y):</span><div><input type="number" v-model="curNiche.xpos"><input type="number" v-model="curNiche.ypos"></div></label>    
             <label><span>Size (width,height):</span><div><input type="number" v-model="curNiche.xs"><input type="number" v-model="curNiche.ys"></div></label>                
             <label class="itms"><span>Items:</span><div><ItemList v-model="curNiche.items"></ItemList></div></label>
             </x-form>
         </x-section>
-        <div class="buttons"><button @click="emit('ok')">OK</button>
+        <footer>
+            <button @click="emit('ok')">OK</button>
             <button @click="curNiche = null">Cancel</button>
-            <button class="left" @click="emit('delete')">Delete</button></div>
-    </div>
-</div>
+            <button class="left" @click="emit('delete')">Delete</button>
+        </footer>
 
+</dialog>
 </template>
 
 <style lang="css" scoped>

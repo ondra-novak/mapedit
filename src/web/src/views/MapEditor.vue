@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { server } from '@/core/api';
-import { ArcConfiguration, FloorCeilConfiguration, GlobalMapPalettes, MapFile, MAPGLOBAL, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
+import { ArcConfiguration, EnemyOnSector, FloorCeilConfiguration, GlobalMapPalettes, MapFile, MAPGLOBAL, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
 import { shallowClone, Document } from '@/utils/document';
@@ -25,6 +25,7 @@ import MapSettingsDlg from '@/components/MapSettingsDlg.vue';
 import { ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import { enemyFromArrayBuffer, type EnemyDef } from '@/core/enemy_struct';
+import ItemList from '@/components/ItemList.vue';
 const list_assets = ref<string[]>([]);
 const item_list = ref<ItemDef[]>([]);
 const enemy_list = ref<EnemyDef[]>([]);
@@ -127,6 +128,11 @@ const action_ui = ref(false);
 const wall_props = ref(false);
 const active_enemy = ref(-1);
 const focused_enemies = ref(new Set<number>());
+const item_order = [0,1,3,2];
+
+const focus_items = reactive({
+    items: [] as number[][]
+})
 
 let warn_empty_tool = true;
 const mapcontainer = new MapContainer;
@@ -249,31 +255,35 @@ function updateFocusData(sect: number, side: number) {
                                     stringTable:curmap.value.strtable.map(x=>toRaw(x))
                                }
                             };                
-                            updateFocus();
+                focus_items.items = item_order.map((i)=>shallowClone(sdef.side[i].items));
+                updateFocus();
                 StatusBar.set_current_sector(sect,side, saveOnTeleport);
             } else {
                 StatusBar.unset_current_sector();
                 focus.value = undefined;
+                
             }
 
 }
 
 function onMapClickXY(pt: DOMPointReadOnly, side:number,  shift: boolean, control: boolean) {
-    if ((settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Items)) {
-        if (!control) {
-            const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
-            updateFocusData(sect,side);
-            if (!shift) {
-                selection.value = [];
+    if (!control) {
+        const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
+        updateFocusData(sect,side);
+        if (!shift) {
+            selection.value = [];
+            if (focus.value && settings.edit_mode == EditMode.Enemies) {
+                selection.value.push(focus.value.sector);
+                enumerate_enemies();
             }
-        } else {
-            if (Array.isArray(selection.value)) {
-                const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
-                if (sect) {
-                    const idx = selection.value.findIndex(x=>x==sect);
-                    if (idx != -1) selection.value = [...selection.value.slice(0,idx),...selection.value.slice(idx+1)];
-                    else selection.value = [...selection.value, sect];
-                }
+        }
+    } else {
+        if (Array.isArray(selection.value)) {
+            const sect = findSectorAtPos(curmap.value, settings.curlevel, pt);
+            if (sect) {
+                const idx = selection.value.findIndex(x=>x==sect);
+                if (idx != -1) selection.value = [...selection.value.slice(0,idx),...selection.value.slice(idx+1)];
+                else selection.value = [...selection.value, sect];
             }
         }
     }
@@ -401,6 +411,7 @@ function drawRectArcs(m: MapFile, rc: DOMRectReadOnly) {
 
 async function drawRect(rc: DOMRectReadOnly) {
     const map = begin_edit();
+    let too_many_sectors = false;
     const free_sectors :number[] =  [];
     const sectormap = map.sectors.reduce((mp, sect, idx)=>{
         if (idx == 0) return mp;
@@ -441,7 +452,12 @@ async function drawRect(rc: DOMRectReadOnly) {
                     idx = free_sectors.shift(); 
                     if (!idx) {
                         idx = map.sectors.length;
+                        if (idx >= 32768) {
+                            too_many_sectors = true;
+                            continue;
+                        }
                         map.sectors.push(new MapSector());
+                        
                     }
                     sect = map.sectors[idx] = new MapSector();                    
                     sect.x = x;
@@ -476,6 +492,9 @@ async function drawRect(rc: DOMRectReadOnly) {
     }
     drawRectArcs(map,rc);
     if (done_anything) end_edit(map);
+    if (too_many_sectors) {
+        alert("Too many sectors. The map is too big. Count of sector reached a limit of 32768 sectors")
+    }
 }
 
 function modifySelection(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
@@ -527,7 +546,7 @@ mapcontainer.onSelectRect = onMapSelectRect;
 
 
 function updateFocus() {
-    if (focus.value && (settings.edit_mode == EditMode.Edit||settings.edit_mode == EditMode.Items)) {
+    if (focus.value/* && (settings.edit_mode == EditMode.Edit||settings.edit_mode == EditMode.Items)*/) {
         mapdraw.drawFocusedWall(curmap.value, settings.curlevel, focus.value.sector, focus.value.side);
     } else {
         mapdraw.removeFocusedWall();
@@ -604,6 +623,7 @@ async function loadMap(mapname: string)   {
     curmap.value = map_document.get_current();
     const start = curmap.value.info.start_sector;
     settings.curlevel = curmap.value.sectors[start].level;
+    selection.value = [];
     redraw();        
     mapcontainer.zoom_reset();
     map_filename.value = mapname;
@@ -945,6 +965,79 @@ watch(mapview,()=>{
     }    
 })
 
+
+function put_enemies(dir: number) {
+    if (!selection.value) return;
+    const map = begin_edit();
+    let placed = false;
+    map.sectors = shallowClone(map.sectors);
+    selection.value.forEach(n=>{
+        const s = shallowClone(map.sectors[n]);
+        s.enemy = new EnemyOnSector();
+        s.enemy.direction = dir;
+        s.enemy.enemy_index = active_enemy.value;        
+        placed = true;
+        map.sectors[n] = s;
+    });
+    if (placed) {
+        const count = map.sectors.reduce((a,b)=>{
+            return a+(b.enemy?1:0);
+        },0);
+        if (count > 250) {
+            alert(`Too many enemies. There is limit 250 enemies per a map (created ${count})`);
+        } else {
+            end_edit(map);
+            redraw();
+        }
+    }
+}
+
+function erase_enemies() {
+    if (!selection.value) return;
+    const map = begin_edit();
+    let placed = false;
+    map.sectors = shallowClone(map.sectors);
+    selection.value.forEach(n=>{
+        const s = shallowClone(map.sectors[n]);
+        s.enemy = null
+        placed = true;
+        map.sectors[n] = s;
+    });
+    if (placed) {
+        end_edit(map);
+        redraw();
+    }
+}
+
+watch(focus_items, ()=>{
+
+    function any_change(a:number[], b:number[]) {
+        if (a.length != b.length) return true;
+        return a.findIndex((v,idx)=>v != b[idx]) >= 0;
+    }
+
+    const s= focus.value?.sector || 0;
+    if (s && settings.edit_mode == EditMode.Enemies) {
+        let changed = false;
+        const map = begin_edit();
+        item_order.forEach((src,side)=>{
+            const sd = map.sectors[s].side[side];
+            if (any_change(sd.items,focus_items.items[src])) {
+                map.sectors = shallowClone(map.sectors);
+                map.sectors[s] = shallowClone(map.sectors[s]);
+                map.sectors[s].side = shallowClone(map.sectors[s].side);
+                map.sectors[s].side[side] = shallowClone(map.sectors[s].side[side]);
+                map.sectors[s].side[side].items = shallowClone(focus_items.items[src]);
+                changed = true;
+            }
+        })
+        if (changed) {
+            end_edit(map);
+            redraw();
+        }
+    }
+})
+
 </script>
 
 <template>
@@ -1105,30 +1198,39 @@ watch(mapview,()=>{
             <button class="big-apply" @click="applyChanges">Apply</button>
         </x-form>
         </div>
-        <div><span class="title">Niche</span>
-            <div class="buttons">
-            <button v-if="!focus.side_def.niche" @click="create_niche">Create</button>
-            <button v-if="focus.side_def.niche" @click="open_niche">Edit</button>
-            </div>
-        </div>
         
 
     </div>
 </div>
-<div class="right edit" v-if="settings.edit_mode == EditMode.Enemies">
-    <div class="enlist">
-        <div class="lst">
-            <div v-for="(e,idx) of enemy_list" :class="{active: active_enemy == idx, insel: focused_enemies.has(idx)}" @click="active_enemy=idx">
-                {{ e.name }}
+<div class="right enemy" v-if="settings.edit_mode == EditMode.Enemies">
+    <div class="enpal">
+        <div><span class="title">Enemies</span></div>
+        <div class="enlist">
+            <div class="lst">
+                <div v-for="(e,idx) of enemy_list" :class="{active: active_enemy == idx, insel: focused_enemies.has(idx)}" @click="active_enemy=idx">
+                    {{ e.name }}
+                </div>
+            </div>
+            <div class="cntr">
+                <button @click="put_enemies(0)">↑</button>
+                <button @click="put_enemies(1)">→</button>
+                <button @click="put_enemies(2)">↓</button>
+                <button @click="put_enemies(3)">←</button>
+                <button @click="erase_enemies()">x</button>
             </div>
         </div>
-        <div class="cntr">
-            <button>↑</button>
-            <button>→</button>
-            <button>↓</button>
-            <button>←</button>
-            <button>x</button>
+        <div class="niche"><span class="title">Items</span>
+            <div v-if="focus">
+                <button v-if="!focus.side_def.niche" @click="create_niche">Create Niche</button>
+                <button v-if="focus.side_def.niche" @click="open_niche">Edit Niche</button>
+            </div>
         </div>
+        <div class="itmlst" v-if="focus">
+            <div v-for="(v,k) of focus_items.items" :key="k">
+                <ItemList v-model="focus_items.items[k]" :inside="true"></ItemList>
+            </div>
+        </div>
+        
     </div>
 </div>
 
@@ -1148,7 +1250,6 @@ watch(mapview,()=>{
         <label><input type="checkbox" v-model="layers.items"><span>Items</span></label>
     </x-form>
 </div>
-<NicheEditor v-if="curNiche != null" v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus!.side_def"></NicheEditor>
 </template>
 <template v-else>
 <div class="open-map-hlp"><div></div></div>
@@ -1156,6 +1257,7 @@ watch(mapview,()=>{
 </x-workspace>
 <MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
 <MapSettingsDlg v-model="map_settings"></MapSettingsDlg>
+<NicheEditor v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus?.side_def || null"></NicheEditor>
 </template>
 
 <style lang="css" scoped>
@@ -1218,10 +1320,11 @@ x-workspace > * {
 }
 
 .right {
-    width: 17rem;
+    width: 18rem;
     height: 100%;
     overflow: auto;
 }
+
 
 .right .palette {
     display: flex;
@@ -1296,12 +1399,12 @@ x-workspace > * {
     position: relative;
 }
 
-.palette > div > span.title {
+div > span.title {
     height: 1.4rem;
     line-height: 1.4rem;
     font-weight: bold;
     display: block;
-    background-color: #aaa;
+    background-color: #aab;
 
 }
 .middle-split {
@@ -1424,7 +1527,7 @@ x-workspace > * {
 }
 
 .enlist {
-    min-height: 100%;
+    flex-grow: 1;
     box-sizing: border-box;
     padding-bottom: 3rem;
     position: relative;
@@ -1437,6 +1540,7 @@ x-workspace > * {
     top: 0;
     bottom: 2rem;
     overflow: auto;
+    cursor: pointer;
 }
 
 .enlist .cntr {
@@ -1466,6 +1570,38 @@ x-workspace > * {
 
 .enlist .lst > *.insel::before {
     content: "*";
+}
+.enpal {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.itmlst {
+    flex-grow: 0.5;
+    display: flex;
+    flex-wrap: wrap;
+    border-top: 1px solid;
+}
+
+.itmlst > * {
+    width: 50%;
+    overflow: auto;
+    border: 1px solid;
+    margin: -1px;    
+    box-sizing: border-box;
+}
+.niche {
+    position: relative;
+}
+.niche > span.title {
+    height: 2rem;
+}
+.niche div {
+    position: absolute;
+    top: 0.2rem;
+    right: 0.5rem;
 }
 
 </style>

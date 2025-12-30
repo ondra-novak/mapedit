@@ -18,6 +18,7 @@ const props = defineProps<{
 const model = defineModel<AssetConfiguration|null>("selection");
 const palette = defineModel<GlobalPaletteConfiguration<AssetConfiguration> >("palette");
 const model_index = ref<number>(-1);
+const dlg = ref<HTMLDialogElement>();
 
 const cur_wall = ref<WallConfiguration>();
 const cur_arc = ref<ArcConfiguration>();
@@ -210,6 +211,14 @@ watch([model,palette], ()=>{
     paletteUpdate();
 })
 
+watch([cur_wall,cur_floorceil, cur_arc],()=>{
+    if (cur_wall.value || cur_floorceil.value || cur_arc.value) {
+        dlg.value?.showModal();
+    } else {
+        dlg.value?.close();
+    }
+});
+
 onMounted(init);
 </script>
 <template>
@@ -219,9 +228,8 @@ onMounted(init);
     <option v-for="(val, k) of palette?.list" :key="k" :value="k"> {{ val.get_name() }}</option>
 </select>
 <Teleport to="body">
-<div class="popup-lb" v-if="cur_wall || cur_floorceil || cur_arc">
-    <div class="edit-window">
-        <div class="content">
+<dialog ref="dlg">
+    <header>Define resource<button class="close" @click="closeDlg"></button></header>
             <div v-if="cur_wall">
                 <div class="wall-preview checkerboard" ref="preview_place">
                 </div>
@@ -301,17 +309,14 @@ onMounted(init);
                     </x-form>
                 </x-section>
             </div>
-        </div>
-        <div class="buttons">
+        <footer>
             <button v-if="model_index < 0" @click="updateItem">Add</button>
             <button v-if="model_index >= 0" @click="deleteItem">Delete</button>
             <button v-if="model_index >= 0" @click="cloneItem">Clone</button>
             <button v-if="model_index >= 0" @click="updateItem">Update</button>
-            <button @click="closeDlg">Close</button>
-        </div>
-        <button class="close" @click="closeDlg"></button>
-    </div>
-</div>
+            <button @click="closeDlg">Close</button>        
+        </footer>
+</dialog>
 </Teleport>
 </template>
 

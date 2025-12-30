@@ -253,7 +253,7 @@ class EnemyPlace extends WithSchema {
     }
 };
 
-class EnemyOnSector {
+export class EnemyOnSector {
     enemy_index: number = 0;
     direction: number = 0;
 
@@ -274,11 +274,11 @@ function parseItems(iter: BinaryIterator) : number [][] {
     const out : number[][] = [];
     while (!iter.eof()) {
         let place = iter.parse_type("int32");
-        let n = iter.parse_type("uint16");
+        let n = iter.parse_type("int16");
         let items = [];
         while (n != 0) {
             items.push(n-1);
-            n = iter.parse_type("uint16");
+            n = iter.parse_type("int16");
         }
         out[place] = items;        
     }
@@ -1375,7 +1375,8 @@ export class MapFile {
                     out.sec_anim = s.secondary.get_anim();
                     out.xsec = s.secondary.offset_x>>1;
                     out.ysec = s.secondary.offset_y>>1;                        
-                }
+                }                
+                if (!sect.exit[side]) out.flags |= SideFlag.NOT_TRANSPARENT;
                 out.flags ^= SideFlag.NOT_AUTOMAP| SideFlag.NOT_TRANSPARENT
                 return out;
 

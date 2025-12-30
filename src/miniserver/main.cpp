@@ -57,7 +57,6 @@ void show_help() {
     "-p port     specify port (default: random port)\n"
     "-b          do not open browser\n"
     "-x          do not exit if no browser ping\n"
-    "-w path     path to web root (default: web)\n"
     "-u path     specify user profile path (default: platform user profile)\n"
     );    
 }
@@ -97,7 +96,7 @@ int main(int argc, char ** argv) {
     std::filesystem::create_directories(user_dir);
 
     server::Config cfg;
-    cfg.addr_port = addrport;
+    cfg.addr_port = srv.get_listen_addr();
     cfg.check_active = !no_exit;
     cfg.user_folder = user_dir;
 

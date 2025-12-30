@@ -186,8 +186,6 @@
 .mapview svg .focus-itm {
     fill: #0F04;
 }
-.mapview svg .grid {
+.gridpattern {
     stroke: black;
-    stroke-dasharray: 4 20;
-    stroke-dashoffset: 14;
 }

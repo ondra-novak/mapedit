@@ -159,6 +159,11 @@ dialog {
   padding: 0 1rem;
   box-shadow: 5px 5px 10px black;
   border: 2px outset;
+  background-color: #ccc;
+}
+
+dialog.white {
+  background-color: white;
 }
 
 dialog > header {
@@ -172,7 +177,7 @@ dialog > header {
 dialog > footer {
   margin: 0 -1rem;
   text-align: right;
-  background-color: #ccc;
+  background-color: #aaa;
   padding: 0.3rem 1rem;
 }
 

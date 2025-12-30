@@ -37,9 +37,6 @@ export class MapDraw {
                 water: new SVGPath("sector water"),                
                 stairs: new SVGPath("sectorfeat stairs"),
             },
-            grid: {
-                grid:new SVGPath("grid"),
-            },
             sectorfeats :{
                 flute_arrow: new SVGPath("sectorfeat flute"),
                 pit: new SVGPath("sectorfeat pit"),
@@ -324,20 +321,28 @@ export class MapDraw {
         });
 
         const drw = new SVGDrawing;
+        const pattern_def = SVGDrawing.createElement("defs");
+        drw.appendElement(pattern_def);
+        const patternId = `mapDraw${(Math.random()).toString().substring(2)}`;
+        const pattern = SVGDrawing.createElement("pattern",{id:patternId,viewBox:"0,0,24,24",width:"24",height:"24",patternUnits:"userSpaceOnUse"},"gridpattern");
+        pattern_def.appendChild(pattern);
+        pattern.appendChild(SVGDrawing.createElement("line",{x1:"10",y1:"12",x2:"14",y2:"12"}));
+        pattern.appendChild(SVGDrawing.createElement("line",{x1:"12",y1:"10",x2:"12",y2:"14"}));
+
         if (bbox.right < bbox.left) {
             bbox.left = bbox.right = bbox.top = bbox.bottom = 0;
         }
-        const extend = scl * 10;
+        const extend = scl * 100;
         const x = bbox.left - extend;
         const y = bbox.top - extend;
         const w = (bbox.right- bbox.left)+2*extend;
         const h = (bbox.bottom - bbox.top)+2*extend;
-        for (let i = scl>>1; i <=w; i+=scl) set.grid.grid.mt((x+i), y).vr((h+1));        
-        for (let i = scl>>1; i <=h; i+=scl) set.grid.grid.mt(x, (y+i)).hr((w+1));
+        drw.createElement("rect",{x:`${x}`,y:`${y}`,width:`${w}`,height:`${h}`,fill:`url(#${patternId})`},"grid");
         Object.values(set).forEach(x=>drw.appendSets(x));
         const svg = drw.getSvgElement()
         this.dim={width:w,height: h};
         svg.setAttribute("viewBox", `${x} ${y} ${this.dim.width} ${this.dim.height}`);
+
         this.svg = svg;        
         this.rect_selction = null;
         this.selection = null;
@@ -900,7 +905,8 @@ export function findSectorAtPos(m: MapFile, level: number , pt: DOMPointReadOnly
 export function makeSectorSelection(m: MapFile, level: number , rect: DOMRectReadOnly) : number[] {    
     return m.sectors.reduce((a,s,idx) => {
         if (s.level == level && rect.left-0.5 < s.x && rect.right-0.5 > s.x
-                                && rect.top-0.5 < s.y && rect.bottom-0.5 > s.y) {
+                                && rect.top-0.5 < s.y && rect.bottom-0.5 > s.y 
+                              && s.type) {
                                     a.push(idx);
                                 }
         return a;

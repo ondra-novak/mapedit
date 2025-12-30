@@ -50,6 +50,7 @@ inline void set_nonblock(SOCKET s) {
 #else 
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <poll.h>
 #include <unistd.h>
 #include <netdb.h>
