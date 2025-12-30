@@ -13,7 +13,7 @@
 
 std::string extract_path(const std::filesystem::path &p) {
     if (p.empty() || !p.has_filename()) return {};
-    std::string n = p.filename();
+    std::string n = p.filename().string();
     std::string parent = extract_path(p.parent_path());
     return parent + "/" + n;
 }
@@ -31,10 +31,10 @@ void process_directory(std::ostream &out, const std::filesystem::path &path, std
             std::copy(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>(), std::back_inserter(data));
             auto h = hasher(data);
             std::string cname = "file_"+std::to_string(h);
-            auto x = std::find_if(mapping.begin(), mapping.end(), [&](const auto &z){
+            auto itr = std::find_if(mapping.begin(), mapping.end(), [&](const auto &z){
                 return z.second == cname;
             });
-            if (x == mapping.end()) {
+            if (itr == mapping.end()) {
                 constexpr std::size_t chunk_size = 1400;
                 std::size_t count_chunks = (data.size()+chunk_size-1)/chunk_size;
                 out << "constexpr auto " << cname << " =  std::array<std::string_view, " << std::hex << "0x" << count_chunks << "> ({";
@@ -59,7 +59,7 @@ void process_directory(std::ostream &out, const std::filesystem::path &path, std
                                 avoid_hex = true;
                             } else {
                                 bool qm2 = x == '?';
-                                bool is_hex = std::isxdigit(x);
+                                bool is_hex = std::isxdigit(static_cast<unsigned char>(x));
                                 if ((qm && qm2)|| (avoid_hex && is_hex)) {
                                     std::cout << "\\x" << std::hex << static_cast<int>(x);
                                     qm = false;
