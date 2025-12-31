@@ -1,6 +1,6 @@
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, loadBinaryContent, parseSection, splitArrayBuffer, writeSection, type Schema } from "./binary"
 import { ItemDef, ItemSchema } from "./items_struct";
-import { bitproxy, condition_proxy} from "./bitproxy";
+
 
 const MapSections = {
     SIDEMAP: 0x8001,
@@ -301,21 +301,21 @@ function serializeItems(items: number[][]): ArrayBuffer {
 
 export class TMA_GEN extends WithSchema {
     
-    _action:number = 0;
+    header = {
+        action :0,
+        cancel: false,
+        once: false
+    };
     flags:number = 0;
 
     getSchema() : Schema { return {
-        _action: "uint8",
+        header: ["bitmap","uint8",{
+            action: 0x3F,
+            cancel: 0x40,
+            once: 0x80
+        }],
         flags: "uint16",    
-    }};;
-
-    static action_mask = {
-        action: 0x3F,
-        cancel: 0x40,
-        once: 0x80
-    };
-
-    header = bitproxy(TMA_GEN.action_mask, this, "_action");
+    }};
 
     clone() : TMA_GEN  {
         const c = create_action_instance(this.header.action as number, this.flags);
@@ -337,7 +337,12 @@ export class TMA_GEN extends WithSchema {
 
 export class TMA_SOUND extends TMA_GEN {
 
-    _snd_flags:number=1;
+    snd_flags={
+        bit16:false,
+        mute_open:false,
+        mute_close:false,
+        random_balance:false
+    }
     volume:number=100;
     soundid:number=0;
     freq:number=22050;
@@ -346,19 +351,14 @@ export class TMA_SOUND extends TMA_GEN {
     offset:number=0;
     filename: string = "";
 
-    static snd_flags_def = {
-        bit16: 0x1,
-        mute_open: 0x2,
-        mute_close: 0x4,
-        random_balance: 0x8
-    }
-
-    snd_flags = bitproxy(TMA_SOUND.snd_flags_def, this, "_snd_flags");    
-
-    getSchema(): Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        _snd_flags: "uint8",
+    getSchema(): Schema { 
+        return Object.assign(super.getSchema(),{
+        snd_flags: ["bitmap","uint8",{
+            bit16: 0x1,
+            mute_open: 0x2,
+            mute_close: 0x4,
+            random_balance: 0x8
+        }],
         volume: "uint8",
         soundid: "uint8",
         freq: "uint16",
@@ -366,7 +366,8 @@ export class TMA_SOUND extends TMA_GEN {
         end_loop: "int32",
         offset: "int32",
         filename: "char[12]"
-    } };
+    })
+     };
 };
 
 
@@ -375,38 +376,42 @@ export class TMA_TEXT extends TMA_GEN{
     pflags:number = 0;
     textindex:number = 0;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        pflags: "uint8",
-        textindex: "int32"
-    }};
+    getSchema() : Schema {
+        return Object.assign(super.getSchema(),{
+            pflags: "uint8",
+            textindex: "int32"
+        })};
 }
 
 export class TMA_SEND_ACTION extends TMA_GEN {
 
-    _change_bits:number= 0;
+    change_bits = {
+        automap: false,
+        block_player: false,
+        block_monster: false,
+        block_item: false,
+        block_sound: false
+    }
     sector:number= 0;
     side:number= 0;
     s_action:number= 0;
     delay:number= 0;
-    change_bits = bitproxy({
-        automap:0x1,
-        block_player:0x2,
-        block_monster:0x4,
-        block_item: 0x8,
-        block_sound:0x10
-    },this,"_change_bits");
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        _change_bits: "uint8",
-        sector: "uint16",
-        side: "uint16",
-        s_action: "uint16",
-        delay: "uint8"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            change_bits: ["bitmap","uint8",{
+                automap:0x1,
+                block_player:0x2,
+                block_monster:0x4,
+                block_item: 0x8,
+                block_sound:0x10
+            }],
+            sector: "uint16",
+            side: "uint16",
+            s_action: "uint16",
+            delay: "uint8"
+        })
+    };;
 };
 
 export class TMA_FIREBALL extends TMA_GEN {
@@ -417,15 +422,15 @@ export class TMA_FIREBALL extends TMA_GEN {
     speed:number = 16;
     item:number | null = null;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        xpos: "int16",
-        ypos: "int16",
-        zpos: "int16",
-        speed: "int16",
-        item: "int16"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            xpos: "int16",
+            ypos: "int16",
+            zpos: "int16",
+            speed: "int16",
+            item: "int16"
+        })
+    };;
 };
 
 export class TMA_LOADLEV extends TMA_GEN {
@@ -434,24 +439,24 @@ export class TMA_LOADLEV extends TMA_GEN {
     dir:number = 0;
     name:string = "";
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        start_pos: "int16",
-        dir: "uint8",
-        name: "char[13]"
-    }};;
+    getSchema() : Schema {        
+        return Object.assign(super.getSchema(),{
+            start_pos: "int16",
+            dir: "uint8",
+            name: "char[13]"
+        })
+    };;
 };
 
 export class TMA_DROPITM extends TMA_GEN {
 
     item: number | null = null;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        item: "int16"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            item: "int16"
+        })
+    };;
 };
 
 
@@ -462,13 +467,13 @@ export class TMA_CODELOCK extends TMA_GEN {
     codenum: number =0;
 
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        znak: "char[1]",
-        string: "char[8]",
-        codenum: "uint8"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            znak: "char[1]",
+            string: "char[8]",
+            codenum: "uint8"
+        })
+    };;
 };
 
 export class TMA_CANCELACTION extends TMA_GEN {
@@ -477,13 +482,13 @@ export class TMA_CANCELACTION extends TMA_GEN {
     sector:number = 0;
     dir:number = 0;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        pflags: "uint8",
-        sector: "int16",
-        dir: "int16"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            pflags: "uint8",
+            sector: "int16",
+            dir: "int16"
+        })
+    };;
 };
 
 export class TMA_SWAPS extends TMA_GEN {
@@ -492,13 +497,13 @@ export class TMA_SWAPS extends TMA_GEN {
     sector1: number = 0;
     sector2: number = 0;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        pflags: "uint8",
-        sector1: "int16",
-        sector2: "int16"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            pflags: "uint8",
+            sector1: "int16",
+            sector2: "int16"
+        })
+    };;
 };
 
 export class TMA_WOUND extends TMA_GEN {
@@ -507,13 +512,13 @@ export class TMA_WOUND extends TMA_GEN {
     minor:number = 0;
     major:number = 0;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        pflags: "uint8",
-        minor: "int16",
-        major: "int16"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            pflags: "uint8",
+            minor: "int16",
+            major: "int16"
+        })
+    };;
 };
 
 export class TMA_LOCK extends TMA_GEN {
@@ -521,12 +526,12 @@ export class TMA_LOCK extends TMA_GEN {
     key_id: number = 0;
     thieflevel: number = -1;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        key_id: "int16",
-        thieflevel: "int16"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            key_id: "int16",
+            thieflevel: "int16"
+        })
+    };;
 };
 
 export class TMA_TWOP extends TMA_GEN {
@@ -534,35 +539,46 @@ export class TMA_TWOP extends TMA_GEN {
     parm1:number = 0;
     parm2:number = 0;
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        parm1: "int16",
-        parm2: "int16"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            parm1: "int16",
+            parm2: "int16"
+        })
+    };;
 };
 
 export class TMA_IFJMP extends TMA_TWOP {
-    cond = condition_proxy(this, "parm1");
     constructor() {
         super();
         this.parm2 = 1;
     }
 };
 
-export class TMA_TELEPORT extends TMA_TWOP {
-    telep_flags = bitproxy({direction:0x3, effect:0x80},this, "parm2");
+export class TMA_TELEPORT extends TMA_GEN {
+
+    sector = 0;
+    param = {
+        direction: 0,
+        effect: false
+    };
+
+     getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            sector: "int16",
+            param: ["bitmask","int16",{direction:0x3, effect:0x80}],
+        });
+    }
 };
 
 export class TMA_UNIQUE extends TMA_GEN {
     
     item: ItemDef = new ItemDef();
 
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        item: ItemSchema
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            item: ItemSchema
+        })
+    };;
 
 };
 
@@ -574,15 +590,15 @@ export class TMA_GLOBE extends TMA_GEN {
     cancel:number=0;
     param:number=0;
     
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        event: "uint8",
-        sector: "uint16",
-        side: "uint8",
-        cancel: "uint8",
-        param: "uint32"
-    }};;
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            event: "uint8",
+            sector: "uint16",
+            side: "uint8",
+            cancel: "uint8",
+            param: "uint32"
+        })
+    };;
 };
 
 export class TMA_IFSEC extends TMA_GEN {
@@ -592,43 +608,15 @@ export class TMA_IFSEC extends TMA_GEN {
     line: number = 0;
     invert: number = 0;
     
-    getSchema() : Schema { return {
-        _action: "uint8",
-        flags: "uint16",    
-        side: "uint8",
-        sector: "uint16",
-        line: "int16",
-        invert: "uint8"
-    }};
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            side: "uint8",
+            sector: "uint16",
+            line: "int16",
+            invert: "uint8"
+        })
+    };
 };
-
-export class MAExecutionLine<T extends TMA_GEN> {
-    
-    item: T|null;
-    id: string;
-    next = "";
-    jump = "";    
-    static id: number = 1;
-
-    static nextId() {
-        return (MAExecutionLine.id++).toString();
-    }
-    constructor(item: T|null, id?: string) {
-        this.id = id?id:MAExecutionLine.nextId();
-        this.item = item;
-    }
-};
-
-function containsTWOPJump(item:TMA_GEN | null) : boolean{
-    if (item) {
-        const an = item.header.action;
-        return  (an == ActionType.IFACT||an == ActionType.IFJMP 
-            || an == ActionType.IFSTP||an == ActionType.RANDJ
-            || an == ActionType.ISFLG);
-        }
-    return false;
-
-}
 
 type ConstructorWithSchema<T extends WithSchema> = { new(): T };
 
@@ -651,10 +639,6 @@ function deserialize_arr<T extends WithSchema>(cls:ConstructorWithSchema<T>, dat
         res.push(deserialize(cls, data));
     }
     return res;
-}
-
-function serialize_arr<T extends WithSchema>(wr:BinaryWriter, instance: T[]) {
-    instance.forEach(x=>serialize(wr, x));
 }
 
 

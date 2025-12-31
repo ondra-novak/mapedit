@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import {  ActionType, create_action_instance, directions, SimpleActionType, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFJMP, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TELEPORT, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
+import {  ActionType, create_action_instance, directions, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFJMP, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TELEPORT, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
 import { readWavInfoFromBuffer } from '@/core/sound_info';
-import { create_datalist, type DataListHandle, type DataListItem } from '@/utils/datalist';
+import { create_datalist, type DataListHandle } from '@/utils/datalist';
 import { computed, onMounted, ref, watch } from 'vue';
 import ItemList from './ItemList.vue';
 import globalGetItems from '@/utils/global_item_list';
 import { SVGDrawing, SVGPath } from '@/utils/svg';
 import FactEditor from './FactEditor.vue';
+import { condition_proxy } from '@/core/bitproxy';
 
 
 
@@ -441,7 +442,7 @@ async function fill_sound_info() {
     try {
         const blob = await server.getDDLFile(f.filename);
         const info = readWavInfoFromBuffer(blob);
-        f.snd_flags.bit16 = info.bitsPerSample == 16?1:0;
+        f.snd_flags.bit16 = info.bitsPerSample == 16;
         f.end_loop = info.numSamples;
         f.start_loop = info.numSamples;
         f.freq = info.sampleRate;        
@@ -479,6 +480,14 @@ function create_computed_select_item(get: ()=>number|null, set:(x:number|null)=>
     }
 })
 }
+const if_jump_cond = computed(()=>{
+    if (focused_item.value && (focused_item.value instanceof TMA_IFJMP)) {
+        return condition_proxy(focused_item.value, "param1");
+    } else {
+        return null;
+    }
+});
+
 const item_list_TMA_DROPITM = create_computed_select_item(
     ()=>(focused_item.value as TMA_DROPITM).item,
     (x:number|null)=>(focused_item.value as TMA_DROPITM).item = x
@@ -488,8 +497,8 @@ const item_list_TMA_FIREBALL = create_computed_select_item(
     (x:number|null)=>(focused_item.value as TMA_FIREBALL).item = x
 )
 const item_list_TMA_HAVEIT = create_computed_select_item(
-    ()=>(focused_item.value as TMA_IFJMP).cond.cond,
-    (x:number|null)=>(focused_item.value as TMA_IFJMP).cond.cond = x
+    ()=>if_jump_cond.value.cond,
+    (x:number|null)=>if_jump_cond.value.cond = x
 )
 const relative_offset_TMA_IFJMP = computed({
     get: ()=>{
@@ -703,24 +712,24 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
             </template>
             <template v-else>
                 <template v-if="focused_item.header.action == ActionType.IFJMP">
-                    <label><span>Condition</span><select v-model="focused_item.cond.cond">
+                    <label><span>Condition</span><select v-model="if_jump_cond.cond">
                         <option v-for="x of IfJumpCondition" :key="x[0]" :value="x[0]">{{ x[1] }}</option>
                     </select></label>
                 </template>                
                 <template v-else-if="focused_item.header.action == ActionType.ISFLG">
-                    <div class="factedit"><FactEditor v-model="focused_item.cond.cond"></FactEditor></div>
+                    <div class="factedit"><FactEditor v-model="if_jump_cond.cond"></FactEditor></div>
                 </template>
                 <template v-else-if="focused_item.header.action == ActionType.HAVIT || focused_item.header.action == ActionType.PICKI">
                     <ItemList v-model="item_list_TMA_HAVEIT" :limit="1"></ItemList>
                 </template>
                 <template v-else-if="focused_item.header.action == ActionType.IFACT">
-                    <label><span>Action type</span><select v-model="focused_item.cond.cond">
+                    <label><span>Action type</span><select v-model="if_jump_cond.cond">
                         <template v-for="(x, idx) of SimpleActionTypeName" :key="idx">
                             <option v-if="x" :value="idx">{{ x }}</option>
                         </template>
                     </select></label>
                 </template>
-                <label><input type="checkbox" v-model="focused_item.cond.invert"><span>Jump if FALSE</span></label>
+                <label><input type="checkbox" v-model="if_jump_cond.invert"><span>Jump if FALSE</span></label>
             </template>
             <label><span>Jump to command</span>
                 <select v-model="relative_offset_TMA_IFJMP">
@@ -730,9 +739,9 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
                 </select></label>
         </template>
         <template v-else-if="(focused_item instanceof TMA_TELEPORT)">       
-            <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.parm1"></input></label>
-            <label><span>Target side</span><select v-model="focused_item.telep_flags.direction"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></label>
-            <label><input type="checkbox" v-model="focused_item.telep_flags.effect"></input><span>Play teleport effect</span></label>
+            <label><span>Target sector</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector"></input></label>
+            <label><span>Target side</span><select v-model="focused_item.param.direction"><option v-for="(v,idx) of directions" :key="idx" :value="idx"> {{ v  }}</option></select></label>
+            <label><input type="checkbox" v-model="focused_item.param.effect"></input><span>Play teleport effect</span></label>
         </template>
         <template v-else-if="(focused_item instanceof TMA_TWOP)">       
             <template v-if="focused_item.header.action == ActionType.SWAPS">
