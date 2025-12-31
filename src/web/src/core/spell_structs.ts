@@ -1,7 +1,7 @@
-import { BinaryIterator, BinaryWriter } from "./binary";
+import { BinaryIterator, BinaryWriter,type Schema } from "./binary";
 
 
-const TKouzloSchema = {
+const TKouzloSchema : Schema= {
     num:"uint16", //spell number
     um:"uint16",  //min require magic stat
     mge:"uint16", //mana cost
@@ -224,22 +224,22 @@ interface SpellSimpleCmd {
 function parseSpellCmdList(buffer : ArrayBuffer) : SpellSimpleCmd[] {
     const ret : SpellSimpleCmd[] = [];
     const iter = new BinaryIterator(buffer);
-    let cmd = iter.parse_type("uint8");
+    let cmd = iter.parse("uint8");
     while (cmd != SpellInstruction.spell_end) {
         const argType = SpellArguments.find(x=>x[0] == cmd)![1];        
         if (argType < 16) {
             if (argType  < 3) {
-                const a = iter.parse_type("int16");
+                const a = iter.parse("int16");
                 ret.push({instr: cmd, arg: a, arg_type: argType});
             } else {
-                const a = iter.parse_type("uint16");
+                const a = iter.parse("uint16");
                 ret.push({instr: cmd, arg: a, arg_type: argType});
             }
         } else {
             const a = iter.parse_stringz();
             ret.push({instr: cmd, arg: a, arg_type: argType});
         }        
-        cmd = iter.parse_type("uint8");
+        cmd = iter.parse("uint8");
     }
     return ret;
 }
@@ -335,24 +335,24 @@ function buildScript(script: SpellScriptCommand[]) {
                 const element = frag.instr[i];
                 const arg = SpellArguments.find(x=>x[0] == element);
                 if (arg) {
-                    wr.write_type("uint8",element);
+                    wr.write("uint8",element);
                     const type = arg[1];
                     if (type < 3) {
-                        wr.write_type("int16", cmd.args[i]);
+                        wr.write("int16", cmd.args[i]);
                     } else if (type < 16) {
-                        wr.write_type("uint16", cmd.args[i]);
+                        wr.write("uint16", cmd.args[i]);
                     } else {
                         wr.write_stringz(cmd.args[i] as string);
                     }
                 }                               
             }
             if (frag.action) {
-                wr.write_type("uint8", SpellInstruction.special);
-                wr.write_type("uint16", frag.action);
+                wr.write("uint8", SpellInstruction.special);
+                wr.write("uint16", frag.action);
             }
         }
     }
-    wr.write_type("uint8", SpellInstruction.spell_end);
+    wr.write("uint8", SpellInstruction.spell_end);
     return wr.getBuffer();
 }
 

@@ -1,6 +1,29 @@
 import { keybcs2string, string2keybcs } from "./keybcs2";
 
 
+export function make1DArray<T>(n:number, init: T|(()=>T)) : T[]{
+    const r = [];
+    if (typeof init == "function") {
+        for (let i = 0; i < n; ++i) r[i] = (init as (()=>T))();
+    } else {
+        for (let i = 0; i < n; ++i) r[i] = init;
+    }
+    return r;
+}
+
+export function make2DArray<T>(i:number,j:number, init: T|(()=>T)):T[][] {
+    return make1DArray<T[]>(i, ()=>{
+        return make1DArray<T>(j, init);
+    });
+}
+export function make3DArray<T>(i:number,j:number,k:number, init: T|(()=>T)):T[][][] {
+    return make1DArray<T[][]>(i, ()=>{
+        return make1DArray<T[]>(j, ()=>{
+            return make1DArray<T>(k, init);
+        });
+    });
+}
+
 export async function loadBinaryContent(url:string) {
     try {
         const response = await fetch(url);
@@ -15,12 +38,22 @@ export async function loadBinaryContent(url:string) {
     }
 }
 
-export type SchemaArray = readonly [Schema | string, number, ...number[]];
+type Digits1 = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+type Digits = "0" | Digits1;
+type Integral = Digits1 | `${Digits1}${Digits}` | `${Digits1}${Digits}${Digits}`;
+type CharArray = `char[${Integral}]`;
 
-export interface Schema {
-    [key: string]: string | SchemaArray | Schema;
-}
 
+export type SchemaType = "int8"|"uint8"|"int16"|"uint16"|"int32"|"uint32"|"float32"|"float64"|CharArray;
+export type SchemaArray = [Schema, number, ... number[]];
+export type SchemaBitmapTk = "bitmap";
+export type SchemaBitmap = [SchemaBitmapTk, SchemaType, Record<string, number>];
+
+export interface SchemaObject {
+    [key:string]: Schema;
+};
+
+export type Schema = SchemaType| SchemaArray | SchemaBitmap | SchemaObject;
 
 
 export class BinaryIterator {
@@ -37,9 +70,9 @@ export class BinaryIterator {
     }
 
 
-    parse_array(type:string, dimensions:number[]) : any[]{
+    parse_array(type:Schema, dimensions:number[]) : any[]{
         if (dimensions.length == 0) {
-            return this.parse_type(type);
+            return this.parse(type);
         }
         const r = [];
         const cnt = dimensions[0];
@@ -50,18 +83,49 @@ export class BinaryIterator {
         return r;
     }
 
-    parse_type(type:string|Schema) : any{
-        let result;
-        if (typeof type === 'object') {
-            if (!Array.isArray(type)) {
-                result = this.parse(type);
+
+    parse_bitmap(v: number, bitmap: Record<string, number> ) {
+        const out : Record<string, number|boolean> = {};
+        for (const k in bitmap) {
+            const m = bitmap[k];
+            const shift = Math.log2(m & -m);
+            const vv = (v & m) >> shift;;
+            if ((m & -m) == m) out[k] = (vv != 0);
+            else out[k] = vv;
+        }
+        return out;
+    }
+
+    parse(schema: Schema) : any{
+        let result: any;
+        if (typeof schema === 'object') {
+            if (!Array.isArray(schema)) {
+                result = {};
+                for (const [n, type] of Object.entries(schema)) {
+                    try {
+                        result[n] = this.parse(type as Schema);
+                    } catch (e) {
+                        if (e instanceof RangeError) {
+                            break;
+                        } else {
+                            throw e;
+                        }
+                    }
+                }
+                return result;
             } else {
-                let item_type = type[0];
-                let dimensions = type.slice(1);
-                result = this.parse_array(item_type, dimensions)
+                let item_type = schema[0];
+                if (item_type == "bitmap") {  // ["bitmap", "type", {field: mask}]
+                    const t = (schema as SchemaBitmap)[1];
+                    const v = this.parse(t) as number;
+                    result = this.parse_bitmap(v, (schema as SchemaBitmap)[2]);
+                } else {
+                    let dimensions = schema.slice(1);
+                    result = this.parse_array(item_type as SchemaType, dimensions as number[])
+                }
             }
-        } else if (type.startsWith('char[')) {
-            const m = type.match(/\d+/);
+        } else if (schema.startsWith('char[')) {
+            const m = schema.match(/\d+/);
             if (m) {
                 const length = parseInt(m[0], 10);
                 const chars = [];
@@ -81,7 +145,7 @@ export class BinaryIterator {
                 result = keybcs2string(chars);                
             }
         } else {
-            switch (type) {
+            switch (schema) {
                 case 'int8':
                     result = this.dataView.getInt8(this.position);
                     this.position += 1;
@@ -115,27 +179,13 @@ export class BinaryIterator {
                     this.position += 8;
                     break;
                 default:
-                    throw new Error(`Unsupported type: ${type}`);
+                    throw new Error(`Unsupported type: ${schema}`);
             }
         }
         return result;
 
-    }
 
-    parse(schema: Schema) {
-        const result: Record<string, any> = {};
-        for (const [n, type] of Object.entries(schema)) {
-            try {
-                result[n] = this.parse_type(type as string | Schema);
-            } catch (e) {
-                if (e instanceof RangeError) {
-                    break;
-                } else {
-                    throw e;
-                }
-            }
-        }
-        return result;
+
     }
 
     readBytes(length:number) {
@@ -206,9 +256,9 @@ export class BinaryWriter {
     buffer: BinaryBuilder = new BinaryBuilder();
 
 
-    write_array(type:string | Schema, dimensions:number[], item:any) {
+    write_array(type:Schema, dimensions:number[], item:any) {
         if (dimensions.length == 0) {
-            this.write_type(type,item);
+            this.write(type,item);
         } else {
             const dim = dimensions.slice();
             const cnt = dim.shift() || 0;            
@@ -228,17 +278,26 @@ export class BinaryWriter {
         }
     }
 
-    write_type(type:Schema| string| SchemaArray, value:any)  {
-        if (typeof type === 'object') {
-            if (!Array.isArray(type)) {
-                this.write(type as Schema, value);
+    write(schema:Schema, value:any)  {
+        if (typeof schema === 'object') {
+            if (!Array.isArray(schema)) {
+                for (const [key, type] of Object.entries(schema)) {
+                    const v = value[key];
+                    this.write(schema[key], v);
+                }
             } else {
-                let item_type = type[0];
-                let dimensions = type.slice(1) as number[];
-                this.write_array(item_type, dimensions, value);
+                let item_type = schema[0];
+                if (item_type == "bitmap") {  // ["bitmap", "type", {field: mask}]
+                    const t = (schema as SchemaBitmap)[1] 
+                    const v = this.create_bitmap((schema as SchemaBitmap)[2],value);
+                    this.write(t, v);
+                } else {
+                    let dimensions = schema.slice(1) as number[];
+                    this.write_array(item_type, dimensions, value);
+                }
             }
-        } else if (type.startsWith('char[')) {
-            const m = type.match(/\d+/) || ["0"];
+        } else if (schema.startsWith('char[')) {
+            const m = schema.match(/\d+/) || ["0"];
             const length = parseInt(m[0], 10);
             const encodedChars = string2keybcs(value);
             for (let i = 0; i < length; i++) {
@@ -246,7 +305,7 @@ export class BinaryWriter {
                 this.buffer.write(charCode);
             }
         } else {
-            switch (type) {
+            switch (schema) {
                 case 'int8':
                     this.buffer.write(value & 0xff);
                     break;
@@ -286,16 +345,22 @@ export class BinaryWriter {
                     break;
                 }
                 default:
-                    throw new Error(`Unsupported type: ${type}`);
+                    throw new Error(`Unsupported type: ${schema}`);
             }
         }
     }
 
-    write(schema: Schema, obj:any) {
-        for (const [key, type] of Object.entries(schema)) {
-            const value = obj[key];
-            this.write_type(type as Schema| string |SchemaArray, value);
+    create_bitmap(bitmap: Record<string, number>, value: Record<string, number|boolean>) {
+        let out : number  = 0;
+        for (const k in bitmap) {
+            let val = value[k] || 0;
+            if (typeof val == "boolean") val = val?1:0;
+            const m = bitmap[k];
+            const shift = Math.log2(m & -m);
+            const v = (val << shift) &  m;
+            out = out | v;
         }
+        return out;
     }
 
     write_stringz(text : string) : void{

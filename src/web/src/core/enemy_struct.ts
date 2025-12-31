@@ -1,50 +1,75 @@
-import { BinaryIterator, BinaryWriter, joinUint8Arrays, splitArrayBuffer, type Schema } from "./binary";
+import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, splitArrayBuffer, type Schema, type SchemaObject, type SchemaType } from "./binary";
 
-export interface EnemyDef {
-  name: string; // jméno moba (char[30])
-  casting: number; // číslo kouzla (short)
-  adjusting: number[][]; // volba středu pro animace (short[16*6] = short[96])
-  sector: number; // pozice (word)
-  dir: number; // směr (word)
-  locx: number; // přesná pozice (char)
-  locy: number;
-  headx: number; // pozice kam mob míří (char)
-  heady: number;
-  anim_counter: number; // čítač animací (word)
-  vlastnosti: number[]; // základní vlastnosti potvory (short[24])
-  inv: number[]; // batoh potvory (short[MOBS_INV]) – délka bude třeba určit podle definice
-  lives: number; // počet životů (short)
-  cislo_vzoru: number; // vzor ze kterého vznikl (short)
-  speed: number; // rychlost (short)
-  dohled: number; // dohled (short)
-  dosah: number; // dosah (short)
-  stay_strategy: number; // chování ve statickém režimu (char)
-  walk_data: number; // číslo pro pohyb v bludišti (char)
-  bonus: number; // bonus za zabití (word)
-  flee_num: number; // pravděpodobnost útěku (char)
-  anim_counts: number[]; // počet animačních fází (char[6])
-  mobs_name: string; // jméno souboru (char[7])
-  experience: number; // zkušenost (long)
-  vlajky: number; // bitová vlajka (char)
-  anim_phase: number; // fáze animace (char)
-  csektor: number; // cílový sektor (short)
-  home_pos: number; // domácí pozice (short)
-  next: number; // číslo dalšího moba (short)
-  actions: number; // počet akcí (char)
-  hit_pos: number; // pozice zásahu (char)
-  sounds: number[]; // zvukové události (word[MOB_SOUNDS]) – délka bude třeba doplnit
-  sound_files?: string[]; //associated sound files
-  paletts_count: number; // počet palet (signed char)
-  mode: number; // režim (char)
-  dialog: number; // dialog (short)
-  dialog_reserved: number; // rezervace (char)
-  money: number; // peníze (word)
-  specproc: number; // speciální akce (word)
-  reserved: number[]; // rezervovaná data (char[3])
-};
 
 const MOBS_INV = 16;
 const MOB_SOUNDS = 4;
+
+
+export const EnemyFlags1 = {
+    "MOB_WALK": 0x1,
+    "MOB_WATCH": 0x2,
+    "MOB_LISTEN": 0x4,
+    "MOB_BIG": 0x8,
+    "MOB_GUARD": 0x10,
+    "MOB_PICK": 0x20,
+    "MOB_PICKING": 0x40,
+    "MOB_ROGUE": 0x80,
+} as const ; 
+export type EnemyFlags1Type = typeof EnemyFlags1[keyof typeof EnemyFlags1];
+
+export const EnemyFlags2 = {
+    "MOB_IN_BATTLE": 0x1,
+    "MOB_PASSABLE": 0x2,
+    "MOB_SENSE": 0x4,
+    "MOB_MOBILE": 0x8,
+    "MOB_RELOAD": 0x10,
+    "MOB_CASTING": 0x20,
+    "MOB_SAMPLE_LOOP": 0x40,
+} as const;
+export type EnemyFlags2Type = typeof EnemyFlags2[keyof typeof EnemyFlags2];
+
+export class EnemyDef{
+  name: string = ""; // jméno moba (char[30])
+  casting: number = 0; // číslo kouzla (short)
+  adjusting: number[][] = make2DArray(16,6,0); // volba středu pro animace (short[16*6] = short[96])
+  sector: number = 0; // pozice (word)
+  dir: number = 0; // směr (word)
+  locx: number = 0; // přesná pozice (char)
+  locy: number = 0;
+  headx: number = 0; // pozice kam mob míří (char)
+  heady: number = 0;
+  anim_counter: number = 0; // čítač animací (word)
+  vlastnosti: number[] = make1DArray(24,0); // základní vlastnosti potvory (short[24])
+  inv: number[] = []; // batoh potvory (short[MOBS_INV]) – délka bude třeba určit podle definice
+  lives: number = 0; // počet životů (short)
+  cislo_vzoru: number = 0; // vzor ze kterého vznikl (short)
+  speed: number = 0; // rychlost (short)
+  dohled: number = 0; // dohled (short)
+  dosah: number = 0; // dosah (short)
+  stay_strategy = 0;
+  walk_data: number = 0; // číslo pro pohyb v bludišti (char)
+  bonus: number = 0; // bonus za zabití (word)
+  flee_num: number = 0; // pravděpodobnost útěku (char)
+  anim_counts: number[] = make1DArray(6,0); // počet animačních fází (char[6])
+  mobs_name: string = ""; // jméno souboru (char[7])
+  experience: number = 0; // zkušenost (long)
+  vlajky = 0;
+  anim_phase: number = 0; // fáze animace (char)
+  csektor: number = 0; // cílový sektor (short)
+  home_pos: number = 0; // domácí pozice (short)
+  next: number = 0; // číslo dalšího moba (short)
+  actions: number = 0; // počet akcí (char)
+  hit_pos: number = 0; // pozice zásahu (char)
+  sounds: number[] = make1DArray(MOB_SOUNDS,0); // zvukové události (word[MOB_SOUNDS]) – délka bude třeba doplnit
+  sound_files: string[] = make1DArray(MOB_SOUNDS,""); //associated sound files
+  paletts_count: number = 0; // počet palet (signed char)
+  mode: number = 0; // režim (char)
+  dialog: number = 0; // dialog (short)
+  dialog_reserved: number = 0; // rezervace (char)
+  money: number = 0; // peníze (word)
+  specproc: number = 0; // speciální akce (word)
+  reserved: number[] = []; // rezervovaná data (char[3])
+};
 
 const EnemySchema : Schema = {
   name: "char[30]",
@@ -93,7 +118,7 @@ export type Enemies = EnemyDef[];
 export type EnemySounds = string[];
 
 
-const EnemyHdrSchema = {
+const EnemyHdrSchema : Schema= {
     "ver":"int32",
     "itemsz":"int32"
 };
@@ -109,7 +134,9 @@ export function enemyFromArrayBuffer(buffer:ArrayBuffer ): Enemies {
     if (hdr.ver != 256) throw new Error("Invalid ENEMY.DAT version");
     const enms = [] as Enemies;
     while (!iter.eof()) {
-        enms.push(iter.parse(EnemySchema) as EnemyDef);
+        const e = new EnemyDef;
+        Object.assign(e, iter.parse(EnemySchema));
+        enms.push(e);
     }
     return enms;
 }
@@ -144,74 +171,6 @@ export function enemySoundsToArrayBuffer(sounds: EnemySounds):  ArrayBuffer {
     return joinUint8Arrays(strs,0).buffer;
 }
 
-export function newEnemy(graphic: string) : EnemyDef{
-    const enm :EnemyDef = {
-        name: "",
-        casting: 0,
-        adjusting: new Array<number>().map(x=>new Array<number>(16).fill(0)),
-        sector: 0,
-        dir: 0,
-        locx: 0,
-        locy: 0,
-        headx: 0,
-        heady: 0,
-        anim_counter: 0,
-        vlastnosti: new Array<number>(24).fill(0),
-        inv: new Array<number>(MOBS_INV).fill(0),
-        lives: 0,
-        cislo_vzoru: 0,
-        speed: 1,
-        dohled: 1,
-        dosah: 1,
-        stay_strategy: 0,
-        walk_data: 0,
-        bonus: 0,
-        flee_num: 0,
-        anim_counts: new Array<number>(6).fill(0),
-        mobs_name: graphic.substring(0,6),
-        experience: 0,
-        vlajky: 0,
-        anim_phase: 0,
-        csektor: 0,
-        home_pos: 0,
-        next: 0,
-        actions: 0,
-        hit_pos: 0,
-        sounds: new Array<number>(MOB_SOUNDS),
-        paletts_count: 0,
-        mode: 0,
-        dialog: 0,
-        dialog_reserved: 0,
-        money: 0,
-        specproc: 0,
-        reserved: new Array<number>(3).fill(0)
-    };
-
-    return enm;
-}
-
-export const EnemyFlags1 = {
-    "MOB_WALK": 0x1,
-    "MOB_WATCH": 0x2,
-    "MOB_LISTEN": 0x4,
-    "MOB_BIG": 0x8,
-    "MOB_GUARD": 0x10,
-    "MOB_PICK": 0x20,
-    "MOB_PICKING": 0x40,
-    "MOB_ROGUE": 0x80,
-} as const ; 
-export type EnemyFlags1Type = typeof EnemyFlags1[keyof typeof EnemyFlags1];
-
-export const EnemyFlags2 = {
-    "MOB_IN_BATTLE": 0x1,
-    "MOB_PASSABLE": 0x2,
-    "MOB_SENSE": 0x4,
-    "MOB_MOBILE": 0x8,
-    "MOB_RELOAD": 0x10,
-    "MOB_CASTING": 0x20,
-    "MOB_SAMPLE_LOOP": 0x40,
-} as const;
-export type EnemyFlags2Type = typeof EnemyFlags2[keyof typeof EnemyFlags2];
 
 export const EnemySounds = {
     "MBS_WALK": 0,

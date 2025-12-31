@@ -6,7 +6,7 @@ import { ref, watch, onMounted, computed,  shallowRef, onUnmounted } from 'vue';
 import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import CanvasView from './CanvasView.vue';
 import { PCXProfile, PCX } from '@/core/pcx';
-import StatusBar, {type SaveRevertControl} from '@/components/statusBar.ts'
+import StatusBar, {type SaveRevertControl} from '@/components/statusBar'
 import { EnemyFlags1, type EnemyDef } from '@/core/enemy_struct';
 
 const emit = defineEmits<{

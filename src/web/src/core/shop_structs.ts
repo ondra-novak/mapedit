@@ -1,6 +1,6 @@
-import { BinaryIterator, BinaryWriter } from "./binary"
+import { BinaryIterator, BinaryWriter, type Schema } from "./binary"
 
-const TProductSchema = {
+const TProductSchema  : Schema = {
   "item":"int16",  
   "cena":"int32",  
   "trade_flags":"int16",
@@ -16,7 +16,7 @@ export class TProduct {
     max_pocet:number  = 0;
 };
 
-const TShopSchema = {
+const TShopSchema : Schema = {
   keeper:"char[16]", 
   picture:"char[13]",
   koef:"int32",
@@ -42,7 +42,7 @@ export class TShop {
 export function shopsFromArrayBuffer(buff: ArrayBuffer): TShop[]  {
     const result :TShop[] = [];
     const rd  = new BinaryIterator(buff);
-    const count = rd.parse_type("uint32");
+    const count = rd.parse("uint32");
     for (let i = 0; i < count; ++i) {
         const shp = Object.assign(new TShop(), rd.parse(TShopSchema));
         const p = [];
@@ -58,7 +58,7 @@ export function shopsFromArrayBuffer(buff: ArrayBuffer): TShop[]  {
 
 export function shopsToArrayBuffer(shops: TShop[]) {
     const wr = new BinaryWriter();
-    wr.write_type("uint32", shops.length);
+    wr.write("uint32", shops.length);
     shops.forEach(x=>{
         wr.write(TShopSchema, x);
         x.product_list.forEach(y=>{

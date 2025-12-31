@@ -1,4 +1,4 @@
-import { BinaryIterator, BinaryWriter, joinUint8Arrays, parseSection, splitArrayBuffer, writeSection } from "./binary";
+import { BinaryIterator, BinaryWriter, joinUint8Arrays, parseSection, type Schema, splitArrayBuffer, writeSection } from "./binary";
 
 export type FrameSequence = {
     name: string;
@@ -43,17 +43,17 @@ export class SeqFile {
         this.big = !!big;
     };
 
-    static NewHeader = {
+    static NewHeader:Schema = {
         row: "uint8",
         count: "uint8",
     };
 
-    static NewItem = {
+    static NewItem :Schema= {
         file: "uint16",
         offsetx: "int16",
         offsety: "int16",
     };
-    static Config = {
+    static Config :Schema= {
         big: "uint8",
         hitpos: "uint8"
     };
@@ -152,7 +152,7 @@ export class SeqFile {
         config.write(SeqFile.Config, {big: this.big?1:0, hitpos: this.hit_pos || 0})
 
         const enc = new TextEncoder();        
-        const strings = joinUint8Arrays(Object.entries(strtable).sort((a,b)=>a[1] - b[1]).map(x=>enc.encode(x[0])).concat([new Uint8Array(0)]),0);
+        const strings = joinUint8Arrays(Object.entries(strtable).sort((a,b)=>a[1] - b[1]).map(x=>enc.encode(x[0]).buffer).concat([new ArrayBuffer(0)]),0);
         const out =  new BinaryWriter();
         writeSection(out, 1, animData.getBuffer());
         writeSection(out, 2, strings.buffer);

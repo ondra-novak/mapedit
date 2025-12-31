@@ -273,12 +273,12 @@ export class EnemyOnSector {
 function parseItems(iter: BinaryIterator) : number [][] {
     const out : number[][] = [];
     while (!iter.eof()) {
-        let place = iter.parse_type("int32");
-        let n = iter.parse_type("int16");
+        let place = iter.parse("int32");
+        let n = iter.parse("int16");
         let items = [];
         while (n != 0) {
             items.push(n-1);
-            n = iter.parse_type("int16");
+            n = iter.parse("int16");
         }
         out[place] = items;        
     }
@@ -289,11 +289,11 @@ function serializeItems(items: number[][]): ArrayBuffer {
     const wr = new BinaryWriter();
     items.forEach((x,idx)=>{
         if (x.length) {
-            wr.write_type("int32", idx);                
+            wr.write("int32", idx);                
             x.forEach(itm=>{
-                wr.write_type("int16", itm+1);
+                wr.write("int16", itm+1);
             })
-                wr.write_type("int16", 0);
+                wr.write("int16", 0);
         }
     })
     return wr.getBuffer();
@@ -768,23 +768,23 @@ function parseActions(iter:BinaryIterator) : TMA_GEN[][] {
     const ret:TMA_GEN[][] = [];
     
     while (!iter.eof()) {
-        const sectorside = iter.parse_type("uint32");
+        const sectorside = iter.parse("uint32");
         if (sectorside == 0) break;
         const sector = sectorside >> 2;
         const side = sectorside & 0x3;
-        let size = iter.parse_type("uint32");
+        let size = iter.parse("uint32");
         const lst = [];
         while (size) {
             const action = iter.readBytes(size);
             let iter2 = new BinaryIterator(action);
-            const a = iter2.parse_type("uint8");
+            const a = iter2.parse("uint8");
             const atype = a & 0x3F;
             if (action_to_schema[atype]) {
                 iter2 = new BinaryIterator(action);
                 const action_def = deserialize(action_to_schema[atype], iter2);
                 lst.push(action_def);
             }
-            size = iter.parse_type("uint32");
+            size = iter.parse("uint32");
         }      
         ret[sector * 4 + side] = lst;
     }        
@@ -795,18 +795,18 @@ function serializeActions(a:  TMA_GEN[][]) : ArrayBuffer{
     const wr = new BinaryWriter;
     a.forEach((alist,idx)=>{
         if (alist.length) {
-            wr.write_type("uint32", idx);
+            wr.write("uint32", idx);
             alist.forEach(a=>{
                 const wr2 = new BinaryWriter();
                 serialize(wr2,a);
                 const buff = wr2.getBuffer()
-                wr.write_type("uint32", buff.byteLength);
+                wr.write("uint32", buff.byteLength);
                 wr.write_buffer(buff);
             })
-            wr.write_type("uint32", 0);
+            wr.write("uint32", 0);
         }
     })
-    wr.write_type("uint32",0);
+    wr.write("uint32",0);
     return wr.getBuffer();
 }
 
