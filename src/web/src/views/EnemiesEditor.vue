@@ -34,6 +34,7 @@ const appearence = ref<PCX>();
 const appearence_margin = ref<string>("");
 const palettes = ref<COLPaletteSet>();
 const edit_seq = ref<string>();
+const new_enemy_dlg = ref<HTMLDialogElement>();
 let save_state: SaveRevertControl;
 
 async function  load_files() {
@@ -152,12 +153,12 @@ async function deleteEnemy() {
             while (enemies.value.length > 0 && enemies.value[enemies.value.length-1].mobs_name.length ==0) {
                 enemies.value.pop();
             }
+            selected_enemy.value = undefined;
         }
     }
 }
 
 function findFreePos() : number{
-    if (!enemies.value) return 0;
     const pos = enemies.value.findIndex((x:EnemyDef)=>x.mobs_name.length == 0);
     if (pos == -1) return enemies.value.length;
     else return pos;
@@ -172,8 +173,8 @@ function cloneEnemy() {
 }
 
 const filteredAndSortedEnemies = computed(() => {
-    const mp =  enemies.value.filter(x=>x.mobs_name.length>0)
-        .map((x,idx)=>{return [x, idx];}) as [ EnemyDef, number][];
+    const mp =  enemies.value.map((x,idx)=>{return [x, idx]  as [ EnemyDef, number];})
+                    .filter(x=>x[0].mobs_name.length>0);        
     const srt = mp.sort((a,b)=>{
                     return a[0].name.localeCompare(b[0].name);
                 });
@@ -184,6 +185,7 @@ const filteredAndSortedEnemies = computed(() => {
 async function addEnemy() {
     await load_graphics();
     new_enemy_type.value = "";
+    new_enemy_dlg.value.showModal();
 }
 
 function createEnemy() {
@@ -192,10 +194,11 @@ function createEnemy() {
         const name = new_enemy_type.value.split('.')[0];
         const enm = new EnemyDef();
         enm.name=`${name}-${pos}`;
+        enm.mobs_name = name;
         enemies.value[pos] = enm;
         selected_enemy.value = pos;
         new_enemy_type.value = undefined;
-
+        new_enemy_dlg.value.close();
     }
 }
 
@@ -440,14 +443,18 @@ const Abilities=[
         </div>
     </x-workspace>
 
-    <div class="new-enemy-window" v-if="new_enemy_type !== undefined">
+    <dialog ref="new_enemy_dlg" class="new-enemy-dlg">
+        <header>Create enemy <button class="close" @click="new_enemy_dlg.close()"></button></header>
         <x-form>
             <label><span>Enemy graphic</span><select v-model="new_enemy_type">
                 <option v-for="g of list_graphics" :key="g" :value="g">{{ g }}</option>
             </select></label>
         </x-form>
-        <div class="button-panel"><button @click="createEnemy" :disabled="!new_enemy_type">Add</button><button @click="new_enemy_type=undefined">Cancel</button></div>
-    </div>
+        <footer>
+            <button @click="createEnemy" :disabled="!new_enemy_type">Add</button>
+            <button @click="new_enemy_dlg.close()">Cancel</button>
+        </footer>
+    </dialog>
     <div class="edit-seq" v-if="edit_seq">
         <div>
             <AssetToolSeq v-model="edit_seq" :def="enemies[selected_enemy || 0]" />
@@ -486,41 +493,6 @@ const Abilities=[
 
 .buttons>button {
     flex-grow: 1;
-}
-.new-enemy-window {
-    position: absolute;
-    left: 50%;
-    top: 10vw;
-    height: 14em;
-    width: 25em;
-    margin-left: -10em;
-    border: 1px solid;
-    background-color: white;
-    text-align: center;
-    box-shadow: 3px 3px 5px black;
-}
-
-.new-enemy-window {
-    padding-top: 1em;
-    height: 5em;
-}
- 
-.new-enemy-window x-form {
-    padding: 0 2em;
-}
-
-.button-panel {
-    border-top: 1px solid;
-    padding-top:  1em;
-}
-
-.button-panel button {
-    width: 5em;
-}
-.enemy-not-found input {
-    display: block;
-    margin: 1em auto;
-    width: 7.5em;
 }
 
 .editor-bgr {
@@ -593,5 +565,8 @@ div.multiple > *{
     background-color: #0008;
 }
 
+dialog.new-enemy-dlg {
+    width: 20rem;
+}
 
 </style>
