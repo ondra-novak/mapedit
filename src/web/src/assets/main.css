@@ -1,5 +1,3 @@
-#app {
-}
 
 html {
 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;  
@@ -73,9 +71,9 @@ x-section {
 x-section-title {
   display:block;
   position: absolute;
-  left: 1em;
-  top: -0.7em;  
-  padding: 0.1em 0.5em ;
+  left: 1rem;
+  top: -1rem;  
+  padding: 0.1rem 0.5rem ;
   background-color: #ccc;
 
 }

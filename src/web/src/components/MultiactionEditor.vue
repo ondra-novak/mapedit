@@ -484,7 +484,7 @@ const if_jump_cond = computed(()=>{
     if (focused_item.value && (focused_item.value instanceof TMA_IFJMP)) {
         return condition_proxy(focused_item.value, "param1");
     } else {
-        return null;
+        return condition_proxy({x:0}, "x");
     }
 });
 
@@ -497,7 +497,7 @@ const item_list_TMA_FIREBALL = create_computed_select_item(
     (x:number|null)=>(focused_item.value as TMA_FIREBALL).item = x
 )
 const item_list_TMA_HAVEIT = create_computed_select_item(
-    ()=>if_jump_cond.value.cond,
+    ()=>if_jump_cond.value?.cond || 0,
     (x:number|null)=>if_jump_cond.value.cond = x
 )
 const relative_offset_TMA_IFJMP = computed({

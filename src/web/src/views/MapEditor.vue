@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
-import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
+import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar'
 import { server } from '@/core/api';
 import { ArcConfiguration, EnemyOnSector, FloorCeilConfiguration, GlobalMapPalettes, MapFile, MAPGLOBAL, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
@@ -10,8 +10,7 @@ import { shallowClone, Document } from '@/utils/document';
 import svg_pointer from '@/assets/toolbar/pointer.svg'
 import svg_pencil from '@/assets/toolbar/pencil.svg'
 import svg_eraser from '@/assets/toolbar/eraser.svg'
-import svg_chest from '@/assets/toolbar/chest.svg'
-import svg_enemy from '@/assets/toolbar/enemy.svg'
+import svg_chest_enemy from '@/assets/toolbar/chest_enemy.svg'
 import PalleteEditor from '@/components/PalleteEditor.vue';
 import { messageBox } from '@/utils/messageBox';
 import { create_datalist } from '@/utils/datalist';
@@ -34,8 +33,7 @@ const EditMode = {
     Edit:0,
     Draw:1,
     Erase:2,
-    Items:3,
-    Enemies:4
+    Enemies:3
 } as const;
 
 class MapFileWithStringtable extends MapFile{
@@ -115,6 +113,14 @@ const ActionEvent = [
 "On wall attack", //MC_WALLATTACK 0x8000
 ]
 
+
+const SelectionShape = {
+    None: 0,
+    Row: 1,
+    Block: 2
+}
+
+
 const focus = ref<FocusItem>();
 const selection = ref<number[]>();
 const link = ref<LinkRef>();
@@ -129,6 +135,11 @@ const wall_props = ref(false);
 const active_enemy = ref(-1);
 const focused_enemies = ref(new Set<number>());
 const item_order = [0,1,3,2];
+const search_enemy = ref("");
+let last_apply_mode = [
+    ApplyMode.ACTIVE.v, ApplyMode.SELECTION_DIR.v, ApplyMode.ALL_SIDES.v
+]
+let last_selection_shape = 0
 
 const focus_items = reactive({
     items: [] as number[][]
@@ -701,8 +712,7 @@ const edit_modes = [
 [svg_pointer,"Edit"],
 [svg_pencil,"Draw"],
 [svg_eraser,"Erase"],
-[svg_chest,"Items/Loot"],
-[svg_enemy,"Enemies"],
+[svg_chest_enemy,"Items/Enemies"],
 ]
 
 onMounted(init);
@@ -715,6 +725,26 @@ watch([()=>settings.edit_mode,selection],()=>{
     updateSelection();
 })
 
+
+function getSelectionShape() : number {
+    const s = selection.value || [];
+    if (s.length == 0 || !curmap.value) return SelectionShape.None;
+    const bx = curmap.value.sectors[s[0]].x;
+    const by = curmap.value.sectors[s[0]].y;
+    const bbox = s.reduce((a,b)=>{
+        const x = curmap.value.sectors[b].x;
+        const y = curmap.value.sectors[b].y;
+        if (a[0] > x) a[0] = x;
+        if (a[1] > y) a[1] = y;
+        if (a[2] < x) a[2] = x;
+        if (a[3] < y) a[3] = y;
+        return a;
+    }, [bx,by,bx,by]);
+    const row = (bbox[3]-bbox[1])<=1;
+    const col = (bbox[2]-bbox[0])<=1;
+    if ((row || col) && row != col) return SelectionShape.Row;
+    return SelectionShape.Block;
+}
 
 function applyChanges() {
     if (focus.value) {
@@ -763,7 +793,10 @@ function applyChanges() {
             })
             changesSide.push((s:MapSide)=>{
                 s.actions = apply_array_diff(s.actions, diff, (a,b)=>{
-                    return a._action == b._action && a.flags == b.flags;
+                    return a.header.action == b.header.action 
+                        && a.header.once == b.header.once
+                        && a.header.cancel == b.header.cancel
+                        && a.flags == b.flags
                 });
             });
         }
@@ -837,6 +870,7 @@ function applyChanges() {
                 end_edit(m);
                 updateFocusData(focus.value.sector, focus.value.side);
                 StatusBar.invoke_teleport();
+                last_apply_mode[getSelectionShape()] = applyMode.value;
             }
         }
     }
@@ -1038,6 +1072,25 @@ watch(focus_items, ()=>{
     }
 })
 
+const filteredAndSortedEnemies = computed(() => {
+    const mp =  enemy_list.value.map((x,idx)=>{return [x, idx]  as [ EnemyDef, number];})
+                    .filter(x=>x[0].mobs_name.length>0)
+                    .filter(x=>!search_enemy.value || x[0].name.toUpperCase().indexOf(search_enemy.value.toUpperCase()) != -1);
+    const srt = mp.sort((a,b)=>{
+                    return a[0].name.localeCompare(b[0].name);
+                });
+    return srt;
+
+});
+
+watch(selection,()=>{
+    let sh = getSelectionShape();
+    if (last_selection_shape != sh) {
+        last_selection_shape = sh;
+        applyMode.value = last_apply_mode[sh];
+    }    
+},{deep:true})
+
 </script>
 
 <template>
@@ -1205,10 +1258,11 @@ watch(focus_items, ()=>{
 <div class="right enemy" v-if="settings.edit_mode == EditMode.Enemies">
     <div class="enpal">
         <div><span class="title">Enemies</span></div>
+        <input type="search" v-model="search_enemy" />
         <div class="enlist">
             <div class="lst">
-                <div v-for="(e,idx) of enemy_list" :class="{active: active_enemy == idx, insel: focused_enemies.has(idx)}" @click="active_enemy=idx">
-                    {{ e.name }}
+                <div v-for="e of filteredAndSortedEnemies" :class="{active: active_enemy == e[1], insel: focused_enemies.has(e[1])}" @click="active_enemy=e[1]">
+                    {{ e[0].name }}
                 </div>
             </div>
             <div class="cntr">
@@ -1278,7 +1332,7 @@ x-workspace > * {
     gap:1px;
 }
 .toolbar > * {
-    height: 1.5rem;
+    height: 2rem;
     text-align: center;
     padding: 0.25rem;
     background: linear-gradient(90deg, white, #ccc);
@@ -1299,7 +1353,7 @@ x-workspace > * {
 }
 
 .toolbar   img {
-    height: 1.5rem;
+    height: 2rem;
 }
 .middle {
     flex-grow: 1;

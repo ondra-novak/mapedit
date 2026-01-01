@@ -16,6 +16,8 @@ import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import BitCheckbox from '@/components/BitCheckbox.vue';
+import AbilitySheet from '@/components/AbilitySheet.vue';
+import EffectSheet from '@/components/EffectSheet.vue';
 
 
 
@@ -35,12 +37,12 @@ const appearence_margin = ref<string>("");
 const palettes = ref<COLPaletteSet>();
 const edit_seq = ref<string>();
 const new_enemy_dlg = ref<HTMLDialogElement>();
-let save_state: SaveRevertControl;
+let save_state: SaveRevertControl|null = null;
 
 async function  load_files() {
 
     const sst = save_state;
-    save_state = undefined;
+    save_state = null;
 
     const [en, sd, id] = await Promise.all([
         getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS),
@@ -142,7 +144,7 @@ async function save_all() {
 
 }
 
-onUnmounted(()=>save_state.unmount());
+onUnmounted(()=>save_state?.unmount());
 
 
 
@@ -185,7 +187,7 @@ const filteredAndSortedEnemies = computed(() => {
 async function addEnemy() {
     await load_graphics();
     new_enemy_type.value = "";
-    new_enemy_dlg.value.showModal();
+    new_enemy_dlg.value?.showModal();
 }
 
 function createEnemy() {
@@ -198,7 +200,7 @@ function createEnemy() {
         enemies.value[pos] = enm;
         selected_enemy.value = pos;
         new_enemy_type.value = undefined;
-        new_enemy_dlg.value.close();
+        new_enemy_dlg.value?.close();
     }
 }
 
@@ -379,27 +381,12 @@ const Abilities=[
                 </div>
             </x-section>
             <x-section>
-                <x-form>
-                    <x-section-title>Stats</x-section-title>
-                    <label v-for="idx of Abilities" :key="idx">
-                        <span> {{ CharacterStatsNames[idx] }}</span>
-                        <select v-if="idx == CharacterStats.VLS_MGZIVEL" v-model="form.vlastnosti[idx]">
-                            <option v-for="(nn,i) of ElementTypeName" :key="nn" :value="i"> {{ nn }}</option>
-                        </select>
-                        <input v-else type="number" v-model="form.vlastnosti[idx]" v-watch-range 
-                            :min="CharacterStatsMinMaxs[idx][0]"
-                            :max="CharacterStatsMinMaxs[idx][1]">
-                    </label>
-                </x-form>
+                <x-section-title>Stats</x-section-title>
+                <AbilitySheet v-model="form.vlastnosti" :enemy="true"></AbilitySheet>
             </x-section>
             <x-section>
                 <x-section-title>Effects</x-section-title>
-                <x-form>
-                    <label v-for="(v, idx) of Object.values(SpellEffects)" :key="idx">
-                        <BitCheckbox v-model="form.vlastnosti[CharacterStats.VLS_KOUZLA]" :mask="v"/>
-                        <span> {{ SpellEffectName[idx] }}</span>
-                    </label>
-                </x-form>
+                <EffectSheet v-model="form.vlastnosti[CharacterStats.VLS_KOUZLA]" />
             </x-section>
             <x-section>
                 <x-section-title>Behavior</x-section-title>
@@ -444,7 +431,7 @@ const Abilities=[
     </x-workspace>
 
     <dialog ref="new_enemy_dlg" class="new-enemy-dlg">
-        <header>Create enemy <button class="close" @click="new_enemy_dlg.close()"></button></header>
+        <header>Create enemy <button class="close" @click="new_enemy_dlg?.close()"></button></header>
         <x-form>
             <label><span>Enemy graphic</span><select v-model="new_enemy_type">
                 <option v-for="g of list_graphics" :key="g" :value="g">{{ g }}</option>
@@ -452,7 +439,7 @@ const Abilities=[
         </x-form>
         <footer>
             <button @click="createEnemy" :disabled="!new_enemy_type">Add</button>
-            <button @click="new_enemy_dlg.close()">Cancel</button>
+            <button @click="new_enemy_dlg?.close()">Cancel</button>
         </footer>
     </dialog>
     <div class="edit-seq" v-if="edit_seq">

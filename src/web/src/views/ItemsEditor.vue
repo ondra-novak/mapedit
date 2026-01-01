@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { server, type FileItem } from '@/core/api';
+import { server,} from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch, type Ref, type WatchHandle } from 'vue';
-import { itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName, type ItemDef } from '@/core/items_struct';
+import { computed, nextTick, onMounted, onUnmounted,  ref, shallowRef, watch} from 'vue';
+import { ItemDef, itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName } from '@/core/items_struct';
 import CanvasView from '@/components/CanvasView.vue';
 import { PCX, PCXProfile, type PCXProfileType } from '@/core/pcx';
-import { loadAllIcons, loadSingleIcon } from '@/core/IconLIB';
-import { CharacterStats, ElementType, ElementTypeName, SpellEffects } from '@/core/common_defs';
-import { useBitmaskCheckbox2 } from '@/core/flags';
-import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
+import { loadAllIcons } from '@/core/IconLIB';
+import { CharacterStats, ElementType, ElementTypeName } from '@/core/common_defs';
+import StatusBar, { type SaveRevertControl } from '@/components/statusBar'
 import { create_datalist } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
+import BitCheckbox from '@/components/BitCheckbox.vue';
+import AbilitySheet from '@/components/AbilitySheet.vue';
+import EffectSheet from '@/components/EffectSheet.vue';
 
-const selected_item = ref<number>();
+const selected_item = ref<number|null>(null);
 
 const item_list = ref<ItemDef[]>([]);
 const filter_kind = ref<number>(-1);
@@ -34,7 +36,7 @@ let save_state: SaveRevertControl;
 function reload() {
     getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
         item_list.value = x?itemsFromArrayBuffer(x):[];
-        selected_item.value = undefined;
+        selected_item.value = null;
         nextTick(()=>save_state.set_changed(false));
     });
 }
@@ -69,29 +71,24 @@ function reg_save() {
 
 
 function deleteItem() {
-    if (selected_item.value !== undefined && item_list.value) {
+    if (selected_item.value !== null && item_list.value) {
         const lst = item_list.value;
         if (confirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
             lst[selected_item.value].jmeno = "";
+            selected_item.value = null;
         }
         while (lst.length && !lst[lst.length-1].jmeno) lst.pop();
     }
 }
 function addItem() {
-    let pos = 0;
-    if (!item_list.value) {
-        item_list.value = [];        
-        item_list.value.push({} as ItemDef);
-    } else {
-        pos = item_list.value.findIndex(x=>x.jmeno.length == 0);
-        if (pos == -1) {
-            pos = item_list.value.length;   
-            item_list.value.push({} as ItemDef);         
-        }
-    }
-    form.jmeno = "New Item";
+    let pos = item_list.value.findIndex(x=>x.jmeno.length == 0);
+    if (pos < 0) pos = item_list.value.length;
+    const cloned = selected_item.value?item_list.value[selected_item.value]:null;
+    const new_item = new ItemDef();
+    if (cloned) Object.assign(new_item, JSON.parse(JSON.stringify(cloned)));
+    new_item.jmeno = "New item"
+    item_list.value[pos] = new_item;
     selected_item.value = pos;
-    saveItemData();
 }
 
 const filteredAndSortedItems = computed(() => {
@@ -140,147 +137,38 @@ function decorateElement<T extends HTMLElement>(htmlElement: T | null, props: Re
 }
 
 function change_icon() {
-    if (selected_item.value!== undefined && item_list.value) {
+    if (selected_item.value!== null && item_list.value) {
         change_icon_model.value = -1;
     }
 }
 
 function onSelectIcon() {
-    if (change_icon_model.value!== undefined && change_icon_model.value!== -1 && selected_item.value !== undefined && item_list.value) {
-        form.ikona = change_icon_model.value;
+    if (change_icon_model.value!== undefined && change_icon_model.value!== -1 && selected_item.value !== null && item_list.value) {
+        form.value.ikona = change_icon_model.value;
         change_icon_model.value = undefined;
         
     }
 }
 
-const [itm_flags, chk_flags ] = useBitmaskCheckbox2({
-        DESTROY: 0x1,
-        NOREMOVE: 0x2,
-}, 0);
-
-
-const [itm_effects, chk_effects] = useBitmaskCheckbox2(SpellEffects);
-
-const form = reactive({
-    jmeno: "",
-    popis: "",
-    zmeny: new Array(4).fill(0),
-    podminky: new Array(24).fill(0),
-    hmotnost: 0,
-    nosnost:0,
-    druh:0,
-    umisteni:0,
-    spell:0,
-    magie:0,
-    ikona:0,
-    vzhled_on_ground: "",
-    vzhled_on_male:"",
-    vzhled_on_female:"",
-    user_value:0,
-    keynum:0,
-    arrow_type:0,
-    polohy: [ [0,0],[0,0]],
-    typ_zbrane: 0,
-    sound_file:"",
-    v_letu_files :new Array(16).fill(""),
-    cena:0,
-    weapon_animation_file:"",
-    hitpos:0,
-    shiftup:null as number|null,
-});
 
 const key_mode = ref<number>(0);
-const whandle  = shallowRef<WatchHandle>();
-
-function saveItemData() {
-    if (selected_item.value!==undefined && item_list.value) {
-        const itm = item_list.value[selected_item.value];
-        itm.jmeno = form.jmeno;
-        itm.popis = form.popis;
-        itm.zmeny = form.zmeny;
-        itm.zmeny[CharacterStats.VLS_KOUZLA] = itm_effects.value;
-        itm.podminky = form.podminky;
-        itm.hmotnost = form.hmotnost;
-        itm.nosnost = form.nosnost;
-        itm.druh = form.druh;
-        itm.umisteni = form.umisteni;
-        itm.spell = form.spell;
-        itm.magie = form.magie;
-        itm.ikona = form.ikona;
-        itm.vzhled_on_ground  = form.vzhled_on_ground;
-        itm.vzhled_on_male  = form.vzhled_on_male;
-        itm.vzhled_on_female  = form.vzhled_on_female;
-        itm.user_value = form.user_value;
-        itm.druh_sipu = form.arrow_type;
-        itm.keynum = form.keynum;
-        itm.polohy = form.polohy;
-        itm.typ_zbrane = form.typ_zbrane;
-        itm.sound_file  = form.sound_file;
-        itm.cena = form.cena;
-        itm.weapon_animation_file  = form.weapon_animation_file;
-        itm.hitpos = form.hitpos;
-        itm.shiftup = typeof form.shiftup == "number"?form.shiftup:255;
-        itm.v_letu_files = form.v_letu_files;
-        itm.flags = itm_flags.value || 0;
-        if (!key_mode.value) itm.keynum = 0;
-        else if (key_mode.value < 0 && itm.keynum >=0) itm.keynum = -1;
-        else if (key_mode.value > 0 && itm.keynum <=0) itm.keynum = 0;
-        save_state.set_changed(true);
-    }
-}
-
-function loadItemData() {
-    if (selected_item.value!==undefined && item_list.value) {
-        if (whandle.value) whandle.value();
-        const itm = item_list.value[selected_item.value];
-        form.jmeno = itm.jmeno;
-        form.popis = itm.popis;
-        form.zmeny = itm.zmeny;
-        itm_effects.value = itm.zmeny[CharacterStats.VLS_KOUZLA];
-        form.podminky = itm.podminky;
-        form.hmotnost = itm.hmotnost;
-        form.nosnost = itm.nosnost;
-        form.druh = itm.druh;
-        form.umisteni = itm.umisteni;
-        form.spell = itm.spell;
-        form.magie = itm.magie;
-        form.ikona = itm.ikona;
-        form.arrow_type = itm.druh_sipu;
-        form.vzhled_on_ground = itm.vzhled_on_ground || "";
-        form.vzhled_on_male = itm.vzhled_on_male || "";
-        form.vzhled_on_female = itm.vzhled_on_female || "";
-        form.user_value = itm.user_value;
-        form.keynum = itm.keynum;
-        form.polohy = itm.polohy;
-        form.typ_zbrane = itm.typ_zbrane;
-        form.sound_file = itm.sound_file || "";
-        form.cena = itm.cena;
-        form.weapon_animation_file = itm.weapon_animation_file || "";
-        form.hitpos = itm.hitpos;
-        form.shiftup = itm.shiftup == 255?null:itm.shiftup;;
-        if (itm.v_letu_files) form.v_letu_files = itm.v_letu_files;
-        itm_flags.value = itm.flags;
-        key_mode.value = Math.sign(form.keynum);
-        whandle.value = watch([form,itm_flags,itm_effects,key_mode],saveItemData,{deep:true});
-    }
-}
 
 
-async function onChangeSelection() {
-    loadItemData();
-}
+const form = computed<ItemDef>(()=>selected_item.value?item_list.value[selected_item.value]:new ItemDef);
+
+
 
 function recalc_place_preview() {
     if (preview_canvas.value) {
         const parent = preview_canvas.value.parentElement;
         const app_bottom = preview_canvas.value.offsetTop + preview_canvas.value.offsetHeight;
-        const app_top = preview_canvas.value.offsetTop;
+//        const app_top = preview_canvas.value.offsetTop;
         const app_center = parent?parent.clientWidth / 2.0:0;
         [left_hand_place,right_hand_place].forEach((place,idx) => {
             if (place.value) {
                 const c= place.value;
-                const x = form.polohy[idx][0]+app_center-c.width/2;
-                const y = app_bottom - form.polohy[idx][1] - c.height;
+                const x = form.value.polohy[idx][0]+app_center-c.width/2;
+                const y = app_bottom - form.value.polohy[idx][1] - c.height;
                 c.style.left = `${x}px`;
                 c.style.top = `${y}px`;
             }
@@ -288,20 +176,23 @@ function recalc_place_preview() {
     }
 }
 
-watch(()=>form.vzhled_on_ground,()=>{
-    if (form.vzhled_on_ground) {
-        server.getDDLFile(form.vzhled_on_ground).then(x=>{
+watch(selected_item, recalc_place_preview);
+
+watch(()=>form.value.vzhled_on_ground,()=>{
+    if (form.value.vzhled_on_ground) {
+        server.getDDLFile(form.value.vzhled_on_ground).then(x=>{
             appearence.value = PCX.fromArrayBuffer(x);
         })
     } else {
         appearence.value = undefined;
     }
 })
-watch(()=>form.vzhled_on_male,()=>{
-    if (form.vzhled_on_male) {
-        server.getDDLFile(form.vzhled_on_male).then(x=>{
+
+watch(()=>form.value.vzhled_on_male,()=>{
+    if (form.value.vzhled_on_male) {
+        server.getDDLFile(form.value.vzhled_on_male).then(x=>{
             const pcx = PCX.fromArrayBuffer(x);
-            const single = form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR;
+            const single = form.value.umisteni != ItemWearPlace.PL_RUKA && form.value.umisteni != ItemWearPlace.PL_OBOUR;
             [left_hand_place, right_hand_place].forEach((h,idx)=>{
                 if (single && idx == 1) {
                     h.value = null;
@@ -321,16 +212,17 @@ watch(()=>form.vzhled_on_male,()=>{
             recalc_place_preview();
         });
     } else {
-        appearence.value = undefined;
+        [left_hand_place, right_hand_place].forEach((h,idx)=>{
+            h.value = null;
+        });
     }
 })
 
-watch(()=>form.polohy,()=>{
+watch(()=>form.value.polohy,()=>{
     recalc_place_preview();
 
 },{deep:true});
 
-watch([selected_item], onChangeSelection);
 watch([change_icon_model], onSelectIcon)
 
 const runeList = Object.values(ElementType).reduce((a:Record<string, string>,b)=>{
@@ -361,8 +253,8 @@ const allArrows = computed(() : {idx:number,id:number|null, name:string}[] =>{
 })
 
 const negative_keylock_id=computed({
-    get:()=>-form.keynum,
-    set:(n:number)=>form.keynum=-n,
+    get:()=>-form.value.keynum,
+    set:(n:number)=>form.value.keynum=-n,
 });
 
 
@@ -387,6 +279,16 @@ watch(allAnimationsList, ()=>ds_animations.update(()=>allAnimationsList.value.ma
 watch(allKeys, ()=>ds_keys.update(()=>allKeys.value.map(x=>({value:x.id.toString(),label:x.name}))));
 watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.toString() || "0",label:x.name}))));
 
+const change_icon_popup = ref<HTMLDialogElement>();
+
+watch(change_icon_popup, ()=>{
+    if (change_icon_popup.value) {
+        change_icon_popup.value.showModal();
+    }
+})
+
+
+watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true});
 </script>
 <template>
     <x-workspace>
@@ -411,9 +313,9 @@ watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.t
     </div>
 
     <div class="editor-bgr">
-    <div class="editor" v-if="selected_item !== undefined">
+    <div class="editor" v-if="selected_item !== null">
         <x-section>
-            <x-section-title>Basic parameters</x-section-title>
+            <x-section-title>Basic parameters (ID: {{ selected_item }})</x-section-title>
             <x-form>
                 <label><span>Name</span><input type="text" maxlength="31" v-model="form.jmeno"/></label>
                 <label><span>Description</span><input type="text" maxlength="31" v-model="form.popis"/></label>
@@ -437,7 +339,7 @@ watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.t
                 <label><span>Wear on</span><select  v-model="form.umisteni">
                     <option v-for="(n, v) of ItemWearPlaceName" :key="v" :value="v"> {{  n }}</option>
                 </select></label>
-                <label v-if="form.umisteni == ItemWearPlace.PL_SIP"><span>Arrow type</span><input type="number" :list="ds_arrows.id" v-model="form.arrow_type" v-watch-range min="0" max="255"/></label>
+                <label v-if="form.umisteni == ItemWearPlace.PL_SIP"><span>Arrow type</span><input type="number" :list="ds_arrows.id" v-model="form.druh_sipu" v-watch-range min="0" max="255"/></label>
                 <label v-if="form.umisteni == ItemWearPlace.PL_SIP"><span>Count arrows</span><input type="number"  v-model="form.user_value" v-watch-range min="0" max="99"/></label>
                 <label v-if="form.umisteni == ItemType.TYP_UTOC || form.umisteni == ItemType.TYP_STRELNA || form.umisteni == ItemType.TYP_VRHACI" ><span>Weapon type</span><select  v-model="form.typ_zbrane">
                     <option v-for="(n, v) of WeaponTypeName" :key="v" :value="v"> {{  n }}</option>
@@ -458,8 +360,8 @@ watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.t
                     </span><input type="number" v-model="form.spell"  v-watch-range min="0" max="10000"/></label>
                 </template>
                 <label  v-if="form.umisteni == ItemWearPlace.PL_BATOH"><span>Capacity</span><input type="number" v-watch-range min="1" max="24" v-model="form.nosnost"/></label>
-                <label><input type="checkbox" v-model="chk_flags.DESTROY"><span>Destroy on hit when thrown</span></label>
-                <label><input type="checkbox" v-model="chk_flags.NOREMOVE"><span>Destroy when removed</span></label>
+                <label><BitCheckbox v-model="form.flags" :mask="0x1"/><span>Destroy on impact</span></label>
+                <label><BitCheckbox v-model="form.flags" :mask="0x2"/><span>Destroy when removed</span></label>
                 <label><span>Acts as Key</span><div><select v-model="key_mode">
                     <option :value=0>Disabled</option>
                     <option :value=1>Enabled</option>
@@ -469,23 +371,6 @@ watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.t
                 <label v-if="key_mode == -1"><span>Picklock bonus</span><input type="number"   v-model="negative_keylock_id"/></label>                    
             </x-form>
         </x-section>
-        <div class="multi">
-        <x-section>
-            <x-form>
-                <x-section-title>Wear conditions</x-section-title>
-                <label><span>Min strenght</span><input type="number" v-model="form.podminky[CharacterStats.VLS_SILA]" v-watch-range min="0" max="100"/></label>
-                <label><span>Min magic</span><input type="number" v-model="form.podminky[CharacterStats.VLS_SMAGIE]" v-watch-range min="0" max="100"/></label>
-                <label><span>Min dexterity</span><input type="number" v-model="form.podminky[CharacterStats.VLS_OBRAT]" v-watch-range min="0" max="100"/></label>
-                <label><span>Min speed</span><input type="number" v-model="form.podminky[CharacterStats.VLS_POHYB]" v-watch-range min="0" max="100"/></label>
-            </x-form>
-        </x-section>
-            <x-section>
-                <x-section-title>Niche / table</x-section-title>
-               <div class="appear-ground checkerboard" >
-                    <CanvasView :canvas="itemCanvas(PCXProfile.item,appearence,form.shiftup?form.shiftup:0)" ></CanvasView>
-                </div>            
-            </x-section>
-        </div>
         <div class="multi">
             <x-section>
                 <x-section-title>Assets</x-section-title>
@@ -501,16 +386,12 @@ watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.t
                 </x-form>
             </x-section>
             <x-section>
-            <x-section-title>Adjustments</x-section-title>
                 <x-form>
-                    <label><span>Ground Anchor Y:</span><input type="number" placeholder="auto" min="0" max="254" v-watch-range  v-model="form.shiftup"></label>
-                    <template v-if="form.umisteni != ItemWearPlace.PL_NIKAM && form.umisteni != ItemWearPlace.PL_PRSTEN &&  form.umisteni != ItemWearPlace.PL_SIP ">
-                    <label v-if="form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR"><span>Avatar pos X,Y</span><input v-watch-range  min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
-                    <template v-if="form.umisteni == ItemWearPlace.PL_RUKA || form.umisteni== ItemWearPlace.PL_OBOUR">
-                    <label><span>Left hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
-                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][0]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]"></label>
-                    </template>
-                    </template>
+                    <x-section-title>Wear conditions</x-section-title>
+                    <label><span>Min strenght</span><input type="number" v-model="form.podminky[CharacterStats.VLS_SILA]" v-watch-range min="0" max="100"/></label>
+                    <label><span>Min magic</span><input type="number" v-model="form.podminky[CharacterStats.VLS_SMAGIE]" v-watch-range min="0" max="100"/></label>
+                    <label><span>Min dexterity</span><input type="number" v-model="form.podminky[CharacterStats.VLS_OBRAT]" v-watch-range min="0" max="100"/></label>
+                    <label><span>Min speed</span><input type="number" v-model="form.podminky[CharacterStats.VLS_POHYB]" v-watch-range min="0" max="100"/></label>
                 </x-form>
             </x-section>
         </div>
@@ -522,95 +403,54 @@ watch(allArrows, ()=>ds_arrows.update(()=>allArrows.value.map(x=>({value:x.id?.t
                 <CanvasView :canvas="right_hand_place"/>
             </div>
         </x-section>
+        <div class="multi">
+            <x-section>
+                <x-section-title>Adjustments</x-section-title>
+                <x-form>
+                    <label><span>Ground Anchor Y:</span><input type="number" placeholder="auto" min="0" max="254" v-watch-range  v-model="form.shiftup"></label>
+                    <template v-if="form.umisteni != ItemWearPlace.PL_NIKAM && form.umisteni != ItemWearPlace.PL_PRSTEN &&  form.umisteni != ItemWearPlace.PL_SIP ">
+                    <label v-if="form.umisteni != ItemWearPlace.PL_RUKA && form.umisteni != ItemWearPlace.PL_OBOUR"><span>Avatar pos X,Y</span><input v-watch-range  min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
+                    <template v-if="form.umisteni == ItemWearPlace.PL_RUKA || form.umisteni== ItemWearPlace.PL_OBOUR">
+                    <label><span>Left hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[0][0]"><input min="-999" max="999" type="number" v-model="form.polohy[0][1]" ></label>
+                    <label><span>Right hand X,Y</span><input v-watch-range min="-999" max="999" type="number" v-model="form.polohy[1][0]"><input min="-999" max="999" type="number" v-model="form.polohy[1][1]"></label>
+                    </template>
+                    </template>
+                </x-form>
+            </x-section>
+            <x-section>
+                <x-section-title>Niche / table</x-section-title>
+                <div class="appear-ground checkerboard" >
+                    <CanvasView :canvas="itemCanvas(PCXProfile.item,appearence,form.shiftup?form.shiftup:0)" ></CanvasView>
+                </div>            
+            </x-section>
+        </div>
         <x-section>
             <x-section-title>When flying</x-section-title>
             <x-form>
-                <label><span>Front</span><div>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[0]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[1]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[2]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[3]"/>
-                    </div></label>
-                <label><span>Left/Right</span><div>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[4]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[5]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[6]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[7]"/>
-                    </div></label>
-                <label><span>Back</span><div>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[8]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[9]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[10]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[11]"/>
-                    </div></label>
-                <label><span>Destroy</span><div>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[12]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[13]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[14]"/>
-                        <input :list="ds_graphics.id" v-model="form.v_letu_files[15]"/>
-                    </div></label>
+                <label v-for="(v,idx) of ['Front','Right','Back','Destroy']" :key="v">
+                    <span> {{ v }}</span>
+                    <div>
+                        <input v-for="w of [0,1,2,3]" :key="w" type="text" :list="ds_graphics.id" v-model="form.v_letu_files[idx*4+w]" />
+                    </div>
+                </label>
             </x-form>
         </x-section>
         <x-section>
             <x-section-title>Modified stats</x-section-title>
-            <x-form>
-                <label><span>Strength</span><input v-model="form.zmeny[CharacterStats.VLS_SILA]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Magic</span><input v-model="form.zmeny[CharacterStats.VLS_SMAGIE]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Speed</span><input v-model="form.zmeny[CharacterStats.VLS_POHYB]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Dexterity</span><input v-model="form.zmeny[CharacterStats.VLS_OBRAT]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Max hitpoints</span><input v-model="form.zmeny[CharacterStats.VLS_MAXHIT]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Max vitality</span><input v-model="form.zmeny[CharacterStats.VLS_KONDIC]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Max mana</span><input v-model="form.zmeny[CharacterStats.VLS_MAXMANA]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Attack</span><div><input type="number" v-model="form.zmeny[CharacterStats.VLS_UTOK_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="form.zmeny[CharacterStats.VLS_UTOK_H]" v-watch-range min="-100" max="100"/></div></label>
-                <label><span>Defese</span><div><input type="number" v-model="form.zmeny[CharacterStats.VLS_OBRAN_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="form.zmeny[CharacterStats.VLS_OBRAN_H]" v-watch-range min="-100" max="100"/></div></label>
-                <label><span>Magic attack</span><div><input type="number" v-model="form.zmeny[CharacterStats.VLS_MGSIL_L]" v-watch-range min="-100" max="100"/>-<input type="number" v-model="form.zmeny[CharacterStats.VLS_MGSIL_H]" v-watch-range min="-100" max="100"/></div></label>
-                <label><span>Magic attack type</span><div><select v-model="form.zmeny[CharacterStats.VLS_MGZIVEL]">
-                    <option value="-1">--select--</option>
-                    <option value="0">fire</option>
-                    <option value="1">water</option>
-                    <option value="2">earth</option>
-                    <option value="3">air</option>
-                    <option value="4">mind</option>
-                </select></div></label>
-                <label><span>Extra damage</span><input v-model="form.zmeny[CharacterStats.VLS_DAMAGE]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection fire</span><input v-model="form.zmeny[CharacterStats.VLS_OHEN]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection water</span><input v-model="form.zmeny[CharacterStats.VLS_VODA]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection earth</span><input v-model="form.zmeny[CharacterStats.VLS_ZEME]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection air</span><input v-model="form.zmeny[CharacterStats.VLS_VZDUCH]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection mind</span><input v-model="form.zmeny[CharacterStats.VLS_MYSL]" type="number" v-watch-range min="-100" max="100" /></label>
-            </x-form>
+            <AbilitySheet v-model="form.zmeny" :changes="true" />
         </x-section>
         <x-section>
             <x-section-title>Effects</x-section-title>
-            <x-form>
-                <label><input type="checkbox" v-model="chk_effects.SPL_INVIS"/><span>Invisible</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_TVAR"/><span>Deflecting stance</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_OKO"/><span>Eye by eye</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_DRAIN"/><span>Live drain</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_MANASHIELD"/><span>Mana shield</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_SANC"/><span>Physical resistance (50%)</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_HSANC"/><span>Magical resistance (50%)</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_BLIND"/><span>Blinded</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_REGEN"/><span>Regenerate during battle</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_ICE_RES"/><span>Cold resitance</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_FIRE_RES"/><span>Hot resistance</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_KNOCK"/><span>Hit knock back</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_FEAR"/><span>Fear (flee from battle)</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_LEVITATION"/><span>Levitation</span></label>
-                <label><input type="checkbox" v-model="chk_effects.SPL_STONED"/><span>Stoned</span></label>
-                <label><span>Regen. HP</span><input v-model="form.zmeny[CharacterStats.VLS_HPREG]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Regen. mana</span><input v-model="form.zmeny[CharacterStats.VLS_MPREG]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Regen. vitality</span><input v-model="form.zmeny[CharacterStats.VLS_VPREG]" type="number" v-watch-range min="-100" max="100" /></label>
-            </x-form>
+            <EffectSheet v-model="form.zmeny[CharacterStats.VLS_KOUZLA]" />
         </x-section>
     </div>
     </div>
-    <div class="popup" v-if="change_icon_model"><div>
+    <dialog class="popup" ref="change_icon_popup" v-if="change_icon_model"><div>
         <template v-for="(ic, idx) of allIcons">
             <CanvasView :canvas="ic.createCanvas(PCXProfile.transp0)" @click="change_icon_model = idx"/>
         </template>
         
-    </div><button class="close" @click="change_icon_model=undefined"></button></div>
+    </div><button class="close" @click="change_icon_model=undefined"></button></dialog>
      </x-workspace>
 
 
@@ -768,5 +608,8 @@ background-position: 0px 2px, 4px 35px, 29px 31px, 34px 6px;
     cursor:pointer;
 }
 
+x-form label input[type="text"] {
+    width: 10rem;
+}
 
 </style>

@@ -1,5 +1,5 @@
 import ItemsEditor from "@/views/ItemsEditor.vue";
-import { BinaryIterator, BinaryWriter, joinUint8Arrays, parseSection, splitArrayBuffer, writeSection, type Schema, type SectionInfo } from "./binary";
+import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, parseSection, splitArrayBuffer, writeSection, type Schema, type SectionInfo } from "./binary";
 import { StringList1, StringList3 } from "./common_defs";
 import { string2keybcs } from "./keybcs2";
 
@@ -38,8 +38,8 @@ export const ItemSchema : Schema =  {
 export class ItemDef  {
 	jmeno: string="";
 	popis: string="";
-	zmeny: number[]=new Array(24).fill(0);
-	podminky: number[]=new Array(4).fill(0);
+	zmeny: number[]=make1DArray(24,0);
+	podminky: number[]=make1DArray(4,0);
 	hmotnost: number=0;
 	nosnost:number=0;
 	druh:number=0;
@@ -56,13 +56,13 @@ export class ItemDef  {
 	vzhled_on_female?:string;
 	user_value:number=0;
 	keynum:number=0;
-	polohy: number[][]=[[0,0],[0,0]];
+	polohy: number[][]=make2DArray(2,2,0);
 	typ_zbrane: number=0;
 	druh_sipu: number=0;
 	sound: number=0;
 	sound_file?:string=""
-	v_letu: number[]=new Array(16).fill(0);
-	v_letu_files? :string[];
+	v_letu: number[]=make1DArray(16,0);
+	v_letu_files :string[]=make1DArray(16,"");
 	cena:number=0;
 	weapon_animation:number=0;
 	weapon_animation_file?:string;
