@@ -26,6 +26,7 @@ export default defineConfig({
   build: {
     outDir: process.env.VITE_OUTPUT_DIR || 'dist' ,
     emptyOutDir: true,
+    assetsInlineLimit: 0
   },
   server: {
   proxy: {

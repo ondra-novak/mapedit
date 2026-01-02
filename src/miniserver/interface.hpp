@@ -31,6 +31,7 @@ protected:
     std::unique_ptr<DDLManager> _game;
     std::shared_mutex _mx;
     std::filesystem::path _user_dir;
+    std::filesystem::path _game_folder;
     std::string _addrport;
     std::u8string _current_ddl;
     std::stop_source _stop;
@@ -106,6 +107,9 @@ protected:
     void ws_control(const WsRpc::Request &req);
     void ws_file_history(const WsRpc::Request &req);    
     void ws_file_copy(const WsRpc::Request &req);   
+    void ws_publish_status(const WsRpc::Request &req);   
+    void ws_publish_set_image(const WsRpc::Request &req);   
+    void ws_publish_publish(const WsRpc::Request &req);   
 
     void send_state_update(WsRpc &rpc);
 
@@ -135,6 +139,9 @@ protected:
         {"preview_reload",&WebInterface::ws_preview_reload},
         {"preview_console_show",&WebInterface::ws_preview_console_show},
         {"preview_console_exec",&WebInterface::ws_preview_console_exec},
+        {"publish.status", &WebInterface::ws_publish_status},
+        {"publish.set_image", &WebInterface::ws_publish_set_image},
+        {"publish.publish", &WebInterface::ws_publish_publish},
     };
 
 

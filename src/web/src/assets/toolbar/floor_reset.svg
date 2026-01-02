@@ -1,9 +1,1 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect x="39.937" y="65.505" width="60.211" height="14.591" style="stroke-width: 1;"/>
-  <rect x="54.881" y="50.545" width="45.267" height="14.96" style="stroke-width: 1;"/>
-  <rect x="70.279" y="35.585" width="29.869" height="14.96" style="stroke-width: 1;"/>
-  <rect x="85.12" y="20.625" width="15.028" height="14.96" style="stroke-width: 1;"/>
-  <path d="M 24.208 15.632 H 72.437 L 72.437 6.632 L 96.574 20.132 L 72.437 33.632 L 72.437 24.632 H 24.208 V 15.632 Z" style="" transform="matrix(0, 1, -1, 0, 39.714714, -16.478071)"/>
-  <rect x="0.989" y="87.746" width="99.159" height="11.845" style=""/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M39.937 65.505h60.211v14.591H39.937zM54.881 50.545h45.267v14.96H54.881zM70.279 35.585h29.869v14.96H70.279zM85.12 20.625h15.028v14.96H85.12z" style="stroke-width:1"/><path d="M24.083 7.73v48.229h9l-13.5 24.137-13.5-24.137h9V7.729zM.989 87.746h99.159v11.845H.989z"/></svg>

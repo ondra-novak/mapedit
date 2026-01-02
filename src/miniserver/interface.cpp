@@ -4,6 +4,7 @@
 #include "mgifdecomp.hpp"
 #include "skeldal_exe.hpp"
 #include "utils/json.hpp"
+#include "publish_helper.hpp"
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -239,6 +240,7 @@ bool WebInterface::init_game_dir(std::filesystem::path game_dir, const Json &ske
             txt << "\n";            
         }        
     }
+    _game_folder = full_dir;
     _game = std::make_unique<DDLManager>(full_dir);
     _game_control = std::make_unique<SkeldalExeControl>(game_dir,ini,_addrport,[this](auto s){this->control(s);});
     return true;
@@ -721,6 +723,59 @@ void WebInterface::ws_file_copy(const WsRpc::Request &req) {
     }
 }
 
+void WebInterface::ws_publish_status(const WsRpc::Request &req){
+    PublishHelper hlp(_game_folder);;
+    auto p = getUserDDL().get_path();
+    auto st = hlp.get_state(p);
+    
+    std::vector<WsRpc::Attachment> attchs;
+
+    auto [data,ctx] = hlp.get_image(p);
+    if (!ctx.empty()) {
+        attchs.push_back(std::move(data));
+    }
+
+
+    req.send_response(Json{{
+        {"item_id", st.steam_id},
+        {"last_publish", st.publish_time == std::chrono::system_clock::time_point()?Json():Json(std::chrono::system_clock::to_time_t(st.publish_time))},
+        {"tags",Json::Array(st.tags.begin(), st.tags.end())},
+        {"visibility", st.visibility},        
+    },ctx},{attchs});
+
+
 }
+void WebInterface::ws_publish_set_image(const WsRpc::Request &req){
+    const auto ctx = req.params[0].as_text();
+    const auto attch = req.attachments[0];
+    auto p = getUserDDL().get_path();
+    PublishHelper hlp(_game_folder);;
+    hlp.set_image(p, attch, ctx);
+    req.send_response(true);
+
+
+}
+void WebInterface::ws_publish_publish(const WsRpc::Request &req){
+    auto title = req.params[0].as<std::string>();
+    auto desc = req.params[1].as<std::string>();
+    auto lang= req.params[2].as<std::string>();
+    auto tags = req.params[3].as_array();
+    auto visibility = req.params[4].as<unsigned int>();
+    auto change_desc = req.params[5].as<std::string>();
+    std::vector<std::string> taglst;
+    std::transform(tags.begin(), tags.end(), std::back_inserter(taglst),
+            [](const Json &x){return x.as<std::string>();});
+
+    auto p = getUserDDL().get_path();
+    PublishHelper hlp(_game_folder);
+    hlp.publish(p, std::move(title), std::move(desc), 
+            std::move(lang), std::move(taglst), 
+            visibility, std::move(change_desc));
+    req.send_response(true);
+    
+}
+
+}
+
 
 

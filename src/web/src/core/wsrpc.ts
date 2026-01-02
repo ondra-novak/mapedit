@@ -4,6 +4,18 @@ export type WsRpcResult = {
     attachments: ArrayBuffer[]
 }
 
+export class WsRpcException extends Error {
+    data: any;
+    constructor(data:any) {        
+        let str = JSON.stringify(data);
+        if (str.startsWith('"')) str = str.substring(1, str.length-1);
+        super(str);
+        this.data = data;
+        this.name = "WsRpcException";
+        Object.setPrototypeOf(this, WsRpcException.prototype);
+    }
+};
+
 type Pending = {
     suc:(x:WsRpcResult)=>void;
     fail:(x:any)=>void;
@@ -179,7 +191,7 @@ class WsRpcClient {
                 attachments: msg.attachments
             });
         } else {
-            pending.fail(msg.data);
+            pending.fail(new WsRpcException(msg.data));
         }
     }
 

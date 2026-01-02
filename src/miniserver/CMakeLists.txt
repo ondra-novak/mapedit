@@ -14,6 +14,10 @@ set_source_files_properties(
         OBJECT_DEPENDS ${GENERATED_H}
 )
 
+
+add_library(mapedit_server_webcontent webpage.cpp ${GENERATED_H})
+
+
 add_executable(mapedit_server 
     main.cpp 
     server.cpp 
@@ -25,7 +29,7 @@ add_executable(mapedit_server
     mgifcomp.cpp
     wsrpc.cpp
     publisher.cpp
-    webpage.cpp
+    publish_helper.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c
@@ -33,3 +37,4 @@ add_executable(mapedit_server
     utils/fast_copy_file.cpp
     )
 
+target_link_libraries(mapedit_server PRIVATE mapedit_server_webcontent)

@@ -1,5 +1,5 @@
 import type { AssetGroupType } from "./asset_groups";
-import  WsRpcClient  from "./wsrpc"
+import  WsRpcClient, { type WsRpcResult }  from "./wsrpc"
 
 
 
@@ -185,6 +185,23 @@ export class ApiClient extends WsRpcClient{
 
     async copy_files(from: string, to:string, to_group: AssetGroupType, from_rev = 0) : Promise<boolean> {
         return (await this.call("file_copy",[from, to, to_group, from_rev],[])).data;
+    }
+
+    async get_publish_status() : Promise<WsRpcResult> {
+        return await this.call("publish.status",[],[]);
+    }
+
+    async set_publish_image(image: ArrayBuffer, content_type: string): Promise<boolean> {
+        return (await this.call("publish.set_image",[content_type],[image])).data;;
+    }
+
+    async publish(title: string, 
+                 desc:string, 
+                 lang:string, 
+                 tags: string[],
+                 visbility: number,
+                 change_desc:string) : Promise<boolean> {
+        return (await this.call("publish.publish", [title,desc,lang,tags,visbility,change_desc],[])).data;
     }
 
 }
