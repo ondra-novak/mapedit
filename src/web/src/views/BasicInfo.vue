@@ -21,7 +21,8 @@ import { WsRpcException } from '@/core/wsrpc';
 class BasicInfoData {
     name:string = "My new adventure";
     desc:string = "some description of adventure";
-    characters:number = 3;
+    characters_min:number = 3;
+    characters_max:number = 3;
     start_map: string = "START.MAP";
     language: string = "en";
 };
@@ -204,7 +205,8 @@ async function publish_publish() {
                 <option v-for="v of lang_list" :key="v[0]" :value="v[2]"> {{ v[0] }} </option>
             </select></label>
             <label><span>Start map</span><input type="text" maxlength="12" v-model="basic_info.start_map" @input="basic_info.start_map=dosname_sanitize(basic_info.start_map)"></label>
-            <label><span>Initial number of adventurers</span><input type="number" v-watch-range min="1" max="6" v-model="basic_info.characters"></label>
+            <label><span>Initial number of adventurers</span><div><input type="number" v-watch-range min="1" max="6" v-model="basic_info.characters_min">-
+                                        <input type="number" v-watch-range :min="basic_info.characters_min" max="6" v-model="basic_info.characters_max"></div></label>
             <div class="label"><span>Initial runes</span>        <table>
             <tbody>
                 <tr v-for="(r, n) of runes" :key="n">
@@ -231,7 +233,7 @@ async function publish_publish() {
                 <label><span>Publised date</span><span> {{ publish_data.last_publish?.toLocaleString()  }} </span></label>
                 <label><span>Tags</span><div class="tags">
                     <div v-for="v of publish_data.tags" @click="deltag(v)"> {{ v }}</div>
-                    <input v-model="next_tag" @keydown="e=>tag_keydown(e)" @change="tag_change" :list="taglist.id" placeholder="Click to add a tag">
+                    <input v-model="next_tag" @keydown="(e:KeyboardEvent)=>tag_keydown(e)" @change="tag_change" :list="taglist.id" placeholder="Click to add a tag">
                 </div></label>
                 <label><span>Visibility</span><select v-model="publish_data.visibility">
                     <option :value="0">Public - visible to everyone</option>
@@ -245,6 +247,7 @@ async function publish_publish() {
             <x-section-title>Publish an update</x-section-title>
             <label  v-if="publish_data.item_id"><span>Description of changes:</span><w-y-s-i-w-y-gedit v-model="new_changelog" format="BBCode" class="chgdesc"/></label>
             <div class="pub"><button @click="publish_publish" :disabled="new_changelog.length == 0 && !!publish_data.item_id">Publish</button></div>
+            <p class="note">You can't publish! This feature is not implemented yet  (mock-up only)</p>
         </x-section>
     </div>
 </div>
@@ -329,6 +332,14 @@ async function publish_publish() {
     font-size: 2rem;
     text-align: center;
     margin: 0.3rem 0;
+}
+input[type=number] {
+    text-align: right   ;
+}
+
+p.note  {
+    color: red;
+    font-size: 1.2rem;
 }
 
 </style>

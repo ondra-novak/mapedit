@@ -48,6 +48,11 @@ export interface DDLFileHistory {
     timestamp: Date|null;
 }
 
+export interface ModifiedFileNotify {
+    name: string;
+    group: number;
+}
+
 export class Config {
     project = "";    
 }

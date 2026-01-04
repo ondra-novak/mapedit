@@ -455,7 +455,7 @@ bool WebInterface::file_put(std::string_view name, std::uint32_t group, bool fai
         if (fail_if_exists && user.exists(name)) return false;
         user.put(name, data, group);    
     }
-    _publisher.publish("modified", name);
+    _publisher.publish("modified", {{"name",name},{"group",group}});
     return true;
 }
 

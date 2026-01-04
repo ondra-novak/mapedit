@@ -2,7 +2,7 @@
 import AssetsPcxView from '@/components/AssetsPcxView.vue';
 import AssetsHiView from '@/components/AssetsHiView.vue';
 import AssetsList from '../components/AssetsList.vue'
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { AssetGroup } from '@/core/asset_groups';
 import type {AssetGroupType}from '@/core/asset_groups';
 import { server, type FileItem } from '@/core/api';
@@ -17,13 +17,16 @@ import AssetsToolMGF from '@/components/AssetsToolMGF.vue';
 import AssetsFontsViewer from '@/components/AssetsFontsViewer.vue';
 import TextsEditor from '@/components/TextsEditor.vue';
 import FileHistory from '@/components/FileHistory.vue';
+import { EditorID, mainMenuControl, mapEditorControl, type EditorRef } from '@/core/services';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
 const selected_group = ref<AssetGroupType>(AssetGroup.UNKNOWN);
 const cur_file_model = ref<FileItem>();
 const disable_delete = ref<boolean>(true);
-const editor_exists = ref<string>();
+const props = defineProps<{
+    active: boolean;
+}>();
 
 const listOfTools = {
     "walls":"Wall",
@@ -44,16 +47,20 @@ const listOfTools = {
     "ddlinfo":"Manage DDL",
 };
 
-const listOfEditors : Record<string,string>= {
-    "ENEMY.DAT":"enemies",
-    "SOUND.DAT":"enemies",
-    "ITEMS.DAT":"items",
-    "KOUZLA.DAT":"spells",
-    "KNIHA.TXT":"book",
-    "POSTAVY.DAT":"characters",
-    "DIALOGY.DAT":"dialogs",
-    "DIALOGY.JSON":"dialogs",
-    ".MAP":"maps"
+const listOfEditors : Record<string,(s:string)=>void>= {
+    "ADV.INI":()=>mainMenuControl.open_editor(EditorID.GENERAL),
+    "ENEMY.DAT":()=>mainMenuControl.open_editor(EditorID.ENEMIES),
+    "SOUND.DAT":()=>mainMenuControl.open_editor(EditorID.ENEMIES),
+    "ITEMS.DAT":()=>mainMenuControl.open_editor(EditorID.ITEMS),
+    "KOUZLA.DAT":()=>mainMenuControl.open_editor(EditorID.SPELLS),
+    "KNIHA.TXT":()=>{},
+    "POSTAVY.DAT":()=>mainMenuControl.open_editor(EditorID.CHARACTERS),
+    "DIALOGY.DAT":()=>{},
+    "DIALOGY.JSON":()=>{},
+    ".MAP":(s:string)=>{
+        mainMenuControl.open_editor(EditorID.MAP);
+        mapEditorControl.open_map(s);
+    }
 };
 
 
@@ -66,13 +73,22 @@ watch([selected_tool], ()=>{
     }
 });
 
+function is_editor_exists() {
+    const s = cur_file_model.value;
+    if (s) {
+        for (let v in listOfEditors) {
+            if (s.name.endsWith(v)) return true;
+        }
+    }
+    return false;
+}
+
+const editor_exists = computed(()=>is_editor_exists());
+
 function select_tool() : string | null {
-    editor_exists.value = undefined;
     if (!cur_file_model.value) return null;
     for (let v in listOfEditors) {
-        if (cur_file_model.value.name.endsWith(v)) {
-            return editor_exists.value = "#"+listOfEditors[v];
-        }
+        if (cur_file_model.value.name.endsWith(v)) return "editor_exists";
     }
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
     if (cur_file_model.value.name.endsWith(".TXT")) return "strings";
@@ -116,11 +132,6 @@ watch([cur_file_model], ()=>{
 
 const assetList = ref<InstanceType<typeof AssetsList> | null>(null)
 
-async function onUploadDone(filename:string, done?:Promise<void>) {
-    if (done) await done;
-    assetList.value?.reload();
-    if (cur_file_model.value) cur_file_model.value.name = filename;
-}
 
 function delete_file() {
     if (cur_file_model.value) {
@@ -135,38 +146,47 @@ function tool_click(id:string) {
     selected_tool.value = id;
 }
 
+function open_editor() {
+    const s = cur_file_model.value;
+    if (!s) return ;
+    for (const v in listOfEditors) {
+        if (s.name.endsWith(v)) {
+            const editor = listOfEditors[v];
+            editor(s.name);
+        }
+    }
+
+}
+
 </script>
 
 
-<template>
+<template>    
+<x-workspace :hidden="!active">
     <div class="left-panel">
-    <AssetsList v-model="cur_file_model" ref="assetList" />
+    <AssetsList v-model="cur_file_model" ref="assetList" class="asslst" />
     </div>
 
     <div class="middle-panel-pos">
         <div class="middle-panel">
             <div class="tools-pos">
-                <div class="tools">
+                <div class="tools" v-if="active">
                     <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" 
-                        v-model:file="selected_file" v-model:group="selected_group"
-                        @upload="onUploadDone" />
-                    <AssetsHiView v-if="selected_tool == 'dialogshi'"
-                        v-model="selected_file" @upload="onUploadDone" />
-                    <AssetsToolCol v-if="selected_tool == 'coledit'" 
-                        v-model="selected_file" @upload="onUploadDone" />
-                    <AssetToolIcons v-if="selected_tool == 'icons'" @upload="onUploadDone"/>
-                    <AssetToolSeq v-if="selected_tool == 'seqedit'" v-model="selected_file" @upload="onUploadDone"/>
-                    <AssetsFloorAndCeil v-if="selected_tool == 'floorceil'"  @upload="onUploadDone"/>
-                    <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />
-                    <AssetsToolUpload v-if="selected_tool == 'upload'" @upload="onUploadDone"
                         v-model:file="selected_file" v-model:group="selected_group" />
+                    <AssetsHiView v-if="selected_tool == 'dialogshi'" v-model="selected_file" />
+                    <AssetsToolCol v-if="selected_tool == 'coledit'"  v-model="selected_file"  />
+                    <AssetToolIcons v-if="selected_tool == 'icons'"/>
+                    <AssetToolSeq v-if="selected_tool == 'seqedit'" v-model="selected_file"/>
+                    <AssetsFloorAndCeil v-if="selected_tool == 'floorceil'" />
+                    <AssetsDDLManage v-if="selected_tool == 'ddlinfo'" />
+                    <AssetsToolUpload v-if="selected_tool == 'upload'" v-model:file="selected_file" v-model:group="selected_group" />
                     <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
                     <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
-                    <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" @upload="onUploadDone"/>
+                    <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" />
                     <FileHistory v-if="selected_tool == 'history'" v-model="selected_file" />
-                    <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" @upload="onUploadDone"/>
-                    <div v-if="selected_tool == editor_exists" class="goto-tool">
-                        <div class="hint-link">Open editor</div>
+                    <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" />
+                    <div v-if="selected_tool == 'editor_exists'" class="goto-tool">
+                        <button @click="open_editor">Open editor</button>
                     </div>
                     <div v-if="selected_tool == 'delete'" class="delete-file">
                         <p>Confirm you want to delete file:</p>
@@ -180,11 +200,12 @@ function tool_click(id:string) {
             <div class="tool-bar">
                 <div v-for="(t,id) in listOfTools" :class="{selected: selected_tool == id}" :key="id" @click="tool_click(id)"> {{ t }} </div>
                 <div v-if="!disable_delete" :class="{selected: selected_tool == 'delete'}"  @click="tool_click('delete')">Delete file</div>
-                <div v-if="editor_exists" :class="{selected: selected_tool == editor_exists}" @click="tool_click(editor_exists)">Goto editor</div>
+                <div v-if="editor_exists" :class="{selected: selected_tool == 'editor_exists'}" @click="tool_click('editor_exists')">Goto editor</div>
             </div>            
         </div>
     </div>
 
+</x-workspace>
 </template>
 
 <style scoped>
@@ -193,6 +214,7 @@ function tool_click(id:string) {
     position: absolute;
     top: 0;
     bottom: 0px;
+    
 }
 
 .middle-panel-pos {
@@ -263,6 +285,11 @@ function tool_click(id:string) {
     padding: 1rem;
     margin: auto;
     margin-top: 20vh;
+}
+.asslst {
+    background-color: white;
+    overflow: auto;
+    height: 100%;
 }
 
 </style>

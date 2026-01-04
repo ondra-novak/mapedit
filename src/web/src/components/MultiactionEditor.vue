@@ -573,7 +573,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
 <template>
 <div class="wrk">    
     <div class="scroll">
-        <div class="list">
+        <div class="tree-list">
             <div v-for="(x, cat) of event_list" :key="cat" :class="{'tree-node': true, opened: !!(ActionEventToBin[cat] & opened_events)}">
                 <div @click="open_close(cat)" class="event-name" > {{  cat }}</div>
                 <template v-if="!!(ActionEventToBin[cat] & opened_events)">
@@ -891,34 +891,13 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
     background-color: #ddd;
 }
 
-.list .tree-node {
-    position: relative;
-}
-
-.list .tree-node .event-name::before {
-    position: absolute;
-    display: block;
-    content: "⊞";
-    left: 0;
-}
-
-.list .tree-node.opened .event-name::before {
-    content: "⊟";
-}
-
-.list .item {
-    padding-left: 2rem;
-    line-height: 1.5rem;
-    position: relative;
-}
-
-.list > *:last-child {
+.tree-list > *:last-child {
     margin-bottom: 2.5rem;
 }
-.list .item.focused {
+.tree-list .item.focused {
     background-color: wheat;
 }
-.list .item > .buttonx {
+.tree-list .item > .buttonx {
     position: absolute;
     display: inline-block;
     right: 0;
@@ -929,11 +908,11 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
     text-align:center;
     line-height: 1rem;
 }
-.list .item > .buttonx::after {
+.tree-list .item > .buttonx::after {
     content: 'x';
 }
 
-.list > div > div:hover {
+.tree-list > div > div:hover {
     background-color: antiquewhite;
     cursor: pointer;
 }

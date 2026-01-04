@@ -4,13 +4,12 @@ import CanvasView from '@/components/CanvasView.vue';
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { COLPaletteSet } from '@/core/col_palette_set';
-import { CharacterStats, CharacterStatsMinMaxs, CharacterStatsNames, ElementTypeName, EnemyStats, SpellEffectName, SpellEffects } from '@/core/common_defs';
-import { EnemyDef, EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,enemyToArrayBuffer } from '@/core/enemy_struct';
-import { useBitmaskCheckbox2 } from '@/core/flags';
+import { CharacterStats} from '@/core/common_defs';
+import { enemyAndSoundFromArrayBuffer, enemyAndSoundToArrayBuffer, EnemyDef, EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,enemyToArrayBuffer } from '@/core/enemy_struct';
 import { itemsFromArrayBuffer, type ItemDef } from '@/core/items_struct';
 import { PCXProfile, PCX } from '@/core/pcx';
 import { SeqFile } from '@/core/seqfile';
-import { computed, onMounted, onUnmounted, reactive, ref, watch, type WatchHandle } from 'vue';
+import { computed, onMounted, onUnmounted,  ref, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar'
 import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue';
@@ -44,26 +43,30 @@ async function  load_files() {
     const sst = save_state;
     save_state = null;
 
-    const [en, sd, id] = await Promise.all([
-        getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS),
-        getDDLFileWithImport(server, "SOUND.DAT", AssetGroup.MAPS),
-        getDDLFileWithImport(server, "ITEMS.DAT", AssetGroup.MAPS)
-    ]);
+
+
+
+    const en = await getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS)
     if (en) {
-        enemies.value = enemyFromArrayBuffer(en);
-    }
-    if (sd) {
-        sounds.value = enemySoundsFromArrayBuffer(sd);
+        const x = enemyAndSoundFromArrayBuffer(en);
+        if (x === null) {
+            const sd = await getDDLFileWithImport(server, "SOUND.DAT", AssetGroup.MAPS);
+            if (sd) {
+                enemies.value = enemyFromArrayBuffer(en);
+                sounds.value = enemySoundsFromArrayBuffer(sd);
+            }
+        } else {
+            enemies.value = x[0];
+            sounds.value = x[1];
+        }
         enemies.value.forEach(enm=>{
             enm.sound_files = [];
             for (let i = 0; i < 4; ++i) {
                 enm.sound_files[i] = sounds.value[enm.sounds[i]-1] || "";
             }
         });
-    } 
-    if (id) {
-        items.value = itemsFromArrayBuffer(id);
-    } 
+
+    }
 
     queueMicrotask(()=>save_state = sst);
     selected_enemy.value = undefined;
@@ -130,12 +133,9 @@ async function save_all() {
 
             const e = enemies.value;
             const s = sounds.value;
-            const ebuff = enemyToArrayBuffer(enemies.value);
-            const sbuff = enemySoundsToArrayBuffer(sounds.value);
-            await Promise.all([
-                server.putDDLFile("ENEMY.DAT",ebuff,AssetGroup.MAPS),
-                await server.putDDLFile("SOUND.DAT",sbuff,AssetGroup.MAPS)
-            ]);
+            const ebuff = enemyAndSoundToArrayBuffer(e,s);
+            
+            await server.putDDLFile("ENEMY.DAT", ebuff, AssetGroup.MAPS);
         }
         catch (e) {
             alert("Failed to save files:" + e);

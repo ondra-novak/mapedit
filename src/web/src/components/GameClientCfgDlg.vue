@@ -137,7 +137,7 @@ async function store_config() {
     <header>Game client configuration</header>
     <div class="path">
         <div>Game folder</div>
-        <div class="oneline"><input type="text" v-model="game_folder" @input="error_game_path = false"/><button @click="click_browse">Browse</button></div>
+        <div class="oneline"><input type="text" v-model="game_folder" @input="error_game_path = false"/><!--<button @click="click_browse">Browse</button>--></div>
     </div>
     <p v-if="error_game_path" class="error">Entered path is not valid</p>
     <hr />

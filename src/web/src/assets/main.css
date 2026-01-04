@@ -193,3 +193,30 @@ dialog > footer > .left {
   color: blue;
   cursor: pointer;
 }
+
+
+.tree-list .tree-node {
+    position: relative;
+}
+
+.tree-list .tree-node > *:first-child {
+  padding-left: 1rem;
+}
+.tree-list .tree-node > *:first-child:before {
+    position: absolute;
+    display: block;
+    content: "⊞";
+    font-weight: normal;    
+    left: 0;
+    top:0
+}
+
+.tree-list .tree-node.opened > *:first-child::before {
+    content: "⊟";
+}
+
+.tree-list .tree-node > *:nth-child(2) {
+    padding-left: 2rem;
+    line-height: 1.5rem;
+    position: relative;
+}

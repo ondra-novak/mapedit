@@ -1,161 +1,224 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue';
-import { AssetGroup, AssetGroupLabel } from "@/core/asset_groups.ts";
+import { ref, watch, onMounted, computed, triggerRef, onUnmounted } from 'vue';
+import { AssetGroup, AssetGroupLabel,  groupFromNumber, type AssetGroupType } from "@/core/asset_groups.ts";
 import {server  } from '@/core/api.ts';
-import type{ FileItem } from '@/core/api.ts';
+import type{ FileItem, ModifiedFileNotify } from '@/core/api.ts';
+import type { WsRpcResult } from '@/core/wsrpc';
 
-const selectedFile = defineModel<FileItem>();
+const model = defineModel<FileItem>();
 const select_model = ref<string>();
-// Groups
-const asset_groups = AssetGroupLabel;
+const opened_groups = ref(new Set<AssetGroupType>);
+const filter_by_mine = ref(false);
+const srch_filter = ref("");
+
+const files_per_group = ref(new Map<AssetGroupType, FileItem[]>);
+
+function update_list(n:ModifiedFileNotify) {
+  const ng = n.group as AssetGroupType;
+  for (const [g, lst] of files_per_group.value) {
+      const idx = lst.findIndex(v=>v.name.toUpperCase() == n.name.toUpperCase());
+      if (idx > 0) {
+          lst.splice(idx,1);
+      }
+  }
+  let new_grp = files_per_group.value.get(ng);
+  if (!new_grp) {
+      new_grp = [];
+      files_per_group.value.set(ng, new_grp);
+  }
+  const idx = new_grp.findIndex(v=>v.name.localeCompare(n.name) > 0);
+  const nitm = {group: ng, name: n.name, ovr:true};
+  if (idx) {
+      new_grp.splice(idx,0, nitm);
+  } else {
+      new_grp.push(nitm);
+  }
+  triggerRef(files_per_group);
+}
+
+
+function update_files(data: WsRpcResult) {
+    update_list(data.data as ModifiedFileNotify);
+}
+
+async function reload_files() {
+    const all_files = await server.getDDLFiles(null, filter_by_mine.value?"user":"");
+    const new_list  = new Map<AssetGroupType, FileItem[]>();
+    all_files.files.forEach(f=>{
+        let lst = new_list.get(f.group);
+        if (!lst) new_list.set(f.group, lst = []);
+        lst.push(f);
+    })
+    files_per_group.value = new_list;
+    const m = model.value;
+    if (m) {
+        const lst  = new_list.get(m.group);
+        if (!lst) model.value = undefined;
+        else {
+            const idx = lst.find(x=>x.name ==m.name);
+            if (!idx) model.value = undefined;
+        }
+    }
+}
 
 defineExpose({
-  reload: loadFiles
+  reload: reload_files
 })
 
-// Filtry
-const filterType = ref(0);      // 0 = vše, 1 = něco, 2 = něco jiného (podle tvého enumu)
-const filterSource = ref('');   // "" = vše, "orig", "user"
-
-
-
-// Data
-const files = ref<Record<string,FileItem> >({});
-const loading = ref(false);
-const error = ref<string | null>(null);
-
-
-// Simulace fetch z backendu
-async function fetchFilesFromBackend(type: number, source: string): Promise<FileItem[]> {
-  loading.value = true;
-  error.value = null;  
-  try {
-    const ddldata = await server.getDDLFiles(type, source);
-    // mock data - ve skutečnosti to přijde z backendu podle filtru
-    return ddldata.files;
-  } catch (e) {
-    error.value = 'Nepodařilo se načíst soubory';
-    return [];
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function loadFiles() {
-  files.value = (await fetchFilesFromBackend(filterType.value, filterSource.value))
-    .reduce((a:Record<string, FileItem>, b)=>{
-      a[b.name] = b;
-      return a;
-    },{})
-}
-
-function selectFile(file: FileItem) {
-  selectedFile.value = file;  
-}
-
-// Na začátku načti data
-onMounted(() => {
-  loadFiles();
+onMounted(()=>{
+    reload_files();
+    server.on("modified", update_files);
 });
 
-const getRowClass = computed(()=> {
-  return (file:FileItem) => {
-    return {
-      selected: file.name == selectedFile.value?.name,
-      ovr: file.ovr,
+onUnmounted(()=>{
+    server.off("modified", update_files);
+});
+
+const group_order = [
+AssetGroup.WALLS, 
+AssetGroup.ITEMS, 
+AssetGroup.ENEMIES, 
+AssetGroup.DIALOGS, 
+AssetGroup.UI, 
+AssetGroup.SOUNDS, 
+AssetGroup.MUSIC, 
+AssetGroup.MAPS, 
+AssetGroup.FONTS, 
+AssetGroup.UNKNOWN];
+
+const ordered_list = computed(()=>{
+    const lst : AssetGroupType[]= [];
+    for (const v of group_order) {
+      if (files_per_group.value.has(v)) {
+        lst.push(v);
+      }
     }
-  }
-});
+    return lst;
+})
 
-// Sleduj změny filtrů a načti soubory znovu
-watch([filterType, filterSource], () => {
-  loadFiles();
-});
-
-function updateSelectedFile (){
-  if (selectedFile.value) {
-    select_model.value = selectedFile.value.name    
-  }
-}
-
-function updateSelectModel() {
-  if (select_model.value && files.value) {
-    selectedFile.value = {
-        name: select_model.value,
-        group: files.value[select_model.value].group,
-        ovr: files.value[select_model.value].ovr,
+function open_close(g:AssetGroupType)  {
+    if (opened_groups.value.has(g)) {
+      opened_groups.value.delete(g);
+    } else {
+      opened_groups.value.add(g);
     }
-  }
+    triggerRef(ordered_list);
 }
 
 
-watch([selectedFile], updateSelectedFile);
-watch([select_model], updateSelectModel);
+const active_element = ref<Element>();
+
+watch(active_element, ()=>{
+  if (active_element.value) {
+    active_element.value.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+});
+watch(filter_by_mine,()=>{
+    reload_files();
+})
+
+function key_control(e:KeyboardEvent ) {    
+    const m = model.value;
+    if (!m) return;
+    const g = files_per_group.value.get(m.group);
+    if (!g) return;
+    let idx = g.findIndex(x=>x.name == m.name);    
+    if (idx < 0) return;
+    if (e.key == "ArrowUp") {
+        idx = Math.max(idx-1,0);
+        model.value = g[idx];
+        e.preventDefault();
+        e.stopPropagation();
+    } else if (e.key == "ArrowDown"){
+        idx = Math.min(idx+1,g.length-1);
+        model.value = g[idx];
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}
+
+function filter_group(v: AssetGroupType) {
+    const lst = files_per_group.value.get(v);
+    if (!lst) return [] as FileItem[];
+    const src = srch_filter.value.toUpperCase();
+    return lst.filter(x=>x.name.toUpperCase().indexOf(src) >= 0);
+}
+
 </script>
-
 <template>
-  <div class="flist">
-    <div class="toolbar">
-      <select v-model.number="filterType">        
-        <option :value="0">All</option>
-        <option v-for="(label, key) of asset_groups" :key="key" :value="key">{{ label }}</option>
-      </select>
-
-      <select v-model="filterSource">
-        <option value="">All</option>
-        <option value="orig">Original</option>
-        <option value="user">User</option>
-      </select>
-
-      <button @click="loadFiles" :disabled="loading">R</button>
-    </div>
-
-    <div v-if="loading">Načítám soubory...</div>
-    <div v-if="error" style="color: red">{{ error }}</div>
-
-    <select size="2" v-model="select_model" class="files">
-      <option v-for="(file, key) in files" :key="key" :class="{ovr: file.ovr}">{{ file.name }}</option>
-    </select>
+<div v-bind="$attrs" tabindex="1" @keydown="(e:KeyboardEvent)=>key_control(e)">
+  <div class="tlb">
+    <div :class="{pressed: filter_by_mine}" title="Show only my files" @click="filter_by_mine = !filter_by_mine"></div>
+    <input type="search" v-model="srch_filter" :placeholder="filter_by_mine?'Search my files':'Search files'">
   </div>
+  <div class="tree-list" :key="srch_filter">
+    <div v-for="v of ordered_list" :key="v" class="tree-node" :class="{opened: opened_groups.has(v)}" >
+      <div @click="open_close(v)"> {{ AssetGroupLabel[v] }}</div>
+      <div v-if="opened_groups.has(v)">
+        <div class="nothing">
+          <div v-for="l of filter_group(v)" 
+              :key="l.name" :class="{modified: l.ovr,active: l.name == model?.name}" 
+                :ref="(el)=>{ if (el && l.name == model?.name) active_element = el as Element}"
+                @click="model=l"> {{ l.name }}</div>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </template>
+<style lang="css" scoped>
 
-<style scoped>
-
-.flist {
-  width: 100%;
-  height: 100%;
-  position:relative;
+.tree-node {padding: 0.2rem;cursor: pointer;}
+.tree-node > *:first-child{ font-weight: bold;;}
+.active {
+  background-color: wheat;
 }
-
-.files {
-  position: absolute;
-  display:block;
-  left:0;top:2em;right: 0;bottom: 0;
+.tree-node > *:nth-child(2) {
+  font-style: italic;
+  color: #666;
 }
-
-.files option.ovr {
-  font-weight: bold;
-  padding-left:0.5em;
+.modified {
+  font-style: normal !important;
+  color: black;
 }
-
-.files option.ovr::before {
-  content: "✏️";
-  display: inline-block;
-  width: 1.5em;
+.tlb {
+  position: sticky;
+  top: 0;
+  height: 2rem;
+  border: 1px solid;
+  display: flex;
+  z-index: 1;
 }
-
-.files option {
-  padding-left: 2em;
-}
-
-.toolbar > select, .toolbar > button {
-  height: 2em;;
-}
-.toolbar >button {
+.tlb > input{
   flex-grow: 1;
+  width: 1rem;
 }
-.toolbar {
-  display:flex;  
+.tlb > div {
+  width: 2rem;
+  text-align: center;
+  background-color: #ccc;
+  position: relative;
+}
+.tlb > div::before {
+  content: "✏️";
+  display: block;
+  position: absolute;
+  inset: 2px;
+  padding: 2px;
+  width: fit-content;
+  height: fit-content;
+  margin: auto;
+  border: 1px outset;
+  cursor: pointer;
 }
 
+.tlb > div.pressed::before {
+  border: 1px inset;
+  background-color: #aaa;
+}
+
+.nothing:empty::before {
+    content: "No files match the filter";
+}
 </style>

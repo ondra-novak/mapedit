@@ -482,7 +482,7 @@ watch(items, ()=>{
             <dt>XICHT??.PCX</dt>
             <dd>Four variants of portraits* image 54x300  (54x75 for each)<br>
                 <br>
-                <span class="note">* The name xicht is a phonetic transcription of the Czech word ksich, which is a dirty word means a face.</span>
+                <span class="note">* The name xicht is a phonetic transcription of the Czech word ksicht, which is a dirty word means a face.</span>
             </dd>
             </dl>
             </div>

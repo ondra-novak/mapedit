@@ -1,5 +1,5 @@
 import { getDDLFileWithImport } from "@/components/tools/missingFiles";
-import { server } from "@/core/api";
+import { server, type ModifiedFileNotify } from "@/core/api";
 import {type WsRpcResult } from "@/core/wsrpc";
 import { AssetGroup } from "@/core/asset_groups";
 import { itemsFromArrayBuffer, type ItemDef } from "@/core/items_struct";
@@ -12,7 +12,8 @@ async function globalGetItems() {
         item_list = getDDLFileWithImport(server, "ITEMS.DAT", AssetGroup.MAPS)
                .then(x=>x?itemsFromArrayBuffer(x):[],x=>[]);     
         const inv = (x: WsRpcResult)=>{
-            if (x.data == "ITEMS.DAT") {
+            const n : ModifiedFileNotify = x.data;
+            if (n.name == "ITEMS.DAT") {
                 item_list = null;
                 server.off("modified", inv);
             }

@@ -4,7 +4,7 @@ import MessageBoxComponent from './utils/messageBoxComponent.vue';
 import MissingFiles from './components/tools/MissingFiles.vue';
 import ProjectSelectorDlg from './components/ProjectSelectorDlg.vue';
 import ServerConfigDlg from './components/GameClientCfgDlg.vue';
-import { ref, watch } from 'vue';
+import { onMounted, ref, triggerRef, watch } from 'vue';
 import BasicInfo from './views/BasicInfo.vue';
 import MapEditor from './views/MapEditor.vue';
 import AssetsManager from './views/AssetsManager.vue';
@@ -13,12 +13,13 @@ import EnemiesEditor from './views/EnemiesEditor.vue';
 import SpellsEditor from './views/SpellsEditor.vue';
 import CharacterEditor from './views/CharacterEditor.vue';
 import ShopsEditor from './views/ShopsEditor.vue';
+import { mainMenuControl, type EditorRef } from './core/services';
 
 const active_item = ref<number>(0);
 
 
 const items = {
-  1:"Basic",
+  1:"General",
   2:"Assets",
   3:"Map",
   4:"Items",
@@ -28,6 +29,15 @@ const items = {
   8:"Shops"  
 }
 
+function open_editor(id:EditorRef) {
+  active_item.value = id;  
+}
+
+onMounted(()=>{
+  mainMenuControl.set_instance({
+    open_editor
+  });
+});
 
 </script>
 
@@ -38,8 +48,11 @@ const items = {
 </menu>
 <div class="workspace-outer">
   <div class="workspace-inner">
+    <div v-of="active_item == 0">
+      <img src="@/assets/logo.png">
+    </div>
     <div v-if="active_item == 1"><BasicInfo  /></div>
-    <div v-if="active_item == 2"><AssetsManager /></div>
+    <div><AssetsManager :active="active_item == 2"/></div>
     <div><MapEditor :active="active_item == 3"/></div>
     <div v-if="active_item == 4"><ItemsEditor /></div>
     <div v-if="active_item == 5"><EnemiesEditor /></div>

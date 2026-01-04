@@ -25,4 +25,14 @@ export const AssetGroupLabel =  Object.freeze(Object.fromEntries([
 ]));
 
 
+
 export type AssetGroupType = typeof AssetGroup[keyof typeof AssetGroup];
+
+export function groupFromNumber(n: number) : keyof typeof AssetGroup {
+    const r = Object.entries(AssetGroup).find(x=>x[1] == n);
+    if (r) {
+        return r[0] as keyof typeof AssetGroup;
+    } else {
+        return "UNKNOWN"
+    }
+}

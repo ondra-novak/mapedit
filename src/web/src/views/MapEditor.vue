@@ -25,6 +25,7 @@ import { ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import { enemyFromArrayBuffer, type EnemyDef } from '@/core/enemy_struct';
 import ItemList from '@/components/ItemList.vue';
+import { mapEditorControl } from '@/core/services';
 const list_assets = ref<string[]>([]);
 const item_list = ref<ItemDef[]>([]);
 const enemy_list = ref<EnemyDef[]>([]);
@@ -699,6 +700,7 @@ function open_map_prompt() {
 
 async function init() {        
     open_map_prompt();
+    mapEditorControl.set_instance({open_map:(s:string)=>loadMap(s)})
 }
 
 function resetFloor() {

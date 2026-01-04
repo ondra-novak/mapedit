@@ -1,4 +1,4 @@
-import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, splitArrayBuffer, type Schema, type SchemaObject, type SchemaType } from "./binary";
+import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, parseSection, splitArrayBuffer, writeSection, type Schema, type SchemaObject, type SchemaType } from "./binary";
 
 
 const MOBS_INV = 16;
@@ -114,6 +114,51 @@ const EnemySchema : Schema = {
 } as const;
 
 
+const EnemySchemaNew : Schema = {
+  name: "char[30]",                 //30
+  casting: "int16",                 //32
+  adjusting: ["int16", 6, 16],      //224
+  sector: "uint16",                 //226
+  dir: "uint16",                    //228
+  locx: "int8",
+  locy: "int8",
+  headx: "int8",
+  heady: "int8",                    //232
+  anim_counter: "uint16",           //234
+  vlastnosti: ["uint16", 24],       //282
+  inv: ["int16", MOBS_INV],         //314
+  lives: "int16",                   //316
+  cislo_vzoru: "int16",             //318
+  speed: "int16",                   //320
+  dohled: "int16",                  //322
+  dosah: "int16",                   //324
+  stay_strategy: "uint8",           //325
+  walk_data: "int8",                //326
+  bonus: "uint16",                  //328
+  flee_num: "int8",                 //329
+  anim_counts: ["int8", 6],         //335
+  mobs_name: "char[7]",             //342
+  flags2:  "uint8",                 //343
+  reserved: "uint8",                //344
+  experience: "int32",              //348
+  vlajky: "uint8",                  //349
+  anim_phase: "uint8",              //350
+  csektor: "int16",                 //352
+  home_pos: "int16",                //354
+  next: "int16",                    //356
+  actions: "uint8",                 //357
+  hit_pos: "uint8",                 //358
+  sounds: ["uint16", MOB_SOUNDS],   //366
+  paletts_count: "int8",            //367
+  mode: "int8",                     //368
+  dialog: "int16",                  //370
+  dialog_flags: "int16",            //372
+  money: "uint16",                  //374
+  specproc: "uint16",               //376
+  reserved2: "uint16",              //378
+  reserved3: "uint16",              //380
+} as const;
+
 export type Enemies = EnemyDef[];
 export type EnemySounds = string[];
 
@@ -128,7 +173,7 @@ const EnemyHdr = {
     "itemsz":376
 };
 
-export function enemyFromArrayBuffer(buffer:ArrayBuffer ): Enemies {
+function enemyFromArrayBufferOld(buffer:ArrayBuffer ): Enemies {
     const iter = new BinaryIterator(buffer);
     const hdr = iter.parse(EnemyHdrSchema);
     if (hdr.ver != 256) throw new Error("Invalid ENEMY.DAT version");
@@ -141,6 +186,18 @@ export function enemyFromArrayBuffer(buffer:ArrayBuffer ): Enemies {
     return enms;
 }
 
+export function enemyFromArrayBufferNew(buffer:ArrayBuffer ): Enemies {
+    const iter = new BinaryIterator(buffer);
+    const enms = [] as Enemies;
+    while (!iter.eof()) {
+        const e = new EnemyDef;
+        Object.assign(e, iter.parse(EnemySchemaNew));
+        enms.push(e);
+    }
+    return enms;
+}
+
+
 export function enemyToArrayBuffer(enms: Enemies) : ArrayBuffer {
     const wrt = new BinaryWriter();
     wrt.write(EnemyHdrSchema, EnemyHdr);
@@ -148,7 +205,16 @@ export function enemyToArrayBuffer(enms: Enemies) : ArrayBuffer {
         wrt.write(EnemySchema, x);
     });
     return wrt.getBuffer();
+
 }
+export function enemyToArrayBufferNew(enms: Enemies) : ArrayBuffer {
+    const wrt = new BinaryWriter();
+    enms.forEach(x=>{
+        wrt.write(EnemySchemaNew, x);
+    });
+    return wrt.getBuffer();
+}
+
 
 export function enemySoundsFromArrayBuffer(buffer: ArrayBuffer):  EnemySounds {
     const view = buffer.slice(4);
@@ -169,6 +235,45 @@ export function enemySoundsToArrayBuffer(sounds: EnemySounds):  ArrayBuffer {
     strs.push(new ArrayBuffer(0));
     strs.push(new ArrayBuffer(0));
     return joinUint8Arrays(strs,0).buffer;
+}
+
+export function enemyAndSoundToArrayBuffer(enms:Enemies, sounds: EnemySounds) {
+    const e = enemyToArrayBufferNew(enms);
+    const s = enemySoundsToArrayBuffer(sounds);
+    const wr = new BinaryWriter();
+    writeSection(wr, 1, e);
+    writeSection(wr, 2, s);
+    writeSection(wr,0x8000, new ArrayBuffer());    
+    return wr.getBuffer();
+}
+
+export function enemyAndSoundFromArrayBuffer(buff: ArrayBuffer): [Enemies, EnemySounds]|null {
+    try {
+        parseSection(new BinaryIterator(buff));
+    } catch (e) {
+        return null;
+    }    
+    const rd = new BinaryIterator(buff);
+    let enemies: Enemies = [];
+    let sounds: EnemySounds = [];
+    let s = parseSection(rd);
+    while (s.type != 0x8000) {
+        switch (s.type) {
+            case 1: enemies = enemyFromArrayBufferNew(s.data);break;
+            case 2: sounds = enemySoundsFromArrayBuffer(s.data);break;            
+        }
+        s = parseSection(rd);
+    }
+    return [enemies, sounds];
+}
+
+export function enemyFromArrayBuffer(buffer:ArrayBuffer ): Enemies {
+    const s = enemyAndSoundFromArrayBuffer(buffer);
+    if (s == null) {
+        return enemyFromArrayBufferOld(buffer);
+    } else {
+        return s[0];
+    }
 }
 
 
