@@ -1,0 +1,46 @@
+import { fileURLToPath, URL } from 'node:url'
+
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import vueJsx from '@vitejs/plugin-vue-jsx'
+import vueDevTools from 'vite-plugin-vue-devtools'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith("x-")
+        }
+      }
+    }),
+    vueJsx(),
+    vueDevTools(),
+  ],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    },
+  },
+  build: {
+    outDir: process.env.VITE_OUTPUT_DIR || 'dist' ,
+    emptyOutDir: true,
+    assetsInlineLimit: 0
+  },
+  server: {
+  proxy: {
+    '/api': {
+      target: 'http://127.0.0.1:8088',
+      changeOrigin: true,
+      secure: false,
+    },
+    '/ws': {
+      target: 'ws://127.0.0.1:8088',
+      ws: true,
+      changeOrigin: true,
+      secure: false,
+    }
+  },  
+}
+})

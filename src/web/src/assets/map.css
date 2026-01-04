@@ -1,0 +1,191 @@
+
+.mapview {
+    width: 100%;
+    height: 100%;
+    overflow: auto;    
+    position: relative;
+}
+
+.mapview svg {
+    width:100%;
+    height: 100%;
+}
+
+.mapview svg .sector.lava{
+    fill:rgb(255, 185, 81);
+}
+.mapview svg .sector.acid{
+    fill:rgb(134, 216, 51);
+}
+.mapview svg .sector.normal{
+    fill: white;
+}
+.mapview svg .sector.water{
+    fill: rgb(183, 183, 253);
+}
+
+.mapview svg .sector-conn {
+    fill: none;
+    stroke: #0088;
+    stroke-width: 2px;
+}
+.mapview svg .sectorfeat.stairs{
+    fill: black;
+}
+.mapview svg .sectorfeat.flute{
+    fill: blue;
+}
+.mapview svg .sectorfeat.pit{
+    fill: black;
+}
+.mapview svg .sectorfeat.column{
+    fill: #888;
+    stroke: black;
+}
+.mapview svg .sectorfeat.button{
+    stroke: black;
+    fill: none;
+}
+.mapview svg .sectorfeat.button.pressed{
+    stroke: black;
+    fill: rgb(0, 255, 0);
+
+}
+.mapview svg .sectorfeat.death{
+    fill: red;
+}
+.mapview svg .sectorfeat.ship{
+    fill: blue;
+    stroke: blue;
+}
+.mapview svg .sectorfeat.lvplace{
+    fill: rgb(255, 238, 0);
+    stroke: #0008
+}
+.mapview svg .sectorfeat.teleport{
+    stroke: blue;
+    fill: none;
+    stroke-width: 2px;
+}
+.mapview svg .wall.sound_impassable{
+    mix-blend-mode: multiply;
+    stroke: #8F8;
+}
+.mapview svg .wall.alarm{
+    mix-blend-mode: multiply;
+    stroke: red;
+}
+.mapview svg .wall.solid{
+    stroke: black;
+}
+.mapview svg .wall.secondary {
+    stroke: #0008;
+    stroke-dasharray: 2 2;
+}
+.mapview svg .wall.passable{
+    stroke: #aaa;
+}
+.mapview svg .wall.item_barrier{
+    mix-blend-mode: multiply;
+    stroke: #88F;
+}
+.mapview svg .wall.impassable{
+    mix-blend-mode: multiply;
+    stroke: rgba(255, 219, 119);
+}
+.mapview svg .wall.enemy_only_passable{
+    stroke: greenyellow;
+}
+.mapview svg .wall.edge{
+    stroke: black;
+    stroke-width: 2px;
+}
+.mapview svg .wall.secret{
+    stroke: blue;
+}
+.mapview svg .wall.niche{
+    fill: white;
+    stroke: black;
+}
+.mapview svg .arc {
+    stroke: blue;
+}
+.mapview svg .action.wall{
+    fill: #f8a;
+}
+.mapview svg .action.script{
+    fill: #a8f;
+}
+.mapview svg .action.button{
+    fill: #f8a;
+}
+.mapview svg .enemy.placed{
+    fill: red;
+}
+.mapview svg .enemy.impassable{
+    stroke: #F88;
+    mix-blend-mode: multiply;
+}
+.mapview svg .enemy.direction{
+    fill: #aaa;
+}
+.mapview svg .items.placed{
+    fill: green;
+    stroke: none;
+}
+
+.mapview svg .arrow {
+    fill:none;
+    stroke: black;
+    marker-end: url(#arrowhead);
+}
+
+.mapview svg .arrow.out {
+    stroke-dasharray: 3 1;
+    stroke: green
+}
+.mapview svg .arrow.in {
+    stroke-dasharray: 3 1;
+    stroke: purple   ;
+}
+
+.disable_sector_basic .mapview svg .sector,
+.disable_sector_features .mapview svg .sectorfeat,
+.disable_walls .mapview svg .wall,
+.disable_arc .mapview svg .arc,
+.disable_grid .mapview svg .grid,
+.disable_actions .mapview svg .action,
+.disable_arrows .mapview svg .arrow.same,
+.disable_ext_arrows .mapview svg .arrow.in,
+.disable_ext_arrows .mapview svg .arrow.out,
+.disable_enemies .mapview svg .enemy,
+.disable_sector_connections .mapview svg .sector-conn,
+.disable_items .mapview svg .items {
+    visibility: hidden;
+}
+
+.mapview svg .rect-selection {
+    fill: #FF84;
+    stroke: black;
+    stroke-width: 2px;
+    stroke-dasharray: 4 2;
+}
+
+.mapview svg .selection {
+    fill: rgba(255, 217, 0, 0.533);
+}
+
+.mapview svg .focus-bgr {
+    fill: #f8a8;
+    stroke-dasharray: 1 1;
+    stroke: black;
+}
+.mapview svg .focus {
+    fill: red;
+}
+.mapview svg .focus-itm {
+    fill: #0F04;
+}
+.gridpattern {
+    stroke: black;
+}
