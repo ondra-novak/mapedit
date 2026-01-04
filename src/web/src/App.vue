@@ -48,9 +48,10 @@ onMounted(()=>{
 </menu>
 <div class="workspace-outer">
   <div class="workspace-inner">
-    <div v-of="active_item == 0">
-      <img src="@/assets/logo.png">
-    </div>
+    <x-workspace v-of="active_item == 0">
+      <div><img src="@/assets/logo.png"></div>
+      <div>Pre-alpha version</div>
+    </x-workspace>
     <div v-if="active_item == 1"><BasicInfo  /></div>
     <div><AssetsManager :active="active_item == 2"/></div>
     <div><MapEditor :active="active_item == 3"/></div>

@@ -5,7 +5,7 @@ export interface TeleporToFlags {
 }
 
 export interface IGameClientControl {
-    start:()=>void;
+    start:()=>Promise<void>;
     stop:() =>void;
     reload:()=>void;
     teleport_to:(map_name: string, sector: number, side: number, flags: TeleporToFlags)=>void;

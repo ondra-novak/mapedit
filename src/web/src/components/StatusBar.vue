@@ -3,6 +3,7 @@ import StatusBar, { type IGameClientControl, type SaveRevertControl } from '@/co
 import svg_gear from '@/assets/toolbar/gear.svg'
 
 import { onMounted, ref, watch } from 'vue';
+import { messageBoxAlert } from '@/utils/messageBox';
 
 const current_project = ref<string>();
 const current_map = ref<string>();
@@ -237,10 +238,14 @@ function reload_client() {
     }
 }
 
-function start_client() {
+async function start_client() {
     if (game_client_cntr.value) {
-        game_client_cntr.value.start();
-        client_status.value = true;
+        try {
+            await game_client_cntr.value.start();
+            client_status.value = true;
+        } catch (e) {
+            messageBoxAlert(`Failed to run game: ${(e as Error).message}`);
+        }
     }
 }
 

@@ -46,7 +46,7 @@ void process_directory(std::ostream &out, const std::filesystem::path &path, std
                     std::cout << "\"";
                     for (char x: sub) {
                         switch (x) {
-                            case '\0': std::cout << "\\0";break;
+                            case '\0': std::cout << "\\0";avoid_hex = true;break;
                             case '\n': std::cout << "\\n";break;
                             case '\t': std::cout << "\\t";break;
                             case '\a': std::cout << "\\a";break;

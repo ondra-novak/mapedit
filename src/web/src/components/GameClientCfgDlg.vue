@@ -10,8 +10,8 @@ const dlg = ref<HTMLDialogElement>();
 const show_dlg = ref<boolean>(false);
 let reg_ok = false;
 
-function start() {
-    server.game_client_start();
+async function start() {
+    await server.game_client_start();
 }
 
 function stop() {

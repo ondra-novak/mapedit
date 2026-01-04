@@ -251,13 +251,17 @@ void WebInterface::load_config()
     try {
         std::ifstream cfgdata(_user_dir/".config", std::ios::in);
         if (!cfgdata) {
-            _config = Json::Object();
+            _config = {{"game_dir","."},{"skeldal_ini",{
+                {"fullscreen",false},
+                {"window_height",480},
+                {"window_width",640}
+            }}};
         } else {
             std::string content((std::istreambuf_iterator<char>(cfgdata)), std::istreambuf_iterator<char>());
             _config = Json::from_string(content);
         }
         _current_ddl = _config["project"].as<std::u8string>();
-        auto game_dir = _config["game_dir"].as<std::u8string>();
+        auto game_dir = _config["game_dir"].as<std::u8string>();        
         const auto &skeldal_ini = _config["skeldal_ini"];
         
         init_game_dir(game_dir, skeldal_ini);
@@ -631,7 +635,15 @@ void WebInterface::ws_config_put(const WsRpc::Request &req) {
 }
 void WebInterface::ws_preview_start(const WsRpc::Request &req) {
     std::lock_guard _(_mx);
-    if (!_game_control) req.send_error(404, "Not configured");
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+        return;
+    }
+    auto ddl = _user_dir/_current_ddl;
+    if (!std::filesystem::is_regular_file(ddl))  {
+        req.send_error(409, "Project is empty");
+        return;
+    }
     _game_control->start(_user_dir/_current_ddl);
    req.send_response(true);   
 
