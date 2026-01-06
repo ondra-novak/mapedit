@@ -44,7 +44,7 @@ void process_directory(std::ostream &out, const std::filesystem::path &path, std
                     auto sub = data.substr(i*chunk_size,chunk_size);
                     std::cout << "std::string_view(";
                     std::cout << "\"";
-                    for (char x: sub) {
+                    for (signed char x: sub) {
                         switch (x) {
                             case '\0': std::cout << "\\0";avoid_hex = true;break;
                             case '\n': std::cout << "\\n";break;
@@ -54,22 +54,18 @@ void process_directory(std::ostream &out, const std::filesystem::path &path, std
                             case '\r': std::cout << "\\r";break;
                             case '\"': std::cout << "\\\"";break;
                             case '\\': std::cout << "\\\\";break;
-                            default: if (x > 0 && x < 32) {
-                                std::cout << "\\x" << std::hex << static_cast<int>(x);
+                            default: if (x < 32) {
+                                std::cout << "\\x" << std::hex << static_cast<unsigned int>(static_cast<unsigned char>(x));
                                 avoid_hex = true;
                             } else {
                                 bool qm2 = x == '?';
-                                bool is_hex = std::isxdigit(static_cast<unsigned char>(x));
+                                bool is_hex = std::isxdigit(static_cast<unsigned char>(x));                                
                                 if ((qm && qm2)|| (avoid_hex && is_hex)) {
-                                    std::cout << "\\x" << std::hex << static_cast<int>(x);
-                                    qm = false;
-                                    avoid_hex = true;
-                                } else {
-                                    qm = qm2;
-                                    avoid_hex = false;
-                                    std::cout.put(x);
-                                } 
-                                
+                                    std::cout << "\"\"";
+                                }
+                                qm = qm2;
+                                avoid_hex = false;
+                                std::cout.put(x);                                
                             }
                         }
                     }

@@ -131,3 +131,14 @@ export class StringList1 {
 
 	}
 };
+
+export const CharacterWeaponBonus = {
+        TPW_MEC: 0,
+        TPW_SEKERA: 1,
+        TPW_KLADIVO: 2,
+        TPW_HUL: 3,
+        TPW_DYKA: 4,
+        TPW_STRELNA: 5,
+        TPW_OST: 6,
+        TPW_MAX: 7,
+} as const;

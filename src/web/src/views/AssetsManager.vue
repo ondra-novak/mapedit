@@ -18,6 +18,7 @@ import AssetsFontsViewer from '@/components/AssetsFontsViewer.vue';
 import TextsEditor from '@/components/TextsEditor.vue';
 import FileHistory from '@/components/FileHistory.vue';
 import { EditorID, mainMenuControl, mapEditorControl, type EditorRef } from '@/core/services';
+import DialogDecompiler from '@/components/DialogDecompiler.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -55,7 +56,7 @@ const listOfEditors : Record<string,(s:string)=>void>= {
     "KOUZLA.DAT":()=>mainMenuControl.open_editor(EditorID.SPELLS),
     "KNIHA.TXT":()=>{},
     "POSTAVY.DAT":()=>mainMenuControl.open_editor(EditorID.CHARACTERS),
-    "DIALOGY.DAT":()=>{},
+//    "DIALOGY.DAT":()=>{},
     "DIALOGY.JSON":()=>{},
     ".MAP":(s:string)=>{
         mainMenuControl.open_editor(EditorID.MAP);
@@ -90,6 +91,7 @@ function select_tool() : string | null {
     for (let v in listOfEditors) {
         if (cur_file_model.value.name.endsWith(v)) return "editor_exists";
     }
+    if (cur_file_model.value.name.toUpperCase() == "DIALOGY.DAT") return "dialog_decompiler";
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
     if (cur_file_model.value.name.endsWith(".TXT")) return "strings";
     switch (cur_file_model.value.group) {
@@ -185,6 +187,7 @@ function open_editor() {
                     <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" />
                     <FileHistory v-if="selected_tool == 'history'" v-model="selected_file" />
                     <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" />
+                    <DialogDecompiler v-if="selected_tool == 'dialog_decompiler'" />
                     <div v-if="selected_tool == 'editor_exists'" class="goto-tool">
                         <button @click="open_editor">Open editor</button>
                     </div>

@@ -4,6 +4,7 @@
 #include "utf8.hpp"
 #include "flatmap.hpp"
 
+#include <cstdint>
 #include <variant>
 #include <vector>
 #include <unordered_map>
@@ -29,10 +30,10 @@ public:
 
     template<typename T>
     requires(std::is_integral_v<T> && std::is_arithmetic_v<T>)
-    JsonNumber(T val):std::string(std::to_string(val)) {};
+    JsonNumber(T val):std::string(std::to_string(val)) {}
     template<typename T>
     requires(std::is_floating_point_v<T>)
-    JsonNumber(T val):std::string(std::format("{:.12g}", val)) {};
+    JsonNumber(T val):std::string(std::format("{:.12g}", val)) {}
     
 
     template<typename T>

@@ -55,6 +55,15 @@ export interface SchemaObject {
 
 export type Schema = SchemaType| SchemaArray | SchemaBitmap | SchemaObject;
 
+        function demask(v:number, m:number) : number|boolean{
+            if (m >= 0x80000000) return demask(v>>>1, m>>>1);
+            const shift = Math.log2(m & -m);
+            const vv = (v & m) >> shift;;
+            if ((m & -m) == m) return  (vv != 0);
+            return vv;
+        }
+
+
 
 export class BinaryIterator {
 
@@ -86,14 +95,19 @@ export class BinaryIterator {
 
     parse_bitmap(v: number, bitmap: Record<string, number> ) {
         const out : Record<string, number|boolean> = {};
+
         for (const k in bitmap) {
-            const m = bitmap[k];
-            const shift = Math.log2(m & -m);
-            const vv = (v & m) >> shift;;
-            if ((m & -m) == m) out[k] = (vv != 0);
-            else out[k] = vv;
+            out[k] = demask( v, bitmap[k]);
         }
         return out;
+    }
+
+    tell() {
+        return this.position;
+    }
+
+    seek_rel(x:number) {
+        this.position = this.position+x;
     }
 
     parse(schema: Schema) : any{

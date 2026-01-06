@@ -4,7 +4,7 @@ import MessageBoxComponent from './utils/messageBoxComponent.vue';
 import MissingFiles from './components/tools/MissingFiles.vue';
 import ProjectSelectorDlg from './components/ProjectSelectorDlg.vue';
 import ServerConfigDlg from './components/GameClientCfgDlg.vue';
-import { onMounted, ref, triggerRef, watch } from 'vue';
+import { onMounted, ref } from 'vue';
 import BasicInfo from './views/BasicInfo.vue';
 import MapEditor from './views/MapEditor.vue';
 import AssetsManager from './views/AssetsManager.vue';
@@ -18,16 +18,16 @@ import { mainMenuControl, type EditorRef } from './core/services';
 const active_item = ref<number>(0);
 
 
-const items = {
-  1:"General",
-  2:"Assets",
-  3:"Map",
-  4:"Items",
-  5:"Enemies",
-  6:"Spells",
-  7:"Characters",
-  8:"Shops"  
-}
+const items : [number,string][]= [
+  [1,"General"],
+  [2,"Assets"],
+  [3,"Map"],
+  [4,"Items"],
+  [5,"Enemies"],
+  [6,"Spells"],
+  [7,"Characters"],
+  [8,"Shops" ],
+] as const;
 
 function open_editor(id:EditorRef) {
   active_item.value = id;  
@@ -44,7 +44,7 @@ onMounted(()=>{
 <template>
 <div class="screen">
 <menu>
-  <li v-for="(n, i) of items" @click="active_item = i" :class="{active: active_item == i}"> {{ n }}</li>
+  <li v-for="n of items" @click="active_item = n[0]" :class="{active: active_item == n[0]}"> {{ n[1] }}</li>
 </menu>
 <div class="workspace-outer">
   <div class="workspace-inner">

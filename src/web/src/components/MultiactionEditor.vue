@@ -576,7 +576,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
         <div class="tree-list">
             <div v-for="(x, cat) of event_list" :key="cat" :class="{'tree-node': true, opened: !!(ActionEventToBin[cat] & opened_events)}">
                 <div @click="open_close(cat)" class="event-name" > {{  cat }}</div>
-                <template v-if="!!(ActionEventToBin[cat] & opened_events)">
+                <div v-if="!!(ActionEventToBin[cat] & opened_events)">
                     <div v-for="(y,idx) of x" :key="idx" class="item" :class="{focused: y == focused_item}" 
                         @click="if(focused_item ==y) dialog_editor!.show(); else focused_item =y">
                         {{ ActionNameMap[y.header.action as number]}} {{ print_action_flags(y) }}
@@ -585,7 +585,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
 
                         </div>
                     </div>
-                </template>
+                </div>
             </div>
         </div>
     </div>
@@ -912,7 +912,7 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
     content: 'x';
 }
 
-.tree-list > div > div:hover {
+.tree-list .item:hover {
     background-color: antiquewhite;
     cursor: pointer;
 }
