@@ -325,3 +325,94 @@ export class DialogDef {
     }
 
 };
+
+export const DialogBranchType = {
+    jump_to_node:0,       //jump immediately, skip node
+    npctalk:1,    //npc talking, display text and pause
+    choice:2,     //add choice into choices list
+    selchar:3,    //ask for character and continue to target (for example cast spell on target)
+    seldead:4     //ask for dead character and continue to target (for example ressurection)
+} as const;
+
+export const DialogBranchTypeStr = Object.entries(DialogBranchType).reduce((a,b)=>{
+    a[b[1]] = b[0];
+    return a;
+},[] as string[]);
+
+export interface DialogBranch {
+    ///type of this branch
+    type: typeof DialogBranchType[keyof typeof DialogBranchType];
+    ///who speaks (for choice, 0 default)
+    speaker?: number;
+    ///text of this branch (not for jump)
+    text?: string;
+    ///condition when this branch is taken - undefined, no condition
+    condition?: string;
+    ///target node, if not defined, dialog ends 
+    target: number|null;
+};
+
+export interface DialogAction {
+    source: string ;
+    ast: Record<string, any> ;
+}
+
+export interface DialogNode {
+    name?: string;
+    picture?: string;
+    description?: string;    
+    action?: DialogAction;
+    branches: DialogBranch[];
+}
+
+export interface DialogStory {
+    nodes: Record<number, DialogNode>;
+    picture: string;
+    description: string;
+    conditions: Record<string, DialogAction[]>
+    name: string;
+}
+
+export class DialogManager {
+    _dlg: DialogStory[] = [];
+
+    static new_node() : DialogNode{
+        return {
+            branches:[]
+        }
+    }
+
+    static new_branch(): DialogBranch {
+        return {
+            type: DialogBranchType.choice,
+            target: null
+        };
+    }
+
+    static new_story(): DialogStory {
+        return {
+            nodes: {},
+            picture:"",
+            description:"",
+            conditions:{},
+            name: ""
+        };
+    }
+
+    static create_node(story: DialogStory) : [number, DialogNode] {
+        let i = 0;
+        while (story.nodes[i]) ++i;
+        story.nodes[i] = DialogManager.new_node();
+        return [i, story.nodes[i]];
+    }
+
+    save() : string {
+        return JSON.stringify({"dialogs":this._dlg});
+    }
+
+    load(txt:string) {
+        const s = JSON.parse(txt);;
+        this._dlg = s["dialogs"];
+    }
+
+}

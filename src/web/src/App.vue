@@ -14,6 +14,7 @@ import SpellsEditor from './views/SpellsEditor.vue';
 import CharacterEditor from './views/CharacterEditor.vue';
 import ShopsEditor from './views/ShopsEditor.vue';
 import { mainMenuControl, type EditorRef } from './core/services';
+import DialogsEditor from './views/DialogsEditor.vue';
 
 const active_item = ref<number>(0);
 
@@ -27,6 +28,7 @@ const items : [number,string][]= [
   [6,"Spells"],
   [7,"Characters"],
   [8,"Shops" ],
+  [9,"Dialogs"]
 ] as const;
 
 function open_editor(id:EditorRef) {
@@ -60,6 +62,7 @@ onMounted(()=>{
     <div v-if="active_item == 6"><SpellsEditor /></div>
     <div v-if="active_item == 7"><CharacterEditor /></div>
     <div v-if="active_item == 8"><ShopsEditor /></div>
+    <div><DialogsEditor :active="active_item == 9"/></div>
   </div>
 </div>
 <div class="statusbar">  

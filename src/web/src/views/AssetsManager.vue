@@ -56,8 +56,8 @@ const listOfEditors : Record<string,(s:string)=>void>= {
     "KOUZLA.DAT":()=>mainMenuControl.open_editor(EditorID.SPELLS),
     "KNIHA.TXT":()=>{},
     "POSTAVY.DAT":()=>mainMenuControl.open_editor(EditorID.CHARACTERS),
-//    "DIALOGY.DAT":()=>{},
-    "DIALOGY.JSON":()=>{},
+    "DIALOGY.DAT":()=>{mainMenuControl.open_editor(EditorID.DIALOGS)},
+    "DIALOGY.JSON":()=>{mainMenuControl.open_editor(EditorID.DIALOGS)},
     ".MAP":(s:string)=>{
         mainMenuControl.open_editor(EditorID.MAP);
         mapEditorControl.open_map(s);

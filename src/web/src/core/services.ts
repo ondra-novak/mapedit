@@ -25,7 +25,8 @@ export const EditorID = {
     ENEMIES:5,
     SPELLS:6,
     CHARACTERS:7,
-    SHOPS:8    
+    SHOPS:8,
+    DIALOGS:9
 } as const;
 
 export type EditorRef = typeof EditorID[keyof typeof EditorID];

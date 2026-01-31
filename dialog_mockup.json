@@ -1,0 +1,115 @@
+{
+    "dialogs": [
+        {
+            "name": "The Lost Sword",
+            "picture": "story_cover.png",
+            "description": "A short demo story where the player must retrieve a lost sword.",
+            "conditions": {},
+            "nodes": {
+                "0": {
+                    "picture": "village.png",
+                    "name":"Square",
+                    "description": "The village square, peaceful but quiet.",
+                    "branches": [
+                        {
+                            "type": 1,
+                            "text": "Welcome, traveler! You look lost.",
+                            "target": 1
+                        }
+                    ]
+                },
+                "1": {
+                    "name":"Reply guard",
+                    "picture": "npc_guard.png",
+                    "description": "The village guard approaches you.",
+                    "branches": [
+                        {
+                            "type": 2,
+                            "text": "Ask about the lost sword.",
+                            "target": 2
+                        },
+                        {
+                            "type": 2,
+                            "text": "How do you do",
+                            "target": 7
+                        },
+                        {
+                            "type": 2,
+                            "text": "Ignore the guard and walk away.",
+                            "target": 5
+                        }
+                    ]
+                },
+                "2": {
+                    "name":"Guard response",
+                    "picture": "npc_guard.png",
+                    "description": "The guard scratches his head.",
+                    "branches": [
+                        {
+                            "type": 1,
+                            "text": "Ah, the lost sword! It's said to be in the old forest.",
+                            "target": 3
+                        }
+                    ]
+                },
+                "3": {
+                    "picture": "forest.png",
+                    "name":"Edge dark forest",
+                    "description": "You arrive at the edge of the dark forest.",
+                    "branches": [
+                        {
+                            "type": 2,
+                            "text": "Enter the forest.",
+                            "target": 4
+                        },
+                        {
+                            "type": 2,
+                            "text": "Return to the village.",
+                            "target": 5
+                        }
+                    ]
+                },
+                "4": {
+                    "name":"Inside forest",
+                    "picture": "forest_clearing.png",
+                    "description": "A clearing with a pedestal, sword resting upon it.",
+                    "branches": [
+                        {
+                            "type": 3,
+                            "text": "Choose a character to retrieve the sword.",
+                            "target": 6
+                        }
+                    ]
+                },
+                "5": {
+                    "name":"Back in village",
+                    "picture": "village.png",
+                    "description": "You return to the village square. Nothing happens.",
+                    "branches": []
+                },
+                "6": {
+                    "picture": "forest_clearing.png",
+                    "name":"Retrieve sword",
+                    "description": "The chosen character retrieves the sword successfully.",
+                    "branches": [
+                        {
+                            "type": 1,
+                            "text": "You have obtained the lost sword! Victory!",
+                            "target": null
+                        }
+                    ]
+                },
+                "7": {
+                    "name": "Guard is fine",
+                    "branches": [
+                        {
+                            "type": 1,
+                            "text": "I am fine, need help?",
+                            "target": 1
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
