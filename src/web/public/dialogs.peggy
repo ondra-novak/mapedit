@@ -8,9 +8,17 @@ Code
   = Sequence
   
 Sequence 
-  = left:Assignment _ ";" _ right: Sequence {
-  return bin(left, ";", right);
- } /  left:Assignment _ ";"  /Assignment
+  = first:Assignment
+    rest:(
+      _ ";" _ stmt:Assignment { return stmt; }
+    )*
+    _ ";"?
+  {
+    return {
+      type: "sequence",
+      commands: [first, ...rest]
+    };
+  }
 
   
 Assignment 
@@ -55,6 +63,8 @@ Primary
   / String
   / Identifier
   / "(" _ Expression _ ")"
+  / "+" _ Number 
+  / "-" _ arg:Number {return {type:"call","name":"unar_minus","args":[arg]}; }
 
 Call
   = name:Identifier _ "(" _ args:Arguments? _ ")" {

@@ -1,8 +1,8 @@
 {
-    "dialogs": [
-        {
+    "dialogs": {
+        "1":{            
             "name": "The Lost Sword",
-            "picture": "story_cover.png",
+            "picture": "DLG_HOSP.HI",
             "description": "A short demo story where the player must retrieve a lost sword.",
             "conditions": {},
             "nodes": {
@@ -111,5 +111,5 @@
                 }
             }
         }
-    ]
+    }
 }

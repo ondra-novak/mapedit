@@ -347,21 +347,21 @@ export interface DialogBranch {
     ///text of this branch (not for jump)
     text?: string;
     ///condition when this branch is taken - undefined, no condition
-    condition?: string;
+    condition: string;
     ///target node, if not defined, dialog ends 
     target: number|null;
 };
 
 export interface DialogAction {
     source: string ;
-    ast: Record<string, any> ;
+    ast: Record<string, any>|null ;
 }
 
 export interface DialogNode {
-    name?: string;
-    picture?: string;
-    description?: string;    
-    action?: DialogAction;
+    name: string;
+    picture: string;
+    description: string;    
+    action: DialogAction;
     branches: DialogBranch[];
 }
 
@@ -374,17 +374,22 @@ export interface DialogStory {
 }
 
 export class DialogManager {
-    _dlg: DialogStory[] = [];
+    _dlg: Record<number, DialogStory> = {};
 
     static new_node() : DialogNode{
         return {
-            branches:[]
-        }
+            branches:[],
+            action:{ast:{},source:""},
+            description:"",
+            picture:"",
+            name:""
+        };
     }
 
     static new_branch(): DialogBranch {
         return {
             type: DialogBranchType.choice,
+            condition:"",
             target: null
         };
     }
