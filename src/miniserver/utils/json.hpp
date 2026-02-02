@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <variant>
 #include <vector>
-#include <unordered_map>
 #include <string>
 #include <format>
 #include <optional>
@@ -572,7 +571,7 @@ inline JsonBuilder::JsonBuilder(const T &other):type(Type::value) {
         type = Type::string;
         string.str = txt.data();
         string.len = txt.size();
-    } else {
+    } else {    
         static_assert(std::is_constructible_v<Json, const T &>, "Json object is not constructible from this type");
         item.ptr = &other;
         item.construct = [](const void *src) {
