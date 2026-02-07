@@ -63,6 +63,7 @@ Primary
   / String
   / Identifier
   / "(" _ Expression _ ")"
+  / "{" _ Sequence _ "}"
   / "+" _ Number 
   / "-" _ arg:Number {return {type:"call","name":"unar_minus","args":[arg]}; }
 

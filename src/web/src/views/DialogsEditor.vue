@@ -1,33 +1,75 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
-import { DialogManager, DialogBranchType, type DialogNode, type DialogStory, DialogBranchTypeStr } from '@/core/dialog_structs';
+import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker } from '@/core/dialog_structs';
 import { SVGPath } from '@/utils/svg';
-import { computed, onMounted, reactive, ref,watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref,watch } from 'vue';
 import noimage from '@/assets/noimage.svg'
 import HIFormat from '@/core/hiformat';
 import { create_datalist, type DataListItem } from '@/utils/datalist';
 import { AssetGroup } from '@/core/asset_groups';
 import DlgCodeEditor from '@/components/DlgCodeEditor.vue';
+import { messageBoxConfirm } from '@/utils/messageBox';
+import type { SaveRevertControl } from '@/components/statusBar';
+import StatusBar from '@/components/statusBar';
+import { json } from 'stream/consumers';
+import { CharacterStatsNames } from '@/core/common_defs';
+import { humanDataFromArrayBuffer, type THumanData } from '@/core/character_structs';
 
 const dialogs = reactive(new DialogManager);
 let inited = false;
 const props = defineProps<{active:boolean}>();
+let save_state: SaveRevertControl|null = null;
+let ignore_modified = false;
+const edit_speakers_dlg = ref<HTMLDialogElement>();
 
+
+function modified() {
+    if (!ignore_modified) init();
+    ignore_modified = false;
+}
 
 async function init() {
+    if (save_state) {
+        save_state.set_changed(false);
+        save_state.unmount();
+    }
     try {
         const json_data = await server.getDDLFile("DIALOGY.JSON");
         const dec = new TextDecoder();
         dialogs.load(dec.decode(json_data));
         inited = true;
 
-        server.on("modified", ()=>{
-            init();            
-        });
+        server.off("modified", modified);
+        server.on("modified", modified);
+
+        
 
     } catch (e) {
         console.warn("Failed to load dialogs", e);
+    }    
+
+    current_index.value = null;
+
+}
+
+async function init_save() {
+    if (!save_state) {
+        save_state = await StatusBar.register_save_control();
+        save_state!.on_save(save_all);
+        save_state!.on_revert(()=>{
+        init();
+    });
+
+
     }
+}
+
+async function save_all() {
+    const json_data = dialogs.save();
+    const enc = new TextEncoder();
+    const bin = enc.encode(json_data);
+    ignore_modified = true;
+    await server.putDDLFile("DIALOGY.JSON", bin.buffer, AssetGroup.MAPS);    
 }
 
 onMounted(()=>{
@@ -35,15 +77,31 @@ onMounted(()=>{
 });
 
 watch(()=>props.active,()=>{
-    if (props.active && !inited) init();
+    if (props.active) {
+        if (!inited) {
+            init(); 
+        }
+        init_save();                
+    }
+    if (!props.active && save_state) {
+        save_state.unmount();
+        save_state = null;
+    }
 })
+
+watch(dialogs, ()=>{
+    if (save_state) save_state.set_changed(true);    
+},{deep:true})
 
 
 const dlgimage = ref<SVGImageElement>();
-const current_index = ref<number>();
+const current_index = ref<number|null>(null);
 const list_filter = ref<string>("");
 
-const cur_story = ref<DialogStory>()
+const cur_story = computed(()=>{
+    if (current_index.value) return dialogs._dlg[current_index.value];
+    return undefined;
+})
 const filtered_list = computed(()=>{
     const srch = list_filter.value.toLocaleLowerCase();
     return Object.entries(dialogs._dlg).map(v=>[parseInt(v[0]),v[1].name] as [number, string])
@@ -58,7 +116,6 @@ async function update_image() {
         const cvs = hi.createCanvas();
         const href = cvs.toDataURL("image/jpeg");
         dlgimage.value.setAttribute("href",href);
-//        dlgimage.value.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', href);
     }
 }
 
@@ -134,6 +191,7 @@ interface Layout {
     nodes: NodeLayout;
     vias: ViaList;
     arrows: Arrows;
+    unused: Record<number, boolean>
 };
 
 const node_base_height = 1;
@@ -188,7 +246,7 @@ function create_layout(story: DialogStory) : Layout{
                     from_via
                 });
             } else if (tlevel > cur_level) {
-                let h = add_via(cur_level+1, target, toffset);
+                let h = add_via(cur_level+1, target, offset);
                 arrows.push({
                     from_level:cur_level,
                     from_offset: offset,
@@ -243,13 +301,13 @@ function create_layout(story: DialogStory) : Layout{
     
     while (queue.length) {
         const cur = queue.shift()!;
-        const cur_node = cur as Node;
+        const selected_node = cur as Node;
         const cur_via = cur as Via;
-        if (cur_node && cur_node.height !== undefined) {
-            const cur_level = level_map[cur_node.node_id];    
-            const node = story.nodes[cur_node.node_id];
+        if (selected_node && selected_node.height !== undefined) {
+            const cur_level = level_map[selected_node.node_id];    
+            const node = story.nodes[selected_node.node_id];
             node.branches.forEach((b,idx)=>{
-                const offset = cur_node.offset+node_base_height+idx;
+                const offset = selected_node.offset+node_base_height+idx;
                 if (b.target !== null && b.target !== undefined) {
                     add_route(cur_level, b.target, offset, false);
                 }
@@ -261,12 +319,8 @@ function create_layout(story: DialogStory) : Layout{
 
     const unused = Object.fromEntries(Object.keys(story.nodes).map(x=>[x,true]));
     for (const k in level_map) delete unused[k];
-    Object.keys(unused).map((k,idx)=> {
-                        add_node(parseInt(k), idx, 0);
-    });
 
-
-    return {nodes,vias,arrows};
+    return {nodes,vias,arrows, unused};
 }
 
 const diagram = ref<Layout>();
@@ -279,7 +333,7 @@ watch(cur_story, ()=>{
 
 watch(current_index, ()=>{
     if (typeof current_index.value == "number") {
-        cur_story.value =  dialogs._dlg[current_index.value];
+//        cur_story.value =  dialogs._dlg[current_index.value];
     } else {
         return null;
     }
@@ -290,16 +344,28 @@ interface EditFocus {
     dlg?: number
     node?: number;
     branch?: number;
+    condition?: string;
 }
 
 const edit_focus = ref<EditFocus>({});
 
 
 function create_story() {
-
+    const n = dialogs.create_story();
+    if (current_index.value !== null) {
+        const spkcfg = dialogs._dlg[current_index.value].speakers.map(x=>{
+            return Object.assign({}, x) as DialogSpeaker;
+        });
+        dialogs._dlg[n].speakers = spkcfg;
+    }
+    current_index.value = n;
+    edit_focus.value = {};
 }
-function delete_story() {
-
+async function delete_story() {
+    const s = current_index.value
+    if (s && await messageBoxConfirm(`Confirm you wish to delete whole story "#${s} ${dialogs._dlg[s].name}"`)) {
+        delete dialogs._dlg[s];
+    }
 }
 
 const grid_x = 200;
@@ -377,11 +443,154 @@ function add_branch() {
     if (f.node === undefined || f.dlg === undefined) return;
     const d = dialogs._dlg[f.dlg];
     const n = d.nodes[f.node];
-    const [id, node] = DialogManager.create_node(d);
     const b = DialogManager.new_branch();
-    b.target = id;
+    b.target = null;
     n.branches.push(b);
+    edit_focus.value.branch =  n.branches.length-1;
 }
+function add_node_branch() {
+    const f = edit_focus.value;
+    if (f.node === undefined || f.dlg === undefined || f.branch === undefined) return;
+    const d = dialogs._dlg[f.dlg];
+    const n = d.nodes[f.node];
+    const nn = DialogManager.create_node(d);
+    const b = n.branches[f.branch];
+    b.target = nn[0];
+    f.node = b.target;
+    delete edit_focus.value.branch;
+}
+
+const selected_dlg = computed(()=>{
+    const f = edit_focus.value
+    if (f.dlg !== undefined && f.node === undefined && f.branch === undefined) return dialogs._dlg[f.dlg];
+    return undefined;
+
+});
+
+const selected_node = computed(()=>{
+    const f = edit_focus.value
+    if (f.dlg !== undefined&& f.node!== undefined) return dialogs._dlg[f.dlg].nodes[f.node];
+    return undefined;    
+});
+
+const selected_branch = computed(()=>{
+    const f = edit_focus.value
+    if (f.dlg!== undefined && f.node!== undefined && f.branch!== undefined) return dialogs._dlg[f.dlg].nodes[f.node].branches[f.branch];
+    return undefined;    
+});
+
+interface ConditionDef {
+    name: string;
+    content: DialogAction;
+}
+
+const selected_condition = ref<ConditionDef|null>(null);
+    
+watch(edit_focus,()=>{
+    selected_condition.value = null; 
+}, {deep:true});
+
+
+async function delete_branch() {
+    const f = edit_focus.value;
+    if (f.node === undefined || f.dlg === undefined || f.branch === undefined) return;
+    if (await messageBoxConfirm("Confirm you want to delete selected branch")) {
+        const d = dialogs._dlg[f.dlg];
+        const n = d.nodes[f.node];
+        const b = n.branches;
+        b.splice(f.branch);        
+        n.branches = b.slice();
+        f.branch = undefined;
+    }
+}
+
+async function delete_node() {
+    const f = edit_focus.value;
+    if (f.node === undefined || f.dlg === undefined) return;
+    if (await messageBoxConfirm("Confirm you want to delete selected node and all branches)")) {
+        const d = dialogs._dlg[f.dlg];
+        delete d.nodes[f.node];
+        for (const id in d.nodes) {
+            const n = d.nodes[id];
+            n.branches.forEach(b=>{
+                if (b.target === f.node) b.target = null;
+            });
+        }
+    }
+}
+
+async function branch_move(dir: number) {
+    const f = edit_focus.value;
+    if (f.node === undefined || f.dlg === undefined || f.branch === undefined ) return;
+    const d = dialogs._dlg[f.dlg];
+    const n = d.nodes[f.node];
+    if (f.branch + dir < 0 || f.branch + dir >= n.branches.length) return;
+    const b1 = n.branches[f.branch];
+    const b2 = n.branches[f.branch+dir];
+    n.branches[f.branch] = b2;
+    n.branches[f.branch+dir] = b1;
+    f.branch = f.branch+dir;
+}
+
+function edit_condition(s:string) {
+    if (cur_story.value) {
+        if (!s) {
+            selected_condition.value = {name:"",content:{ast:{},source:""}};
+        } else {
+            selected_condition.value = {name:s, content:cur_story.value.conditions[s]};
+        }
+    }
+}
+
+async function save_condition() {
+    if (selected_condition.value && cur_story.value) {
+        if (selected_condition.value.content.source) {
+            cur_story.value.conditions[selected_condition.value.name] = selected_condition.value.content;
+            if (selected_branch.value) {
+                selected_branch.value.condition = selected_condition.value.name;
+            }
+        } else if (await messageBoxConfirm(`Confirm you want to remove the condition ${selected_condition.value.name}`)) {
+            delete cur_story.value.conditions[selected_condition.value.name];
+        } else {
+            return;
+        }
+        selected_condition.value = null;
+    }
+}
+
+function edit_speakers() {
+    if (edit_speakers_dlg.value) {
+        edit_speakers_dlg.value.showModal();
+    }
+}
+
+const postavy_dat_ref = ref<HTMLSelectElement[]>([]);
+let thum : THumanData | null = null;
+
+watch(postavy_dat_ref, async ()=>{
+    const el = postavy_dat_ref.value;
+    if (el.length)  {
+        if (!thum) {
+                const bin =await server.getDDLFile("POSTAVY.DAT");
+                thum = humanDataFromArrayBuffer(bin);
+        }
+        if (thum) {
+                el.forEach(sel=>{
+                    const v = sel.value;
+                    while (sel.options.length) sel.options.remove(0);
+                    thum!.characters.forEach(x=>{
+                        const opt = document.createElement("OPTION") as HTMLOptionElement;
+                        opt.textContent = x.jmeno;
+                        opt.value = `${x.xicht}`;
+                        sel.options.add(opt);
+                    })
+                    sel.value = v;
+            });
+        }
+    } else {
+        thum = null;
+    }
+},{deep:true});
 
 </script>
 <template>
@@ -396,9 +605,9 @@ function add_branch() {
             <button @click="delete_story">Delete</button>
         </div>
     </div>
-    <div class="main-panel" v-if="cur_story">
-        <div class="left-right">
-        <svg v-if="diagram" v-autosvgsize padding="40">
+    <div class="main-panel" v-if="cur_story && current_index">
+        <div class="diagram">
+        <svg v-if="diagram " v-autosvgsize padding="40">
               <defs>
             <marker id="arrow_4d4e7fe4a" markerWidth="8" markerHeight="8" 
             refX="8" refY="4" orient="auto">
@@ -422,87 +631,178 @@ function add_branch() {
                         <rect  rcx="10" ry="10" x="0" y="0" :width="x_width()" :height="y_height(n.height)" />
                         <text class="title" x="5" :y="grid_y/2" v-svg-ellipsis="grid_width-5" :key=" cur_story.nodes[n.node_id].name"> #{{ n.node_id }} {{ cur_story.nodes[n.node_id].name }}</text>
                     </g>
-                    <g v-for="(b,idx) of cur_story.nodes[n.node_id].branches" :class="branch_class(b.type, b.target === undefined, edit_focus.node === n.node_id?idx:-1)"                        
+                    <g v-for="(b,idx) of cur_story.nodes[n.node_id].branches" :class="branch_class(b.type, b.target === null, edit_focus.node === n.node_id?idx:-1)"                        
                         :transform="`translate(0,${y_coord(node_base_height+idx)})`"
                         @click="edit_focus={dlg:current_index,node:n.node_id,branch:idx}"
                         :key="idx">
                         <rect x="0" y="0"
                                 :width="x_width()" :height="y_coord(1)"  />
-                        <text class="text" v-svg-ellipsis="grid_width-5" x="5" :y="grid_y/2" :title="b.text" :key="b.text">{{ b.text }}</text>
+                        <text v-if="b.type==DialogBranchType.jump_to_node" :x="grid_width/2" :y="grid_y/2">(jump)</text>
+                        <text v-else class="text" v-svg-ellipsis="grid_width-5" x="5" :y="grid_y/2" :title="b.text" :key="b.text">{{ b.text }}</text>
+                        <text class="cond" v-if="b.condition" :key="b.condition" :x="grid_width-2" :y="grid_y-2">{{ b.condition }}</text>
                     </g>
                 </g>
             </template>            
         </svg>
         </div>
         <div class="editor" v-if="cur_story">
-            <template v-if="edit_focus.dlg !== undefined &&  edit_focus.node === undefined">
+            <select v-model="edit_focus.node" size="2" @change="edit_focus.branch = undefined;edit_focus.dlg = current_index">
+                <option v-for="(n, id) of cur_story.nodes" :key="id" :value="id" :class="{unused: diagram!.unused[id]}"> #{{ id }} {{ n.name }} </option>
+            </select>
+            <div>                        
+            <template v-if="selected_dlg">
                 <x-section>
                     <x-section-title>Story</x-section-title>
                     <x-form>
-                        <label><span>Name (not visible) </span><input type="text" v-model="dialogs._dlg[edit_focus.dlg].name"</label>
-                        <label><span>Description (visible)</span><textarea v-model="dialogs._dlg[edit_focus.dlg].description" rows="7"></textarea></label>
-                        <label><span>Picture</span><input type="text" v-model="dialogs._dlg[edit_focus.dlg].picture"
+                        <label><span>Name (not visible) </span><input type="text" v-model="selected_dlg.name"</label>
+                        <label><span>Description (visible)</span><textarea v-model="selected_dlg.description" rows="7"></textarea></label>
+                        <label><span>Picture</span><input type="text" v-model="selected_dlg.picture"
                             :list="image_list.id"></label>
                     </x-form>
                 </x-section>
             </template>
-            <template v-else-if="edit_focus.dlg !== undefined && edit_focus.branch === undefined && edit_focus.node !== undefined">
+            <template v-else-if="selected_node && !selected_branch">
                 <x-section>
                     <x-section-title>Node</x-section-title>
                     <x-form>
-                        <label><span>Name (not visible)</span><input type="text" v-model="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node].name"></label>
-                        <label><span>Action (code)</span><DlgCodeEditor class="code_edit" v-model="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node].action"/></label>
+                        <div class="label"><span></span><div class="more r">
+                            <button @click="add_branch">Add Branch</button>
+                            <button @click="delete_node">Delete node</button>
+                        </div></div>
+                        <label><span>Name (not visible)</span><input type="text" v-model="selected_node.name"></label>
+                        <label><span>Action (code)</span><DlgCodeEditor class="code_edit" v-model="selected_node.action"/></label>
                         <label><span>Description (optional, visible)</span><textarea type="text" rows="3"
-                            :value="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node].description ??''"
+                            :value="selected_node.description ??''"
                             @change="ev=>update_optional_field(ev,dialogs._dlg[edit_focus.dlg!].nodes[edit_focus.node!],'description')"
                             ></textarea></label>
                         <label><span>Picture (optional, visible)</span><input type="text" 
-                            :value="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node].picture ??''"
+                            :value="selected_node.picture ??''"
                             @change="ev=>update_optional_field(ev,dialogs._dlg[edit_focus.dlg!].nodes[edit_focus.node!],'picture')"
-                            :list="image_list.id"></label>                            
-                        <label><span></span><div><button @click="add_branch">Add Branch</button></div></label>
+                            :list="image_list.id"></label>                                                    
                     </x-form>
                 </x-section>
             </template>
-            <template v-else-if="edit_focus.dlg">
+            <template v-else-if="selected_condition">
+                <x-section>
+                    <x-section-title>Edit condition: {{ selected_condition.name }}</x-section-title>
+                    <x-form>                        
+                        <label><span>Name</span><input type="text" v-model="selected_condition.name"></label>
+                        <label><span>Code</span><DlgCodeEditor class="code_edit" v-model="selected_condition.content"/></label>
+                        <div class="label"><span>NOTE: A change is applied everywhere the modified condition is used in the current story</span>
+                            <div class="more">
+                                <button @click="save_condition" :disabled="!selected_condition.name">Save & Apply</button>
+                                <button @click="selected_condition = null">Cancel</button>
+                            </div>
+                        </div>
+                    </x-form>
+                </x-section>
+            </template>
+            <template v-else-if="selected_branch && selected_node">
                 <x-section>
                     <x-section-title>Branch</x-section-title>
                     <x-form>
-                        <label><span>Branch type: </span><select v-model.number="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node!].branches[edit_focus.branch!].type">
+                        <div class="label"><span></span><div class="more r">
+                            <button :disabled="!edit_focus.branch" @click="branch_move(-1)">Move up</button>
+                            <button :disabled="(edit_focus.branch ?? 0)+1 >= selected_node.branches.length" @click="branch_move(+1)">Move down</button>
+                            <button @click="add_branch">Add Branch</button>
+                            <button @click="delete_branch">Delete Branch</button>
+                        </div>
+                    </div>
+                        <label><span>Branch type: </span><select v-model.number="selected_branch.type">
                             <option :value="0">Jump</option>
-                            <option :value="1">NPC talk (text+pause)</option>
+                            <option :value="1">Text</option>
                             <option :value="2">Choice</option>
                             <option :value="3">Select character</option>
                             <option :value="4">Select dead character</option>
                         </select></label>
-                        <label><span>Condition</span>
-                            <select v-model="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node!].branches[edit_focus.branch!].condition">
-                                <option value="">(none)</option>
-                                <option v-for="(v,k) of dialogs._dlg[edit_focus.dlg].conditions" :key="k" :value="k">{{ k }}</option>
-                                <option value="#">(create new condition)</option>
-                            </select>
-                        </label>
-                        <label><span>Text</span><textarea rows="4" v-model="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node!].branches[edit_focus.branch!].text"></textarea></label>
-                        <label><span>Speaker (slot)</span><select v-model.number="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node!].branches[edit_focus.branch!].speaker">
-                            <option v-for="v in [0,1,2,3,4,5,6,7,8,9]" :value="v" :key="v"> Slot #{{ v }}</option>
-                            </select>
-                        </label>
-                        <label><span>Target</span><select v-model.number="dialogs._dlg[edit_focus.dlg].nodes[edit_focus.node!].branches[edit_focus.branch!].target">
-                            <option v-for="(v,k) in dialogs._dlg[edit_focus.dlg].nodes" :key="k" :value="k">
-                                #{{ k }} {{ v.name }}
-                            </option>
-                        </select></label>
+                        <div class="label" v-if="selected_branch.type != 0"><span>Speaker</span><div class="more">
+                            <select v-model.number="selected_branch.speaker">
+                                <option :value="0">(not set)</option>                                
+                                <option v-for="(v,idx) in cur_story.speakers" :value="idx+1" :key="idx"> {{ v.name }} </option>
+                            </select>                            
+                            <button @click="edit_speakers">Edit speakers</button>
+                            
+                        </div></div>
+                        <label v-if="selected_branch.type != 0">
+                                <span class="text-help">Text<span>
+                                [he,she] - choosen by speaker gender<br/>
+                                %n - replace by speaker name<br/>
+                                %[ , %] - replaced by [,  ]</span></span>
+                                <textarea rows="5" v-model="selected_branch.text"></textarea></label>
+                        <div class="label"><span>Target</span>
+                            <div class="more">
+                                <select v-model.number="selected_branch.target">
+                                    <option v-for="(v,k) in cur_story.nodes" :key="k" :value="k" :class="{unused: diagram!.unused[k]}">
+                                        #{{ k }} {{ v.name }}
+                                    </option>
+                                </select>
+                            <button :disabled="selected_branch.target === null" @click="selected_branch.target = null">Exit dialog</button>
+                            <button :disabled="selected_branch.target !== null" @click="add_node_branch">Add node</button>
+                        </div></div>
+                        <div class="label"><span>Condition</span>
+                            <div class="more">
+                                <select v-model="selected_branch.condition">
+                                    <option value="">(none)</option>
+                                    <option v-for="(v,k) of cur_story.conditions" :key="k" :value="k">{{ k }}</option>
+                                </select>
+                                <button :disabled="!selected_branch.condition" @click="edit_condition(selected_branch.condition)">Edit</button>
+                                <button @click="edit_condition('')">Add</button>                                
+                            </div>
+                        </div>
                     </x-form>
                 </x-section>
             </template>
             <template v-else>
                 <div class="nsel">Nothing selected</div>
             </template>
-
+            </div>
         </div>
     </div>
 
-
+    <dialog ref="edit_speakers_dlg" v-if="cur_story">
+        <header>Edit speakers <button class="close" @click="edit_speakers_dlg!.close()"></button></header>
+        <table>
+            <thead>
+                <tr>
+                    <th></th><th>Name</th><th>Type</th><th>Attribute</th><th>Parameter</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="(v,idx) of cur_story.speakers" :key="idx">
+                    <td>{{ idx+1 }}.</td>
+                    <td>
+                        <input v-model="v.name">
+                    </td>
+                    <td>
+                        <select v-model="v.type">
+                            <option :value="0">unset</option>
+                            <option :value="1">Attribute</option>
+                            <option :value="2">Random</option>
+                            <option :value="3">Character</option>
+                            <option :value="4">Character position</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select v-model="v.attribute" v-if="v.type == DialogSpeakerType.attribute">
+                            <option v-for="(a,idx) of CharacterStatsNames" :key="idx" :value="idx">{{ a }} &gt;</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input v-if="v.type == DialogSpeakerType.attribute" type="number" v-model="v.param" v-watch-range min="0" max="100">
+                        <select v-else-if="v.type == DialogSpeakerType.character" v-model="v.param">
+                            <option v-for="v of [0,1,2,3,4,5]" :key="v" :value="v"> Character slot {{ v+1 }}</option>
+                        </select>
+                        <select v-else-if="v.type == DialogBranchType.selchar" ref="postavy_dat_ref" v-model="v.param">
+                            <option :value="v.param"> ?? {{ v.param }}</option>
+                        </select>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <footer>
+            <button @click="edit_speakers_dlg!.close()">Close</button>
+        </footer>
+    </dialog>
 
 
 </x-workspace>
@@ -549,12 +849,13 @@ function add_branch() {
     bottom: 0;
     right: 0;    
     overflow: auto;
+    display: flex;
+    flex-direction: column;
     
 }
 
 text.title {
     font-weight: bold;
-
 }
 
 .node {
@@ -596,30 +897,45 @@ text.title {
 .choice.npctalk rect {
     fill:#ddd;
 }
-.choice.npctalk rect {
-    fill:#ddd;
+.choice.seldead rect {
+    fill:#ccf;
+}
+
+.choice.jump_to_node rect {
+    fill:white;
+}
+.choice.jump_to_node text {
+    fill: #888;
+    font-style: italic;
+    text-anchor: middle;
 }
 
 .choice.selchar rect {
     fill:#dfd;
 }
-.choice text {
-    text-overflow: ellipsis; 
-    overflow: hidden; 
-    white-space: nowrap;
-    dominant-baseline: central;
+.choice text.cond {
+    text-anchor: end;
+    font-size: 0.7rem;
+    fill: brown;
 }
+
 .final rect {
     stroke: green;
     stroke-width: 3px;
 }
 .editor {
-    position:sticky;
-    bottom: 0;
-    border: 1px solid;
-    background-color: #ddd;
-    padding: 0.5rem 0 0 0;
+    flex-grow: 0;
+    display: flex;
+    min-height: 20rem;
+
 }
+.editor > *:last-child{
+    flex-grow: 1;
+}
+.editor > *:first-child{
+    width: 15rem;
+}
+
 .editor x-section-title {
     background-color: #ddd;
 }
@@ -629,13 +945,55 @@ text.title {
     height: 7rem;
     border: 1px solid;
 }
-.left-right {
+.diagram {
+    flex-grow: 1;
+    flex-shrink: 1;
     width: 100%;
-    overflow-x: auto;
+    overflow: auto;
 }
 .nsel {
     height: 6rem;
     text-align: center;
 }
+div.label div.more {
+    text-align: left;
+    white-space: nowrap;
+}
+div.label div.more.r {
+       text-align: right;
+}
+div.label div.more > *{
+    margin: 0.2rem;
+    
+}
+
+div.label div.more button, div.label div.more span{
+    display: inline-block;
+}
+div.label select {
+    min-width: 30%;
+}
+
+option.unused {
+    color: red;
+}
+.text-help {
+    position: relative;
+    height: 5rem;
+    overflow: hidden;
+}
+.text-help > span {
+    display: block;
+    position: absolute;
+    font-size: 0.8rem;
+    line-height: 1rem;
+    left: 1rem;
+    top: 1.5rem;
+    bottom: 0;
+    width: 20rem;
+
+
+}
+dialog input[type=number] {width:5rem;text-align: center;}
 
 </style>

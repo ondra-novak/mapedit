@@ -62,7 +62,10 @@ const highlightStyle = computed(() => {
   };
 });
 
-onMounted(() => nextTick(onScroll));
+onMounted(() => {
+    update_model();
+    nextTick(onScroll);
+});
 
 
 const model = defineModel<DialogAction|null>();

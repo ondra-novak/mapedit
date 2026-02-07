@@ -1,4 +1,4 @@
-import { BinaryIterator, type Schema } from "./binary";
+import { BinaryIterator, make1DArray, type Schema } from "./binary";
 import type { CharacterStats, CharacterWeaponBonus } from "./common_defs";
 import type { directions } from "./map_structs";
 
@@ -254,7 +254,7 @@ export class DialogDef {
 
 
     static is_exit_code(c: number) {
-        return (c == 144 || c == 164 || c== 165|| c == 255 || c == 139);
+        return (c == 164 || c== 165|| c == 255 || c == 139);
     }
 
 
@@ -334,6 +334,22 @@ export const DialogBranchType = {
     seldead:4     //ask for dead character and continue to target (for example ressurection)
 } as const;
 
+export const DialogSpeakerType = {
+    unset: 0,
+    attribute: 1,
+    random: 2,
+    xicht: 3,
+    character: 4,
+}
+
+export interface DialogSpeaker {
+    name: string;
+    type: typeof DialogBranchType[keyof typeof DialogBranchType];
+    attribute?: typeof CharacterStats[keyof typeof CharacterStats];
+    param?: number;
+}
+
+
 export const DialogBranchTypeStr = Object.entries(DialogBranchType).reduce((a,b)=>{
     a[b[1]] = b[0];
     return a;
@@ -343,9 +359,9 @@ export interface DialogBranch {
     ///type of this branch
     type: typeof DialogBranchType[keyof typeof DialogBranchType];
     ///who speaks (for choice, 0 default)
-    speaker?: number;
+    speaker: number;
     ///text of this branch (not for jump)
-    text?: string;
+    text: string;
     ///condition when this branch is taken - undefined, no condition
     condition: string;
     ///target node, if not defined, dialog ends 
@@ -369,7 +385,8 @@ export interface DialogStory {
     nodes: Record<number, DialogNode>;
     picture: string;
     description: string;
-    conditions: Record<string, DialogAction[]>
+    conditions: Record<string, DialogAction>
+    speakers: DialogSpeaker[];
     name: string;
 }
 
@@ -390,17 +407,22 @@ export class DialogManager {
         return {
             type: DialogBranchType.choice,
             condition:"",
+            speaker:0,
+            text:"",
             target: null
         };
     }
 
     static new_story(): DialogStory {
+        const nd = DialogManager.new_node();
+        nd.name = "Start";
         return {
-            nodes: {},
+            nodes: {0:nd},
             picture:"",
             description:"",
             conditions:{},
-            name: ""
+            speakers: make1DArray(9, ()=>({name:"",type:DialogSpeakerType.unset} as DialogSpeaker)),
+            name: "New story"
         };
     }
 
@@ -409,6 +431,13 @@ export class DialogManager {
         while (story.nodes[i]) ++i;
         story.nodes[i] = DialogManager.new_node();
         return [i, story.nodes[i]];
+    }
+
+    create_story() : number {
+        let i = 1;
+        while (this._dlg[i]) ++i;
+        this._dlg[i] = DialogManager.new_story();
+        return i;
     }
 
     save() : string {
