@@ -1,4 +1,5 @@
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, parseSection, splitArrayBuffer, writeSection, type Schema, type SchemaObject, type SchemaType } from "./binary";
+import Hive from '@/utils/hive'
 
 
 const MOBS_INV = 16;
@@ -159,7 +160,7 @@ const EnemySchemaNew : Schema = {
   reserved3: "uint16",              //380
 } as const;
 
-export type Enemies = EnemyDef[];
+export class Enemies extends Hive<EnemyDef> {}
 export type EnemySounds = string[];
 
 
@@ -177,23 +178,25 @@ function enemyFromArrayBufferOld(buffer:ArrayBuffer ): Enemies {
     const iter = new BinaryIterator(buffer);
     const hdr = iter.parse(EnemyHdrSchema);
     if (hdr.ver != 256) throw new Error("Invalid ENEMY.DAT version");
-    const enms = [] as Enemies;
+    const enms = new Enemies;
     while (!iter.eof()) {
         const e = new EnemyDef;
         Object.assign(e, iter.parse(EnemySchema));
-        enms.push(e);
+        enms.add(e);
     }
+    enms.forEach((x,idx)=>!x.name.length?enms.remove(idx):null);
     return enms;
 }
 
 export function enemyFromArrayBufferNew(buffer:ArrayBuffer ): Enemies {
     const iter = new BinaryIterator(buffer);
-    const enms = [] as Enemies;
+    const enms = new Enemies;
     while (!iter.eof()) {
         const e = new EnemyDef;
         Object.assign(e, iter.parse(EnemySchemaNew));
-        enms.push(e);
+        enms.add(e);
     }
+    enms.forEach((x,idx)=>!x.name.length?enms.remove(idx):null);
     return enms;
 }
 
@@ -209,8 +212,9 @@ export function enemyToArrayBuffer(enms: Enemies) : ArrayBuffer {
 }
 export function enemyToArrayBufferNew(enms: Enemies) : ArrayBuffer {
     const wrt = new BinaryWriter();
-    enms.forEach(x=>{
-        wrt.write(EnemySchemaNew, x);
+    enms.get_raw().forEach(x=>{
+        if (x === null) wrt.write(EnemySchemaNew, new EnemyDef)
+        else wrt.write(EnemySchemaNew, x);
     });
     return wrt.getBuffer();
 }
@@ -254,7 +258,7 @@ export function enemyAndSoundFromArrayBuffer(buff: ArrayBuffer): [Enemies, Enemy
         return null;
     }    
     const rd = new BinaryIterator(buff);
-    let enemies: Enemies = [];
+    let enemies = new Enemies;
     let sounds: EnemySounds = [];
     let s = parseSection(rd);
     while (s.type != 0x8000) {

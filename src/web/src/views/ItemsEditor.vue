@@ -2,7 +2,7 @@
 import { server,} from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted,  ref, shallowRef, watch} from 'vue';
-import { ItemDef, itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName } from '@/core/items_struct';
+import { ItemDef, ItemHive, itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName } from '@/core/items_struct';
 import CanvasView from '@/components/CanvasView.vue';
 import { PCX, PCXProfile, type PCXProfileType } from '@/core/pcx';
 import { loadAllIcons } from '@/core/IconLIB';
@@ -16,7 +16,7 @@ import EffectSheet from '@/components/EffectSheet.vue';
 
 const selected_item = ref<number|null>(null);
 
-const item_list = ref<ItemDef[]>([]);
+const item_list = ref(new ItemHive());
 const filter_kind = ref<number>(-1);
 const filter_search = ref<string>("");
 const appearence = shallowRef<PCX>();
@@ -35,7 +35,7 @@ let save_state: SaveRevertControl;
 
 function reload() {
     getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
-        item_list.value = x?itemsFromArrayBuffer(x):[];
+        item_list.value = x?itemsFromArrayBuffer(x):new ItemHive;
         selected_item.value = null;
         nextTick(()=>save_state.set_changed(false));
     });
@@ -70,25 +70,22 @@ function reg_save() {
 }
 
 
-function deleteItem() {
-    if (selected_item.value !== null && item_list.value) {
+async function deleteItem() {
+    const sel = selected_item.value
+    if (sel !== null && item_list.value) {
         const lst = item_list.value;
-        if (confirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
-            lst[selected_item.value].jmeno = "";
+        if (confirm("Are you sure delete item: " + lst.get(sel).jmeno)) {
+            lst.remove(sel);
             selected_item.value = null;
-        }
-        while (lst.length && !lst[lst.length-1].jmeno) lst.pop();
+        }        
     }
 }
 function addItem() {
-    let pos = item_list.value.findIndex(x=>x.jmeno.length == 0);
-    if (pos < 0) pos = item_list.value.length;
-    const cloned = selected_item.value?item_list.value[selected_item.value]:null;
-    const new_item = new ItemDef();
+    const new_item = new ItemDef;
+    const cloned = selected_item.value?item_list.value.get(selected_item.value):null;
     if (cloned) Object.assign(new_item, JSON.parse(JSON.stringify(cloned)));
     new_item.jmeno = "New item"
-    item_list.value[pos] = new_item;
-    selected_item.value = pos;
+    selected_item.value = item_list.value.add(new_item);
 }
 
 const filteredAndSortedItems = computed(() => {
@@ -154,7 +151,7 @@ function onSelectIcon() {
 const key_mode = ref<number>(0);
 
 
-const form = computed<ItemDef>(()=>selected_item.value?item_list.value[selected_item.value]:new ItemDef);
+const form = computed<ItemDef>(()=>selected_item.value?item_list.value.get(selected_item.value):new ItemDef);
 
 
 
@@ -260,7 +257,7 @@ const negative_keylock_id=computed({
 
 function save() {
     if (item_list.value) {
-        const buff = itemsToArrayBuffers(item_list.value);
+        const buff = itemsToArrayBuffers(item_list.value as ItemHive);
         server.putDDLFile("ITEMS.DAT",buff, AssetGroup.MAPS);
     }
 }

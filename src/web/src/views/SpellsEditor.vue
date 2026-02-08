@@ -3,7 +3,7 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { CharacterStatsNames, ElementTypeName, SpellEffectName } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
-import {type ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
+import {ItemHive, itemsFromArrayBuffer } from '@/core/items_struct';
 import { spellsFromArrayBuffer, SpellCommandsArgs ,type TKouzlo, SpellArgument, spellsToArrayBuffer } from '@/core/spell_structs';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
@@ -14,7 +14,7 @@ import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 const spell_list = ref<TKouzlo[]>([]);
 const current_spell = ref<TKouzlo>();
 
-const item_list = ref<ItemDef[]>([]);
+const item_list = ref(new ItemHive);
 const all_sounds = ref<string[]>([]);
 const all_animations = ref<string[]>([]);
 let save_state: SaveRevertControl;
@@ -49,7 +49,7 @@ function init() {
         });
         getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(x=>{
             if (x) item_list.value = itemsFromArrayBuffer(x);    
-            else item_list.value = [];
+            else item_list.value = new ItemHive;
         });
     }
 
@@ -122,7 +122,7 @@ function findItem(event: Event, params: any[], index: number) {
                 return;
             }
         }
-        t.value = `${item_list.value[params[index] as number].jmeno} #${params[index]}`;
+        t.value = `${item_list.value.get(params[index] as number).jmeno} #${params[index]}`;
     }
 
 }
@@ -321,7 +321,7 @@ watch(item_list, (nv)=>ds_spellItems.update(()=>nv.map((v,id)=>({value:v.jmeno, 
                                 <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.AnimationFile" v-model="v.args[id]" type="text" :list="ds_spellAnim.id">
                                 <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.SoundFile" v-model="v.args[id]" type="text" :list="ds_spellSounds.id">
                                 <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Item" 
-                                    type="text" :value="`${(item_list && item_list[a as number] && item_list[a as number].jmeno)||'???'} #${a}`" @change="$event=>findItem($event, v.args, id)" :list="ds_spellItems.id">
+                                    type="text" :value="`${item_list.get(a as number).jmeno||'???'} #${a}`" @change="$event=>findItem($event, v.args, id)" :list="ds_spellItems.id">
                                 <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Element" v-model="v.args[id]" >
                                     <option v-for="(v,id) of ElementTypeName" :key="id" :value="id"> {{ v }}</option>
                                 </select>

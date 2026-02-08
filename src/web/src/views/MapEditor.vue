@@ -21,14 +21,14 @@ import { apply_array_diff, create_array_diff } from '@/utils/madiff';
 import MapSelectDlg from '@/components/MapSelectDlg.vue';
 import { map_load_stringtable, map_save_stringtable } from '@/core/string_table';
 import MapSettingsDlg from '@/components/MapSettingsDlg.vue';
-import { ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
+import {ItemHive, ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
-import { enemyFromArrayBuffer, type EnemyDef } from '@/core/enemy_struct';
+import { enemyFromArrayBuffer, type EnemyDef, Enemies } from '@/core/enemy_struct';
 import ItemList from '@/components/ItemList.vue';
 import { mapEditorControl } from '@/core/services';
 const list_assets = ref<string[]>([]);
-const item_list = ref<ItemDef[]>([]);
-const enemy_list = ref<EnemyDef[]>([]);
+const item_list = ref(new ItemHive);
+const enemy_list = ref(new Enemies);
 
 const EditMode = {
     Edit:0,
@@ -681,10 +681,10 @@ function init_save_state() {
 function reload_all_lists() {
     server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
     getDDLFileWithImport(server, "ITEMS.DAT", AssetGroup.MAPS)
-               .then(x=>x?itemsFromArrayBuffer(x):[],x=>[])
+               .then(x=>x?itemsFromArrayBuffer(x):new ItemHive,x=>new ItemHive)
                .then(x=>item_list.value = x);
     getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS)
-               .then(x=>x?enemyFromArrayBuffer(x):[],x=>[])
+               .then(x=>x?enemyFromArrayBuffer(x):new Enemies(),x=>new Enemies)
                .then(x=>enemy_list.value = x);
     redraw();
     updateControls();

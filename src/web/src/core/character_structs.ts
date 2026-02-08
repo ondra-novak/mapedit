@@ -1,5 +1,5 @@
-import { ItemWearPlace } from "./items_struct";
 import { keybcs2string, string2keybcs } from "./keybcs2";
+import Hive from "@/utils/hive"
 
 export interface THuman {
   jmeno: string;
@@ -15,6 +15,8 @@ export interface THuman {
   sip_druh:number;
   npcflags: number;
 }
+
+export class HumanHive extends Hive<THuman> {};
 
 export  const createTHuman = (): THuman => {
         return {
@@ -98,7 +100,7 @@ export class Runes {
 
 
 export interface THumanData  {
-    characters: THuman[],
+    characters: HumanHive,
     runes: Runes;
 }
 
@@ -189,11 +191,12 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
         }
     }
 
-
+    const hive = new HumanHive();
+    humans.forEach((v, idx) => v.jmeno == "#"?null:hive.set(idx,v));
 
   return {
     runes: runes,
-    characters: humans
+    characters: hive
   };
 }
 
@@ -213,7 +216,11 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
         lines.push(-1);
     })
 
-    data.characters.forEach(h=>{
+    data.characters.get_raw().forEach(h=>{
+        if (h === null) {
+            h = createTHuman();
+            h.jmeno = "#";
+        }
         lines.push(128,h.jmeno);
         lines.push(129,h.female?1:0);
         lines.push(130,h.xicht);

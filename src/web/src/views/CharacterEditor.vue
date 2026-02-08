@@ -3,21 +3,20 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts';
-import { createTHuman, humanDataFromArrayBuffer, humanDataToArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman, type THumanData } from '@/core/character_structs';
+import { createTHuman, humanDataFromArrayBuffer, humanDataToArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman, type THumanData , HumanHive} from '@/core/character_structs';
 import { PCX, PCXProfile } from '@/core/pcx';
-import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } from '@/core/items_struct';
-import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName, SpellEffects } from '@/core/common_defs';
+import { ItemHive, itemsFromArrayBuffer, ItemWearPlace } from '@/core/items_struct';
+import { CharacterStats, SpellEffectName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue'
 import { create_datalist, type DataListHandle } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 
-let humand_data: THumanData = {characters:[], runes:{air:[],earth:[],fire:[],mind:[],water:[]}};
-const postavy = ref<THuman[]>([]);
-const selected = ref<number>();
-const items  = ref<ItemDef[]>([]);
-const selected_char = ref<THuman>();
+let humand_data: THumanData = {characters:new HumanHive, runes:{air:[],earth:[],fire:[],mind:[],water:[]}};
+const postavy = ref(new HumanHive);
+const selected = ref<number>(-1);
+const items  = ref(new ItemHive);
 const list_of_xichts = ref<number[]>();
 const change_appearence_index=ref<number>();
 const portraits = ref<HTMLElement[]>([]);
@@ -37,13 +36,10 @@ const [npcflags, chk_npcflags] = useBitmaskCheckbox2({
 });
 const [effects, chk_effects] = useBitmaskCheckbox2(SpellEffects);
 
-watch(selected, ()=>{    
-    selected_char.value = postavy.value && selected.value !== undefined ?postavy.value[selected.value]:undefined;
-    if (selected_char.value) {
-        npcflags.value = selected_char.value.npcflags;
-        effects.value = selected_char.value.stats[CharacterStats.VLS_KOUZLA];
-    }
-});
+const selected_char = computed(()=>
+    selected.value < 0?null:postavy.value.get(selected.value)
+);
+
 
 const PO_XS:number= 194;
 const PO_YS:number= 340;
@@ -112,7 +108,7 @@ watch([selected_char,preview_box],()=>{
                 wr.forEach((item_ref: number, idx: number)=>{
                     let itmpcx: Promise<PCX>|undefined;
                     const key = item_ref*2+(ch.female?1:0);
-                    const item = items.value[item_ref];
+                    const item = items.value.get(item_ref)!;
                     if (preview_items_cache.has(key)) {
                         itmpcx = preview_items_cache.get(key);
                     } else {
@@ -145,25 +141,25 @@ async function init() {
                 humand_data = humanDataFromArrayBuffer(buff);
                 postavy.value = humand_data.characters;
             } else {
-                postavy.value = [];
+                postavy.value = new HumanHive;
             }
             nextTick(()=>save_state.set_changed(false));
         })
         getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(buff=>{
             if (buff) items.value = itemsFromArrayBuffer(buff);
-            else items.value = [];                    
+            else items.value = new ItemHive;                    
         });
     }
     save_state = await StatusBar.register_save_control();
     save_state.on_save(()=>{
         if (postavy.value) {
-            humand_data.characters = postavy.value;
+            humand_data.characters = postavy.value as HumanHive;
             const buff = humanDataToArrayBuffer(humand_data)
             server.putDDLFile("POSTAVY.DAT", buff, AssetGroup.MAPS);
             }
         })
     save_state.on_revert(() => {
-            selected.value = undefined;
+            selected.value = -1;
             reload();
     });
 
@@ -176,7 +172,7 @@ onUnmounted(()=>save_state.unmount());
 function get_item_name(idx: number) : string{
     if (idx === undefined) return "";
     if (items.value) {
-        const v = items.value[idx];
+        const v = items.value.get(idx);
         if (v) return v.jmeno;                
         else return `#${idx}`;
     } else {
@@ -215,7 +211,7 @@ const inventory = HumanWearPlaceName.map((_,idx)=>{
         get:() =>{
             if (selected_char.value && items.value) {
                 const c = selected_char.value;
-                const v = items.value[c.wearing[idx]];
+                const v = items.value.get(c.wearing[idx]);
                 if (v) return v.jmeno;                
                 else return `#${c.wearing[idx]}`;
             } else {
@@ -298,34 +294,24 @@ async function add_xicht() {
 }
 
 function add_char(xicht: number){
-    if (change_appearence_index.value !== undefined) {
-        if (postavy.value) {
-            postavy.value[change_appearence_index.value].xicht = xicht;
-        }
+    if (change_appearence_index.value !== undefined) {        
+        postavy.value.get(change_appearence_index.value).xicht = xicht;        
         change_appearence_index.value = undefined;
         list_of_xichts.value = undefined;
         return;
     }
     const h = createTHuman();
     h.xicht = xicht;
-    selected.value = postavy.value.length;
-    postavy.value.push(h)
+    selected.value = postavy.value.add(h);
     list_of_xichts.value = undefined;
 }
 
 async function delete_char(index: number) {
     const p = postavy.value;
     if (p) {
-        if (await messageBoxConfirm("Confirm you want to delete character: " + p[index].jmeno)) {
-            if (p.length-1 == index) p.pop();
-            else {
-                const z = p[p.length-1];
-                p[p.length-1] = p[index];
-                p[index] = z;
-                p.pop();
-            }
-            selected.value = undefined;
-            selected_char.value = undefined;;
+        if (await messageBoxConfirm("Confirm you want to delete character: " + p.get(index).jmeno)) {
+            p.remove(index);
+            selected.value = -1;
         }
     }
 }
@@ -365,14 +351,16 @@ watch(items, ()=>{
 <template>
     <x-workspace>
     <div class="top-panel">
-        <div v-for="(p,idx) of postavy" :key="idx" @click="selected = idx" :class="{selected: selected == idx}">
-            <div class="portrait" :data-xicht="p.xicht" ref="portraits">
+        <template v-for="(p,idx) of postavy.get_raw()" :key="idx">
+            <div v-if="p"  @click="selected = idx" :class="{selected: selected == idx}">
+                <div class="portrait" :data-xicht="p.xicht" ref="portraits">
 
+                </div>
+                <div class="desc">
+                    {{ p.jmeno }}
+                </div>          
             </div>
-            <div class="desc">
-                {{ p.jmeno }}
-            </div>          
-        </div>
+        </template>
         <div @click="add_xicht">
             <div class="portrait add" >
 
@@ -384,7 +372,7 @@ watch(items, ()=>{
     </div>
     <div class="main-panel" v-if="selected_char">
         <x-section>
-            <x-section-title>Basic info</x-section-title>
+            <x-section-title>Basic info (ID: {{ selected }})</x-section-title>
             <x-form>
                 <label><span>Name</span><input type="text" v-model="selected_char.jmeno"></label>
                 <label><span>Gender</span><div><span><input v-model="selected_char.female" type="radio" :value="false" />Male</span>

@@ -1,3 +1,4 @@
+
 export const ElementType = {
     FIRE:0,
     WATER:1,
@@ -94,7 +95,7 @@ export const CharacterStatsMinMaxs = [
     /*"VLS_MGZIVEL":*/ [0,4],
     /*"VLS_DAMAGE":*/  [0,32767],
     /*"VLS_KOUZLA":*/  [0,32767],
-]
+];
 
 export const EnemyStats = CharacterStats;
 
@@ -120,7 +121,7 @@ export class StringList3 {
 
 export class StringList1 {
 	map: Record<string, number> = {};
-	lst: string[] = [];
+	lst: string[] = []; 
 	add( s1: string) : number {
 		if (!s1) return 0;
         const v = this.map[s1];

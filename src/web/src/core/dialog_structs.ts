@@ -349,6 +349,11 @@ export interface DialogSpeaker {
     param?: number;
 }
 
+export interface DialogConstant {
+    value: number;
+    desc: string;
+}
+
 
 export const DialogBranchTypeStr = Object.entries(DialogBranchType).reduce((a,b)=>{
     a[b[1]] = b[0];
@@ -392,6 +397,7 @@ export interface DialogStory {
 
 export class DialogManager {
     _dlg: Record<number, DialogStory> = {};
+    _consts: Record<string, DialogConstant> = {};
 
     static new_node() : DialogNode{
         return {
@@ -441,12 +447,13 @@ export class DialogManager {
     }
 
     save() : string {
-        return JSON.stringify({"dialogs":this._dlg});
+        return JSON.stringify({"dialogs":this._dlg,"constants":this._consts});
     }
 
     load(txt:string) {
         const s = JSON.parse(txt);;
         this._dlg = s["dialogs"];
+        this._consts = s["constants"] || {};
     }
 
 }

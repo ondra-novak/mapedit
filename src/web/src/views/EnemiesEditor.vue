@@ -5,8 +5,8 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { COLPaletteSet } from '@/core/col_palette_set';
 import { CharacterStats} from '@/core/common_defs';
-import { enemyAndSoundFromArrayBuffer, enemyAndSoundToArrayBuffer, EnemyDef, EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer,enemySoundsToArrayBuffer,enemyToArrayBuffer } from '@/core/enemy_struct';
-import { itemsFromArrayBuffer, type ItemDef } from '@/core/items_struct';
+import { enemyAndSoundFromArrayBuffer, enemyAndSoundToArrayBuffer, Enemies, EnemyDef, EnemyFlags1, EnemyFlags2, enemyFromArrayBuffer,EnemySounds,enemySoundsFromArrayBuffer} from '@/core/enemy_struct';
+import { type ItemDef } from '@/core/items_struct';
 import { PCXProfile, PCX } from '@/core/pcx';
 import { SeqFile } from '@/core/seqfile';
 import { computed, onMounted, onUnmounted,  ref, watch } from 'vue';
@@ -20,7 +20,7 @@ import EffectSheet from '@/components/EffectSheet.vue';
 
 
 
-const enemies = ref<EnemyDef[]>([]);
+const enemies = ref(new Enemies);
 const sounds = ref<EnemySounds>([]);
 const items = ref<ItemDef[]>([]);
 
@@ -133,7 +133,7 @@ async function save_all() {
 
             const e = enemies.value;
             const s = sounds.value;
-            const ebuff = enemyAndSoundToArrayBuffer(e,s);
+            const ebuff = enemyAndSoundToArrayBuffer(e as Enemies,s);
             
             await server.putDDLFile("ENEMY.DAT", ebuff, AssetGroup.MAPS);
         }
@@ -150,27 +150,19 @@ onUnmounted(()=>save_state?.unmount());
 
 async function deleteEnemy() {
     if (selected_enemy.value !== undefined && enemies.value) {
-        if (await messageBoxConfirm("Do you with to delete enemy:" + enemies.value[selected_enemy.value].name)) {
-            enemies.value[selected_enemy.value].mobs_name="";
-            while (enemies.value.length > 0 && enemies.value[enemies.value.length-1].mobs_name.length ==0) {
-                enemies.value.pop();
-            }
+        if (await messageBoxConfirm("Do you with to delete enemy:" + enemies.value.get(selected_enemy.value).name)) {
+            enemies.value.remove(selected_enemy.value);
             selected_enemy.value = undefined;
         }
     }
 }
 
-function findFreePos() : number{
-    const pos = enemies.value.findIndex((x:EnemyDef)=>x.mobs_name.length == 0);
-    if (pos == -1) return enemies.value.length;
-    else return pos;
-}
 
 function cloneEnemy() {
     if (enemies.value && selected_enemy.value !== undefined) {
-        const pos = findFreePos();
-        enemies.value[pos] = JSON.parse(JSON.stringify(enemies.value[selected_enemy.value]));
-        selected_enemy.value = pos;
+        const new_itm = new EnemyDef;
+        Object.assign(new_itm, enemies.value.get(selected_enemy.value));
+        selected_enemy.value = enemies.value.add(new_itm);
     }
 }
 
@@ -192,12 +184,11 @@ async function addEnemy() {
 
 function createEnemy() {
     if (new_enemy_type.value) {
-        const pos =findFreePos();
         const name = new_enemy_type.value.split('.')[0];
         const enm = new EnemyDef();
+        const pos = enemies.value.add(enm);
         enm.name=`${name}-${pos}`;
         enm.mobs_name = name;
-        enemies.value[pos] = enm;
         selected_enemy.value = pos;
         new_enemy_type.value = undefined;
         new_enemy_dlg.value?.close();
@@ -206,8 +197,8 @@ function createEnemy() {
 
 async function loadAppearence() {
     appearence.value = undefined;
-    if (selected_enemy.value !==undefined  && enemies.value && enemies.value[selected_enemy.value]) {
-        const e = enemies.value[selected_enemy.value];
+    if (selected_enemy.value !==undefined  && enemies.value && enemies.value.get(selected_enemy.value)) {
+        const e = enemies.value.get(selected_enemy.value);
          if (e.mobs_name) {                    
             try {
                 const seqdata = await server.getDDLFile(e.mobs_name + ".SEQ");
@@ -238,8 +229,8 @@ async function loadAppearence() {
 
 async function loadColors() {
     palettes.value = undefined;
-    if (selected_enemy.value !==undefined  && enemies.value && enemies.value[selected_enemy.value]) {
-        const e = enemies.value[selected_enemy.value];
+    if (selected_enemy.value !==undefined  && enemies.value && enemies.value.get(selected_enemy.value)) {
+        const e = enemies.value.get(selected_enemy.value);
         if (e.mobs_name) {
             try {
                 const paldata = await server.getDDLFile(e.mobs_name + ".COL");
@@ -265,26 +256,19 @@ watch(selected_enemy, ()=>{
 
 function openAppearence() {
     if (selected_enemy.value && enemies.value) {        
-        edit_seq.value = enemies.value[selected_enemy.value || 0].mobs_name + '.SEQ';
+        edit_seq.value = enemies.value.get(selected_enemy.value || 0).mobs_name + '.SEQ';
     }
 }
 async function closeAppearence() {
     edit_seq.value = undefined;
 }
 
-const form = computed({
-    get:() : EnemyDef=>{
+const form = computed(()=>{
         if (typeof selected_enemy.value == "number") {
-            return enemies.value[selected_enemy.value];
+            return enemies.value.get(selected_enemy.value);
         } else {
             return new EnemyDef();
-        }
-    },
-    set:(enm: EnemyDef) => {
-        if (typeof selected_enemy.value == "number") {
-            enemies.value[selected_enemy.value] = enm;    
-        }
-    }
+        }   
 });
 
 const inventory = computed({
@@ -343,7 +327,7 @@ const Abilities=[
         <div class="editor" v-if="selected_enemy !== undefined">
             <div class="multiple">
                 <x-section>
-                    <x-section-title>Basic parameters</x-section-title>
+                    <x-section-title>Basic parameters (ID: {{ selected_enemy }})</x-section-title>
                     <x-form>
                         <label><span>Name</span><input type="text" v-model="form.name" maxlength="29"></label>
                         <label><span>Color</span><select v-model="form.paletts_count">
@@ -444,7 +428,7 @@ const Abilities=[
     </dialog>
     <div class="edit-seq" v-if="edit_seq">
         <div>
-            <AssetToolSeq v-model="edit_seq" :def="enemies[selected_enemy || 0]" />
+            <AssetToolSeq v-model="edit_seq" :def="enemies.get(selected_enemy || 0)" />
             <button @click="closeAppearence" class="close"></button>
         </div>
     </div>

@@ -19,6 +19,7 @@ import TextsEditor from '@/components/TextsEditor.vue';
 import FileHistory from '@/components/FileHistory.vue';
 import { EditorID, mainMenuControl, mapEditorControl, type EditorRef } from '@/core/services';
 import DialogDecompiler from '@/components/DialogDecompiler.vue';
+import FactEditor from '@/components/FactEditor.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -92,6 +93,7 @@ function select_tool() : string | null {
         if (cur_file_model.value.name.endsWith(v)) return "editor_exists";
     }
     if (cur_file_model.value.name.toUpperCase() == "DIALOGY.DAT") return "dialog_decompiler";
+    if (cur_file_model.value.name.toUpperCase() == "FACTS.JSON") return "fact_editor";
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
     if (cur_file_model.value.name.endsWith(".TXT")) return "strings";
     switch (cur_file_model.value.group) {
@@ -188,6 +190,7 @@ function open_editor() {
                     <FileHistory v-if="selected_tool == 'history'" v-model="selected_file" />
                     <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" />
                     <DialogDecompiler v-if="selected_tool == 'dialog_decompiler'" />
+                    <FactEditor v-if="selected_tool == 'fact_editor'" />
                     <div v-if="selected_tool == 'editor_exists'" class="goto-tool">
                         <button @click="open_editor">Open editor</button>
                     </div>

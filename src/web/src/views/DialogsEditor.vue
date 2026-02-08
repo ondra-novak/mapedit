@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import { server } from '@/core/api';
-import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker } from '@/core/dialog_structs';
+import { server, type ModifiedFileNotify } from '@/core/api';
+import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant } from '@/core/dialog_structs';
 import { SVGPath } from '@/utils/svg';
-import { computed, onMounted, onUnmounted, reactive, ref,watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref,watch, type Reactive } from 'vue';
 import noimage from '@/assets/noimage.svg'
 import HIFormat from '@/core/hiformat';
-import { create_datalist, type DataListItem } from '@/utils/datalist';
+import { create_datalist, type DataListHandle, type DataListItem } from '@/utils/datalist';
 import { AssetGroup } from '@/core/asset_groups';
 import DlgCodeEditor from '@/components/DlgCodeEditor.vue';
 import { messageBoxConfirm } from '@/utils/messageBox';
 import type { SaveRevertControl } from '@/components/statusBar';
 import StatusBar from '@/components/statusBar';
-import { json } from 'stream/consumers';
 import { CharacterStatsNames } from '@/core/common_defs';
 import { humanDataFromArrayBuffer, type THumanData } from '@/core/character_structs';
+import { FactDB } from '@/core/factdb';
+import type { WsRpcResult } from '@/core/wsrpc';
+import FactEditor from '@/components/FactEditor.vue';
+import DlgConstsEditor from '@/components/DlgConstsEditor.vue';
 
 const dialogs = reactive(new DialogManager);
 let inited = false;
@@ -21,47 +24,40 @@ const props = defineProps<{active:boolean}>();
 let save_state: SaveRevertControl|null = null;
 let ignore_modified = false;
 const edit_speakers_dlg = ref<HTMLDialogElement>();
+const facts = ref(new FactDB);
+let image_list : DataListHandle = {id:""} as DataListHandle;
 
 
-function modified() {
-    if (!ignore_modified) init();
-    ignore_modified = false;
-}
-
-async function init() {
-    if (save_state) {
-        save_state.set_changed(false);
-        save_state.unmount();
-    }
-    try {
-        const json_data = await server.getDDLFile("DIALOGY.JSON");
-        const dec = new TextDecoder();
-        dialogs.load(dec.decode(json_data));
-        inited = true;
-
-        server.off("modified", modified);
-        server.on("modified", modified);
-
-        
-
-    } catch (e) {
-        console.warn("Failed to load dialogs", e);
-    }    
-
-    current_index.value = null;
-
-}
-
-async function init_save() {
-    if (!save_state) {
-        save_state = await StatusBar.register_save_control();
-        save_state!.on_save(save_all);
-        save_state!.on_revert(()=>{
-        init();
+function load_dialogy() {
+    server.getDDLFile("DIALOGY.JSON").then((json_data: ArrayBuffer)=>{
+            const dec = new TextDecoder();
+            dialogs.load(dec.decode(json_data));
+            queueMicrotask(()=>{
+                if (save_state) save_state.set_changed(false);
+            })
+            current_index.value = null;
     });
+}
 
+function load_facts() {
+    server.getDDLFile("FACTS.JSON").then((json_data:ArrayBuffer)=>{
+        const dec = new TextDecoder();
+        facts.value = FactDB.fromJSON(dec.decode(json_data));
+    });
+}
 
-    }
+function init() {
+    load_dialogy();
+    load_facts();
+    server.on("modified", (x:WsRpcResult)=>{
+        const n : ModifiedFileNotify = x.data;
+        if (n.name == "DIALOGY.JSON") {
+            if (ignore_modified) ignore_modified = false;
+            else load_dialogy();
+        } else if (n.name == "FACTS.JSON") {
+            load_facts();
+        }
+    });
 }
 
 async function save_all() {
@@ -72,16 +68,22 @@ async function save_all() {
     await server.putDDLFile("DIALOGY.JSON", bin.buffer, AssetGroup.MAPS);    
 }
 
-onMounted(()=>{
-    if (props.active) init();
-});
-
 watch(()=>props.active,()=>{
     if (props.active) {
         if (!inited) {
             init(); 
         }
-        init_save();                
+        if (!save_state) {
+            StatusBar.register_save_control().then(s=>{
+                save_state = s ;
+                save_state.on_save(save_all);
+                save_state.on_revert(load_dialogy);
+            });
+        }
+        image_list =  create_datalist(async ()=>{
+                const lst = await server.getDDLFiles(AssetGroup.DIALOGS) ;
+                return lst.files.map(x=>({value:x.name}));
+        })
     }
     if (!props.active && save_state) {
         save_state.unmount();
@@ -106,6 +108,20 @@ const filtered_list = computed(()=>{
     const srch = list_filter.value.toLocaleLowerCase();
     return Object.entries(dialogs._dlg).map(v=>[parseInt(v[0]),v[1].name] as [number, string])
         .filter((x:[number,string])=>!srch || x[1].toLocaleLowerCase().indexOf(srch) != -1);
+});
+const constant_filter = ref("");
+
+const constant_filtered_list = computed(()=>{
+    const srch = constant_filter.value.toLocaleLowerCase();
+    const clst : Record<string, DialogConstant> = {};
+    const out: [string, number, string, boolean][] = [];
+    for (const k in dialogs._consts) {
+        const c = dialogs._consts[k];
+        out.push([k,c.value,c.desc,false]);
+    }
+    facts.value.getAllFacts().forEach(x=>out.push([x.key,x.id,x.description,true]));
+    return out.filter(x=>!srch || x[0].toLocaleLowerCase().indexOf(srch) != -1 || x[2].toLocaleLowerCase().indexOf(srch) != -1)
+        .sort((a,b)=>a[0].localeCompare(b[0]));
 });
 
 async function update_image() {
@@ -423,10 +439,6 @@ function branch_class(type: number, final: boolean, idx: number) {
     return r.join(" ");
 }
 
-const image_list = create_datalist(async ()=>{
-    const lst = await server.getDDLFiles(AssetGroup.DIALOGS) ;
-    return lst.files.map(x=>({value:x.name}));
-})
 
 function update_optional_field(ev: Event, object: any, field: string) {
     const t = ev.target as HTMLInputElement ;
@@ -592,17 +604,27 @@ watch(postavy_dat_ref, async ()=>{
     }
 },{deep:true});
 
+const showFactDlg = ref(false);
+const showConstDlg = ref(false);
+
 </script>
 <template>
 <x-workspace :hidden="!active">
-    <div class="list" >
-        <input type="search" v-model="list_filter">
-        <select v-model="current_index" size="10">
-            <option v-for="v of filtered_list" :value="v[0]" > {{  v[1] }}</option>
-        </select>        
-        <div class="buttons">
-            <button @click="create_story">Create</button>
-            <button @click="delete_story">Delete</button>
+    <div class="left" >
+        <div class="list" >
+            <input type="search" v-model="list_filter">
+            <select v-model="current_index" size="10">
+                <option v-for="v of filtered_list" :value="v[0]" > {{  v[1] }}</option>
+            </select>        
+            <div class="buttons">
+                <button @click="create_story">Create</button>
+                <button @click="delete_story">Delete</button>
+            </div>
+        </div>
+        <div class="node-list">            
+            <select v-if="cur_story && current_index" v-model="edit_focus.node" size="2" @change="edit_focus.branch = undefined;edit_focus.dlg = current_index">
+                <option v-for="(n, id) of cur_story.nodes" :key="id" :value="id" :class="{unused: diagram!.unused[id]}"> #{{ id }} {{ n.name }} </option>
+            </select>
         </div>
     </div>
     <div class="main-panel" v-if="cur_story && current_index">
@@ -646,10 +668,6 @@ watch(postavy_dat_ref, async ()=>{
         </svg>
         </div>
         <div class="editor" v-if="cur_story">
-            <select v-model="edit_focus.node" size="2" @change="edit_focus.branch = undefined;edit_focus.dlg = current_index">
-                <option v-for="(n, id) of cur_story.nodes" :key="id" :value="id" :class="{unused: diagram!.unused[id]}"> #{{ id }} {{ n.name }} </option>
-            </select>
-            <div>                        
             <template v-if="selected_dlg">
                 <x-section>
                     <x-section-title>Story</x-section-title>
@@ -753,9 +771,31 @@ watch(postavy_dat_ref, async ()=>{
                 </x-section>
             </template>
             <template v-else>
-                <div class="nsel">Nothing selected</div>
+                <x-section>
+                    <x-section-title>Nothing selected</x-section-title>
+                </x-section>
             </template>
-            </div>
+            <x-section>
+                <x-section-title>Constants</x-section-title>
+                <div class="list">
+                    <input type="search" v-model="constant_filter">
+                    <div class="tbl">
+                        <table class="consts">
+                            <tbody>
+                                <tr v-for="v of constant_filtered_list" :key="v[0]" :class="{fact: v[3], const:!v[3]}">
+                                    <td> {{  v[0] }}</td>
+                                    <td> {{  v[1] }}</td>
+                                    <td> {{  v[2] }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="buttons">
+                        <button @click="showConstDlg = true">Edit constants</button>
+                        <button @click="showFactDlg = true">Edit facts</button>
+                    </div>                    
+                </div>
+            </x-section>
         </div>
     </div>
 
@@ -803,54 +843,82 @@ watch(postavy_dat_ref, async ()=>{
             <button @click="edit_speakers_dlg!.close()">Close</button>
         </footer>
     </dialog>
+    <dialog v-if="showFactDlg" :ref="el=>el?(el as HTMLDialogElement).showModal():null">
+        <header>Edit facts<button @click="showFactDlg=false" class="close"></button></header>
+        <div style="max-height: 50vh;overflow: hidden auto ;"><FactEditor/></div>
+    </dialog>
+    <dialog v-if="showConstDlg" :ref="el=>el?(el as HTMLDialogElement).showModal():null">
+        <header>Edit consts<button @click="showConstDlg=false" class="close"></button></header>
+        <div style="max-height: 50vh;overflow: hidden auto ;"><DlgConstsEditor v-model="dialogs._consts"/></div>
+    </dialog>
 
 
 </x-workspace>
 
 </template>
 <style lang="css" scoped>
-.list {
-    position: absolute;
-    left:0;
-    top: 0;
+x-workspace {
+    display: flex;    
+    overflow: hidden;
+
+}
+.left {
     width: 15rem;
-    bottom: 0;
+    display:flex;
+    flex-direction: column;
+    
+}
+.list {
+    display:flex;
+    flex-direction: column;
+    flex-grow: 1;
+    height: 100%;
 }
 .list input {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top:0;
     height: 2rem;
 }
 .list select {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top:2rem;
-    bottom: 2rem;
+    flex-grow: 1;
+    height: 100%;    
+}
+.list .tbl {
+    flex-grow: 1;
+    height: 100%;    
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.list .tbl table {
+    width: 100%;
+    border-collapse: collapse;    
+    background-color: white;    
+}
+.list .tbl table td {
+    border: 1px dotted;
+    cursor: pointer;
+}
+.list .tbl table tr:hover td {
+    background-color: #ccf;
 }
 .list .buttons {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
     height: 2rem;
     display: flex;    
 }
 .list .buttons>* {
     flex-grow: 1;
 }
+.node-list {
+    height: 20rem;
+}
+.node-list > select{
+    height:100%;
+    width: 100%;  
+}
 
 .main-panel {
-    position: absolute;
-    left: 15rem;
-    top: 0;
-    bottom: 0;
-    right: 0;    
     overflow: auto;
     display: flex;
     flex-direction: column;
+    flex-grow: 1;
     
 }
 
@@ -926,14 +994,14 @@ text.title {
 .editor {
     flex-grow: 0;
     display: flex;
-    min-height: 20rem;
+    height: 20rem;
 
 }
-.editor > *:last-child{
+.editor > *:first-child{
     flex-grow: 1;
 }
-.editor > *:first-child{
-    width: 15rem;
+.editor > *:last-child{
+    width: 20rem;
 }
 
 .editor x-section-title {
@@ -950,10 +1018,6 @@ text.title {
     flex-shrink: 1;
     width: 100%;
     overflow: auto;
-}
-.nsel {
-    height: 6rem;
-    text-align: center;
 }
 div.label div.more {
     text-align: left;
@@ -993,6 +1057,9 @@ option.unused {
     width: 20rem;
 
 
+}
+.consts .fact {
+    color: brown;
 }
 dialog input[type=number] {width:5rem;text-align: center;}
 

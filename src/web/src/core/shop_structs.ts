@@ -1,4 +1,5 @@
 import { BinaryIterator, BinaryWriter, type Schema } from "./binary"
+import Hive from "@/utils/hive"
 
 const TProductSchema  : Schema = {
   "item":"int16",  
@@ -39,7 +40,9 @@ export class TShop {
     product_list: TProduct [] = []
 };
 
-export function shopsFromArrayBuffer(buff: ArrayBuffer): TShop[]  {
+export class ShopHive extends Hive<TShop> {};
+
+export function shopsFromArrayBuffer(buff: ArrayBuffer): ShopHive  {
     const result :TShop[] = [];
     const rd  = new BinaryIterator(buff);
     const count = rd.parse("uint32");
@@ -52,14 +55,18 @@ export function shopsFromArrayBuffer(buff: ArrayBuffer): TShop[]  {
         shp.product_list = p.filter(x=>(x.trade_flags & ProductFlags.SHP_POPULATED) == 0);
         result.push(shp);
     }
-    const result2 =  result.reduce((a,b)=>{a[b.shop_id] = b;return a;},[] as TShop[]);
+    const result2 = new ShopHive;
+    result.forEach(x=>result2.set(x.shop_id, x));
     return result2;
 }
 
-export function shopsToArrayBuffer(shops: TShop[]) {
+export function shopsToArrayBuffer(shops: ShopHive) {
     const wr = new BinaryWriter();
-    wr.write("uint32", shops.length);
-    shops.forEach(x=>{
+    let count = 0;
+    shops.forEach(()=>count++);
+    wr.write("uint32", count);
+    shops.forEach((x,idx)=>{
+        x.shop_id = idx;
         wr.write(TShopSchema, x);
         x.product_list.forEach(y=>{
             wr.write(TProductSchema, y);
@@ -78,11 +85,3 @@ export const ProductFlags = {
     SHP_TYPE: 0x80,      //not item, but information about population
 };
 
-export function findFreeShopSlot(shops: TShop[]) {
-    for (let i = 1; i < shops.length; i++) {
-        if (shops[i] === undefined) {
-            return i;
-        }
-    }
-    return shops.length;
-}

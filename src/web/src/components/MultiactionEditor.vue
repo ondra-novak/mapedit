@@ -199,7 +199,7 @@ watch(list_of_keys,()=>{
     if (el) {
         cur_datalist =  create_datalist(async ()=>{
             const items = await globalGetItems();
-            return items.filter(x=>x.keynum).map(x=>({value:`${x.keynum}`,label: x.jmeno}))
+            return items.filter(x=>!!x.keynum).map(x=>({value:`${x.keynum}`,label: x.jmeno}))
         });
         el.setAttribute("list", cur_datalist.id);
     }
