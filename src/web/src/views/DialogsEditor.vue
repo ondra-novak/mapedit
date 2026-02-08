@@ -2,10 +2,10 @@
 import { server, type ModifiedFileNotify } from '@/core/api';
 import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant } from '@/core/dialog_structs';
 import { SVGPath } from '@/utils/svg';
-import { computed, onMounted, onUnmounted, reactive, ref,watch, type Reactive } from 'vue';
+import { computed, reactive, ref,watch } from 'vue';
 import noimage from '@/assets/noimage.svg'
 import HIFormat from '@/core/hiformat';
-import { create_datalist, type DataListHandle, type DataListItem } from '@/utils/datalist';
+import { create_datalist, type DataListHandle } from '@/utils/datalist';
 import { AssetGroup } from '@/core/asset_groups';
 import DlgCodeEditor from '@/components/DlgCodeEditor.vue';
 import { messageBoxConfirm } from '@/utils/messageBox';
@@ -740,6 +740,7 @@ function insert_const(s:string) {
                             <option :value="2">Choice</option>
                             <option :value="3">Select character</option>
                             <option :value="4">Select dead character</option>
+                            <option :value="5">Add to story log</option>
                         </select></label>
                         <div class="label" v-if="selected_branch.type != 0"><span>Speaker</span><div class="more">
                             <select v-model.number="selected_branch.speaker">
@@ -976,6 +977,13 @@ text.title {
 }
 .choice.seldead rect {
     fill:#ccf;
+}
+.choice.addstory rect {
+    fill: #dd8;
+}
+.choice.addstory text {
+    font-style: italic;
+    fill: #444;
 }
 
 .choice.jump_to_node rect {

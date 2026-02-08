@@ -331,7 +331,8 @@ export const DialogBranchType = {
     npctalk:1,    //npc talking, display text and pause
     choice:2,     //add choice into choices list
     selchar:3,    //ask for character and continue to target (for example cast spell on target)
-    seldead:4     //ask for dead character and continue to target (for example ressurection)
+    seldead:4,    //ask for dead character and continue to target (for example ressurection)
+    addstory:5,   //jump but add text to story log
 } as const;
 
 export const DialogSpeakerType = {
