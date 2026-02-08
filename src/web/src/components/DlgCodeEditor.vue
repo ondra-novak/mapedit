@@ -9,6 +9,23 @@ type Annotation = { from: Pos; to: Pos };
 
 const text = ref("");
 
+function paste_str(value: string) {
+    const el = textareaRef.value;
+    if (value && el) {
+        const beg = el.selectionStart;
+        const end = el.selectionEnd;
+        text.value = el.value.substring(0,beg) + value + el.value.substring(end);
+        nextTick(()=>{
+            el.selectionEnd = el.selectionStart = end + value.length;        
+            compile_update_now()
+        });
+        
+        
+    }
+}
+
+defineExpose({paste_str});
+
 // jedna anotace
 const annotation = ref<Annotation|null>(null);
 

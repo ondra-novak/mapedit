@@ -58,6 +58,7 @@ function init() {
             load_facts();
         }
     });
+    inited = true;
 }
 
 async function save_all() {
@@ -606,6 +607,13 @@ watch(postavy_dat_ref, async ()=>{
 
 const showFactDlg = ref(false);
 const showConstDlg = ref(false);
+const code_editor_el = ref<InstanceType<typeof DlgCodeEditor> | null>(null);
+
+function insert_const(s:string) {
+    if (code_editor_el.value) {
+        code_editor_el.value.paste_str(s);
+    }
+}
 
 </script>
 <template>
@@ -688,7 +696,7 @@ const showConstDlg = ref(false);
                             <button @click="delete_node">Delete node</button>
                         </div></div>
                         <label><span>Name (not visible)</span><input type="text" v-model="selected_node.name"></label>
-                        <label><span>Action (code)</span><DlgCodeEditor class="code_edit" v-model="selected_node.action"/></label>
+                        <label><span>Action (code)</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_node.action"/></label>
                         <label><span>Description (optional, visible)</span><textarea type="text" rows="3"
                             :value="selected_node.description ??''"
                             @change="ev=>update_optional_field(ev,dialogs._dlg[edit_focus.dlg!].nodes[edit_focus.node!],'description')"
@@ -705,7 +713,7 @@ const showConstDlg = ref(false);
                     <x-section-title>Edit condition: {{ selected_condition.name }}</x-section-title>
                     <x-form>                        
                         <label><span>Name</span><input type="text" v-model="selected_condition.name"></label>
-                        <label><span>Code</span><DlgCodeEditor class="code_edit" v-model="selected_condition.content"/></label>
+                        <label><span>Code</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_condition.content"/></label>
                         <div class="label"><span>NOTE: A change is applied everywhere the modified condition is used in the current story</span>
                             <div class="more">
                                 <button @click="save_condition" :disabled="!selected_condition.name">Save & Apply</button>
@@ -775,14 +783,14 @@ const showConstDlg = ref(false);
                     <x-section-title>Nothing selected</x-section-title>
                 </x-section>
             </template>
-            <x-section>
+            <x-section v-if="code_editor_el">
                 <x-section-title>Constants</x-section-title>
                 <div class="list">
                     <input type="search" v-model="constant_filter">
                     <div class="tbl">
                         <table class="consts">
                             <tbody>
-                                <tr v-for="v of constant_filtered_list" :key="v[0]" :class="{fact: v[3], const:!v[3]}">
+                                <tr v-for="v of constant_filtered_list" :key="v[0]" :class="{fact: v[3], const:!v[3]}" @click="insert_const(v[0])">
                                     <td> {{  v[0] }}</td>
                                     <td> {{  v[1] }}</td>
                                     <td> {{  v[2] }}</td>
@@ -796,6 +804,7 @@ const showConstDlg = ref(false);
                     </div>                    
                 </div>
             </x-section>
+            <div v-else></div>
         </div>
     </div>
 
@@ -849,7 +858,7 @@ const showConstDlg = ref(false);
     </dialog>
     <dialog v-if="showConstDlg" :ref="el=>el?(el as HTMLDialogElement).showModal():null">
         <header>Edit consts<button @click="showConstDlg=false" class="close"></button></header>
-        <div style="max-height: 50vh;overflow: hidden auto ;"><DlgConstsEditor v-model="dialogs._consts"/></div>
+        <div><DlgConstsEditor v-model="dialogs._consts"/></div>
     </dialog>
 
 
@@ -1001,7 +1010,7 @@ text.title {
     flex-grow: 1;
 }
 .editor > *:last-child{
-    width: 20rem;
+    width: 30%;
 }
 
 .editor x-section-title {
@@ -1062,5 +1071,9 @@ option.unused {
     color: brown;
 }
 dialog input[type=number] {width:5rem;text-align: center;}
+
+table.consts td:nth-child(3) {
+    white-space: nowrap;
+}
 
 </style>
