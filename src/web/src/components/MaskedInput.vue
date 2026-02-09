@@ -27,11 +27,13 @@ function isValid(v: string) {
   return props.mask.test(v);
 }
 
-function onBeforeInput(e: InputEvent) {
+function onBeforeInput(e: Event) {
   if (!inputEl.value) return;
 
+  const inputEvent = e as InputEvent;
+
   // mazání / undo necháme projít
-  if (e.inputType.startsWith("delete") || e.inputType === "historyUndo") {
+  if (inputEvent.inputType.startsWith("delete") || inputEvent.inputType === "historyUndo") {
     return;
   }
 
@@ -39,7 +41,7 @@ function onBeforeInput(e: InputEvent) {
   const start = el.selectionStart ?? el.value.length;
   const end = el.selectionEnd ?? el.value.length;
 
-  const inserted = e.data ?? "";
+  const inserted = inputEvent.data ?? "";
   const nextValue =
     el.value.slice(0, start) + inserted + el.value.slice(end);
 

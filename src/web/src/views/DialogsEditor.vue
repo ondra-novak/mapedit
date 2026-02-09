@@ -199,8 +199,9 @@ interface Arrow {
     to_level: number;
     to_offset: number;
     head: boolean;
-    backward: boolean;
+    backside: boolean;
     from_via: boolean;
+    backward?: boolean;
 };
 type Arrows = Arrow[];
 
@@ -211,10 +212,48 @@ interface Layout {
     unused: Record<number, boolean>
 };
 
+function center_layout_vertically(layout: Layout): void {
+    // Find max offset for each level
+    const level_max_offsets: Record<number, number> = {};
+    
+    layout.nodes.forEach(n => {
+        const max = Math.max(level_max_offsets[n.level] ?? 0, n.offset + n.height);
+        level_max_offsets[n.level] = max;
+    });
+    
+    layout.vias.forEach(v => {
+        const max = Math.max(level_max_offsets[v.level] ?? 0, v.offset + 1);
+        level_max_offsets[v.level] = max;
+    });
+    
+    // Find global max to center around
+    const global_max = Math.max(...Object.values(level_max_offsets));
+    
+    // Calculate offset for each level to center it
+    const level_offsets: Record<number, number> = {};
+    for (const level in level_max_offsets) {
+        level_offsets[level] = (global_max - level_max_offsets[level]) / 2;
+    }
+    
+    // Apply offsets to nodes and vias
+    layout.nodes.forEach(n => {
+        n.offset += level_offsets[n.level];
+    });
+    
+    layout.vias.forEach(v => {
+        v.offset += level_offsets[v.level];
+    });
+    
+    // Apply offsets to arrows
+    layout.arrows.forEach(a => {
+        a.from_offset += level_offsets[a.from_level];
+        a.to_offset += level_offsets[a.to_level];
+    });
+}
 const node_base_height = 1;
 const node_initial_offset = 8;
 
-function create_layout(story: DialogStory) : Layout{
+function create_layout2(story: DialogStory, level_mult:number[] = []) : Layout{
     const nodes: NodeLayout = [];
     const vias: ViaList = [];
     const arrows: Arrows = [];
@@ -248,7 +287,7 @@ function create_layout(story: DialogStory) : Layout{
 
     function add_route(cur_level:number, target: number, offset:number, from_via: boolean) {
         const tlevel = level_map[target];
-        const toffset = from_via?offset:offset-node_base_height-2;
+        const toffset = from_via?offset:((offset-1) / (level_mult[cur_level] ?? 1))*(level_mult[cur_level+1] ?? 1);
         if (tlevel !== undefined) {
             if (tlevel == cur_level+1) {
                 const tref = refs[target];
@@ -259,7 +298,7 @@ function create_layout(story: DialogStory) : Layout{
                     to_level : tlevel,
                     to_offset : h,
                     head: true,
-                    backward:false,
+                    backside:false,
                     from_via
                 });
             } else if (tlevel > cur_level) {
@@ -270,7 +309,7 @@ function create_layout(story: DialogStory) : Layout{
                     to_level: cur_level+1,
                     to_offset: h,
                     head: false,
-                    backward: false,
+                    backside: false,
                     from_via
                 });                            
             } else {
@@ -283,19 +322,20 @@ function create_layout(story: DialogStory) : Layout{
                             to_level : cur_level,
                             to_offset : tref.offset+0.5,
                             head: true,
-                            backward:true,
-                            from_via
+                            backside:true,
+                            from_via                            
                         });                        
                     } else if (from_via) {
-                        let h = add_via(cur_level-1, target, toffset);
+                        let h = add_via(cur_level-1, target, offset);
                         arrows.push({
                             from_level : cur_level-1,
                             from_offset : h,
                             to_level : cur_level,
                             to_offset : offset,
                             head: false,
-                            backward:false,
-                            from_via
+                            backside:false,
+                            from_via,
+                            backward: true,
                         });
                     } else {
                         let h = add_via(cur_level, target, toffset);
@@ -305,8 +345,8 @@ function create_layout(story: DialogStory) : Layout{
                             to_level : cur_level,
                             to_offset : h,
                             head: false,
-                            backward:true,
-                            from_via
+                            backside:true,
+                            from_via,                            
                         });
                     }
                 }
@@ -337,7 +377,60 @@ function create_layout(story: DialogStory) : Layout{
     const unused = Object.fromEntries(Object.keys(story.nodes).map(x=>[x,true]));
     for (const k in level_map) delete unused[k];
 
-    return {nodes,vias,arrows, unused};
+    let rmp1 : Record<number, number> = {};
+    let rmp2 : Record<number, number> = {};
+    level_mult.forEach((x,idx)=>{
+        
+        arrows.forEach(a=>{
+            if (a.backward && a.from_level == idx) {
+                if (rmp1[a.from_offset] !== undefined) {
+                    a.from_offset = rmp1[a.from_offset];
+                }
+                rmp2[a.to_offset] = a.from_offset;
+                a.to_offset = a.from_offset;
+            } else if (a.backside && !a.head) {
+                if (rmp1[a.to_offset] !== undefined) {
+                    a.to_offset = rmp1[a.to_offset];
+                }
+            }
+        });
+        vias.forEach(v=>{
+            if (v.level == idx+1 && rmp2[v.offset] !== undefined)  {
+                v.offset = rmp2[v.offset]
+            }
+        })
+        rmp1 = rmp2;
+        rmp2 = {};
+    });
+
+
+    const fl : Layout = {nodes,vias,arrows, unused};
+
+    return fl;
+}
+
+function create_layout(story: DialogStory) {
+    const layout = create_layout2(story);
+
+        // Find max offset for each level
+    const level_max_offsets: number[] = [];
+    
+    layout.nodes.forEach(n => {
+        const max = Math.max(level_max_offsets[n.level] ?? 0, n.offset + n.height);
+        level_max_offsets[n.level] = max;
+    });
+    
+    layout.vias.forEach(v => {
+        const max = Math.max(level_max_offsets[v.level] ?? 0, v.offset + 1);
+        level_max_offsets[v.level] = max;
+    });
+    
+    // Find global max to center around
+    const global_max = Math.max(...level_max_offsets);
+
+    const mults = level_max_offsets.map(x=>x?global_max/x:1);
+
+    return create_layout2(story, mults);
 }
 
 const diagram = ref<Layout>();
@@ -412,15 +505,15 @@ function x_arrow_right(x:number) {
 function calc_arrow(a : Arrow) : string {
     
 
-    const xf = a.backward && a.from_via?x_coord(a.from_level):x_arrow_right(a.from_level);
-    const xt = a.backward && !a.from_via?x_arrow_right(a.to_level):x_coord(a.to_level);
+    const xf = a.backside && a.from_via?x_coord(a.from_level):x_arrow_right(a.from_level);
+    const xt = a.backside && !a.from_via?x_arrow_right(a.to_level):x_coord(a.to_level);
     const yf = y_arrow(a.from_offset);
     const yt = y_arrow(a.to_offset)
-    const xtp = xt + (a.head?5*(a.backward&& !a.from_via?1:-1):0);
+    const xtp = xt + (a.head?5*(a.backside&& !a.from_via?1:-1):0);
     const xfp = xf - (a.from_via?5:0);
     const m = (grid_x-grid_width)/1.5+Math.abs(yt-yf)*0.1;
-    const xfc = a.backward && a.from_via?xf-m:xf+m
-    const xtc = a.backward && !a.from_via?xt+m:xt-m;
+    const xfc = a.backside && a.from_via?xf-m:xf+m
+    const xtc = a.backside && !a.from_via?xt+m:xt-m;
     const r= Math.min(Math.abs(xt-xf),Math.abs(yt-yf),20);
     
 
