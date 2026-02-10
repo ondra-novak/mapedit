@@ -1,6 +1,6 @@
 {
-  function bin(left, op, right) {
-    return { type: "binary", op, left, right };
+  function node( op, ...args) {
+    return [op, ... args] ;
   }
 }
 
@@ -14,46 +14,43 @@ Sequence
     )*
     _ ";"?
   {
-    return {
-      type: "sequence",
-      commands: [first, ...rest]
-    };
+    return node( "seq",first,...rest);          
   }
 
   
 Assignment 
   = left:Identifier _ ":=" _ right: Expression {
-  return bin(left, ":=" , right);
+  return node(":=" , left, right);
 } / Expression
 
 Expression = Comparison
 
 Comparison 
   = left:LogicalAnd _ op:("<" / ">" / "<=" / ">=" / "==" / "!=" ) _ right: Comparison {
-  	return bin(left, op, right);
+  	return node( op, left, right);
   } / LogicalOr
 
 LogicalOr
   = left:LogicalAnd _ "||" _ right:LogicalOr {
-      return bin(left, "||", right);
+      return node("||", left, right);
     }
   / LogicalAnd
 
 LogicalAnd
   = left:Additive _ "&&" _ right:LogicalAnd {
-      return bin(left, "&&", right);
+      return node( "&&", left, right);
     }
   / Additive
 
 Additive
   = left:Multiplicative _ op:("+" / "-") _ right:Additive {
-      return bin(left, op, right);
+      return node( op, left, right);
     }
   / Multiplicative
 
 Multiplicative
   = left:Primary _ op:("*" / "/") _ right:Multiplicative {
-      return bin(left, op, right);
+      return node( op,left, right);
     }
   / Primary
 
@@ -62,18 +59,14 @@ Primary
   / Number
   / String
   / Identifier
-  / "(" _ Expression _ ")"
-  / "{" _ Sequence _ "}"
-  / "+" _ Number 
-  / "-" _ arg:Number {return {type:"call","name":"unar_minus","args":[arg]}; }
+  / "(" _ a:Expression _ ")" {return a;}
+  / "{" _ a:Sequence _ "}" {return a;}
+  / "+" _ a:Number  {return a;}
+  / "-" _ arg:Number {return node("-", arg); }
 
 Call
   = name:Identifier _ "(" _ args:Arguments? _ ")" {
-      return {
-        type: "call",
-        name: name.name,
-        args: args !== null ? args : []
-      };
+      return node("call", ... args);
     }
 
 Arguments
@@ -83,24 +76,24 @@ Arguments
 
 Identifier
   = name:$(IdentStart IdentPart*) {
-      return { type: "identifier", name };
+      return node("id", name );
     }
 
 Number
   = value:$([0-9]+) {
-      return { type: "number", value: parseInt(value, 10) };
+      return node("num", parseInt(value, 10));
     }
 
 String
   = "\"" chars:$(Char*) "\"" {
-      return { type: "string", value: chars };
+      return node( "str", chars );
     }
 
 IdentStart
   = [a-zA-Z_]
 
 IdentPart
-  = [a-zA-Z0-9_]
+  = [a-zA-Z0-9_.]
 
 Char
   = !("\"") .

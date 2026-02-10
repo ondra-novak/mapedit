@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import {type DialogAction } from '@/core/dialog_structs';
-import peggy from "peggy";
-import globalState from '@/utils/global';
+import { type DialogAction } from '@/core/dialog_structs';
+import  {parse}  from '@/generated/parser'
+
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 
 type Pos = { row: number; col: number };
@@ -14,20 +14,20 @@ function paste_str(value: string) {
     if (value && el) {
         const beg = el.selectionStart;
         const end = el.selectionEnd;
-        text.value = el.value.substring(0,beg) + value + el.value.substring(end);
-        nextTick(()=>{
-            el.selectionEnd = el.selectionStart = end + value.length;        
+        text.value = el.value.substring(0, beg) + value + el.value.substring(end);
+        nextTick(() => {
+            el.selectionEnd = el.selectionStart = end + value.length;
             compile_update_now()
         });
-        
-        
+
+
     }
 }
 
-defineExpose({paste_str});
+defineExpose({ paste_str });
 
 // jedna anotace
-const annotation = ref<Annotation|null>(null);
+const annotation = ref<Annotation | null>(null);
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const mirrorRef = ref<HTMLDivElement | null>(null);
@@ -37,46 +37,46 @@ const scrollTop = ref(0);
 const scrollLeft = ref(0);
 
 function onScroll() {
-  if (!textareaRef.value) return;
-  scrollTop.value = textareaRef.value.scrollTop;
-  scrollLeft.value = textareaRef.value.scrollLeft;
+    if (!textareaRef.value) return;
+    scrollTop.value = textareaRef.value.scrollTop;
+    scrollLeft.value = textareaRef.value.scrollLeft;
 }
 
 /**
  * Přepočet anotace na DOM rect
  */
 const highlightStyle = computed(() => {
-  if (!mirrorRef.value || !annotation.value) return null;
+    if (!mirrorRef.value || !annotation.value) return null;
 
-  const { from, to } = annotation.value;
-  const lines = text.value.split("\n");
+    const { from, to } = annotation.value;
+    const lines = text.value.split("\n");
 
-  const startIndex =
-    lines.slice(0, from.row - 1).join("\n").length +
-    (from.row > 1 ? 1 : 0) +
-    from.col - 1;
+    const startIndex =
+        lines.slice(0, from.row - 1).join("\n").length +
+        (from.row > 1 ? 1 : 0) +
+        from.col - 1;
 
-  const endIndex =
-    lines.slice(0, to.row - 1).join("\n").length +
-    (to.row > 1 ? 1 : 0) +
-    to.col - 1;
+    const endIndex =
+        lines.slice(0, to.row - 1).join("\n").length +
+        (to.row > 1 ? 1 : 0) +
+        to.col - 1;
 
-  const textNode = mirrorRef.value.firstChild as Text;
-  if (!textNode) return null;
+    const textNode = mirrorRef.value.firstChild as Text;
+    if (!textNode) return null;
 
-  const range = document.createRange();
-  range.setStart(textNode, startIndex);
-  range.setEnd(textNode, endIndex);
+    const range = document.createRange();
+    range.setStart(textNode, startIndex);
+    range.setEnd(textNode, endIndex);
 
-  const rect = range.getBoundingClientRect();
-  const containerRect = mirrorRef.value.getBoundingClientRect();
+    const rect = range.getBoundingClientRect();
+    const containerRect = mirrorRef.value.getBoundingClientRect();
 
-  return {
-    top: rect.top - containerRect.top - scrollTop.value,
-    left: rect.left - containerRect.left - scrollLeft.value,
-    width: rect.width,
-    height: rect.height,
-  };
+    return {
+        top: rect.top - containerRect.top - scrollTop.value,
+        left: rect.left - containerRect.left - scrollLeft.value,
+        width: rect.width,
+        height: rect.height,
+    };
 });
 
 onMounted(() => {
@@ -85,13 +85,9 @@ onMounted(() => {
 });
 
 
-const model = defineModel<DialogAction|null>();
+const model = defineModel<DialogAction | null>();
 const error_message = ref("");
 
-const peggy_compiler = globalState("peggy_compiler", async ()=>{
-    const txt = await (await fetch("dialogs.peggy")).text();
-    return peggy.generate(txt);
-})
 
 
 function update_model() {
@@ -103,49 +99,56 @@ function update_model() {
     }
 }
 
-
 async function compile_update() {
-        const txt = text.value;     
-        if (txt) {
-            const compiler = await peggy_compiler;
-            try {
-                const ast = compiler.parse(txt);
-                model.value = {ast:ast, source:txt};
-                if (error_message.value) {
-                    error_message.value ="";
-                    annotation.value = null;
-                }
-            } catch (e) {
-                console.log(e);
-                const err = e as peggy.GrammarError;
+    const txt = text.value;
+    if (txt) {
+        try {
+            const ast = parse(txt);
+            model.value = { ast: ast, source: txt };
+            if (error_message.value) {
+                error_message.value = "";
+                annotation.value = null;
+            }
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                const err = e as { message: string; location?: any };
+
                 error_message.value = err.message;
-                if (err.location) {
+
+                if (err.location?.start && err.location?.end) {
                     annotation.value = {
-                        from:{row: err.location.start.line, col: err.location.start.column},
-                        to:{row: err.location.end.line, col: err.location.end.column},
-                    }
+                        from: {
+                            row: err.location.start.line,
+                            col: err.location.start.column,
+                        },
+                        to: {
+                            row: err.location.end.line,
+                            col: err.location.end.column,
+                        },
+                    };
                 }
-            }        
-        } else {
-            model.value = {ast:null,source:""};
-            error_message.value = "";
-            annotation.value = null;
+            }
         }
+    } else {
+        model.value = { ast: null, source: "" };
+        error_message.value = "";
+        annotation.value = null;
+    }
 
 }
 
-let tm: number |string| NodeJS.Timeout | undefined;
+let tm: number | NodeJS.Timeout | null = null;
 function compile_update_delayed() {
     annotation.value = null;
-    if (tm !== undefined)  clearTimeout(tm);
-    tm = setTimeout(()=>{
-        tm = undefined;
+    if (tm !== null) clearTimeout(tm);
+    tm = setTimeout(() => {
+        tm = null;
         compile_update();
     }, 1000);
 }
 function compile_update_now() {
-    if (tm !== undefined)  clearTimeout(tm);
-    tm = undefined;
+    if (tm !== null) clearTimeout(tm);
+    tm = null;
     compile_update();
 }
 
@@ -157,79 +160,78 @@ watch(model, update_model);
 
 </script>
 <template>
-<div v-bind="$attrs">
-    <div class="wrapper">
-        <!-- textarea -->
-        <textarea ref="textareaRef" spellcheck="false" v-model="text" @scroll="onScroll" @change="compile_update_now" class="textarea"/>
-        <!-- mirror -->
-        <div ref="mirrorRef" class="mirror"> {{ text }} </div>
-        <!-- overlay -->
-        <div ref="overlayRef" class="overlay" v-if="annotation">
-        <div v-if="highlightStyle" class="highlight"
-            :style="{
-                top: highlightStyle.top + 'px',
-                left: highlightStyle.left + 'px',
-                width: highlightStyle.width + 'px',
-                height: highlightStyle.height + 'px'
-            }"
-        />
+    <div v-bind="$attrs">
+        <div class="wrapper">
+            <!-- textarea -->
+            <textarea ref="textareaRef" spellcheck="false" v-model="text" @scroll="onScroll"
+                @change="compile_update_now" class="textarea" />
+            <!-- mirror -->
+            <div ref="mirrorRef" class="mirror"> {{ text }} </div>
+            <!-- overlay -->
+            <div ref="overlayRef" class="overlay" v-if="annotation">
+                <div v-if="highlightStyle" class="highlight" :style="{
+                    top: highlightStyle.top + 'px',
+                    left: highlightStyle.left + 'px',
+                    width: highlightStyle.width + 'px',
+                    height: highlightStyle.height + 'px'
+                }" />
+            </div>
         </div>
+        <p class="error" v-if="error_message">{{ error_message }}</p>
     </div>
-    <p class="error" v-if="error_message">{{ error_message }}</p>
-</div>
 </template>
 
 <style lang="css" scoped>
 .wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  font-family: monospace;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    font-family: monospace;
 }
 
 /* textarea */
 .textarea {
-  position: absolute;
-  inset: 0;
-  resize: none;
-  font: inherit;
-  line-height: 1.1;
-  background: transparent;
-  color: black;
-  z-index: 2;
-  white-space: pre;
-  overflow-wrap: normal;
-  overflow-x: auto;
+    position: absolute;
+    inset: 0;
+    resize: none;
+    font: inherit;
+    line-height: 1.1;
+    background: transparent;
+    color: black;
+    z-index: 2;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
 }
 
 /* mirror text (neviditelný) */
 .mirror {
-  position: absolute;
-  inset: 0;
-  font: inherit;
-  line-height: 1.1;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  visibility: hidden;
-  z-index: 1;
-  padding: 2px;
+    position: absolute;
+    inset: 0;
+    font: inherit;
+    line-height: 1.1;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    visibility: hidden;
+    z-index: 1;
+    padding: 2px;
 }
 
 /* overlay */
 .overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 3;
-  overflow: hidden;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    overflow: hidden;
 }
 
 /* anotace */
 .highlight {
-  position: absolute;
-  background: rgba(255, 0, 0, 0.35);
-  border-radius: 4px;
-  filter: blur(0.3px);
+    position: absolute;
+    background: rgba(255, 0, 0, 0.35);
+    border-radius: 4px;
+    filter: blur(0.3px);
 }
 
 div {
@@ -237,7 +239,7 @@ div {
     flex-direction: column;
 }
 
-pre > :deep(em) {
+pre> :deep(em) {
     color: red;
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { server, type ModifiedFileNotify } from '@/core/api';
-import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant } from '@/core/dialog_structs';
+import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant, DlgNodeType} from '@/core/dialog_structs';
 import { SVGPath } from '@/utils/svg';
 import { computed, reactive, ref,watch } from 'vue';
 import noimage from '@/assets/noimage.svg'
@@ -17,6 +17,7 @@ import { FactDB } from '@/core/factdb';
 import type { WsRpcResult } from '@/core/wsrpc';
 import FactEditor from '@/components/FactEditor.vue';
 import DlgConstsEditor from '@/components/DlgConstsEditor.vue';
+import { shopsFromArrayBuffer } from '@/core/shop_structs';
 
 const dialogs = reactive(new DialogManager);
 let inited = false;
@@ -641,7 +642,7 @@ async function branch_move(dir: number) {
 function edit_condition(s:string) {
     if (cur_story.value) {
         if (!s) {
-            selected_condition.value = {name:"",content:{ast:{},source:""}};
+            selected_condition.value = {name:"",content:{ast:null,source:""}};
         } else {
             selected_condition.value = {name:s, content:cur_story.value.conditions[s]};
         }
@@ -708,6 +709,22 @@ function insert_const(s:string) {
     }
 }
 
+const shop_list = ref<HTMLSelectElement>();
+watch(shop_list, async ()=>{
+    const el = shop_list.value;
+    if (el) {
+        const shp = shopsFromArrayBuffer(await server.getDDLFile("SHOPS.DAT"));
+        const v = el.value;
+        while (el.options.length) el.options.remove(0);
+        shp.forEach((x, idx)=>{
+            const opt = document.createElement("option");
+            opt.value = `${idx}`;
+            opt.textContent = x.keeper;
+            el.options.add(opt);
+        });
+    }
+})
+
 </script>
 <template>
 <x-workspace :hidden="!active">
@@ -753,13 +770,13 @@ function insert_const(s:string) {
                     <g class="node" :class="{final: cur_story.nodes[n.node_id].branches.length == 0, selected: edit_focus.node == n.node_id && edit_focus.branch === undefined}" @click="edit_focus={dlg:current_index, node:n.node_id}">
                         <rect  rcx="10" ry="10" x="0" y="0" :width="x_width()" :height="y_height(n.height)" />
                         <text class="title" x="5" :y="grid_y/2" v-svg-ellipsis="grid_width-5" :key=" cur_story.nodes[n.node_id].name"> #{{ n.node_id }} {{ cur_story.nodes[n.node_id].name }}</text>
+                        <text class="battle" :x="x_width()-5" :y="y_height(1)-10" v-if="cur_story.nodes[n.node_id].node_type == DlgNodeType.battle">⚔</text>
+                        <text class="shopping" :x="x_width()-5" :y="y_height(1)-10" v-if="cur_story.nodes[n.node_id].node_type == DlgNodeType.shopping">🛒</text>
                     </g>
                     <g v-for="(b,idx) of cur_story.nodes[n.node_id].branches" :class="branch_class(b.type, b.target === null, edit_focus.node === n.node_id?idx:-1)"                        
                         :transform="`translate(0,${y_coord(node_base_height+idx)})`"
-                        @click="edit_focus={dlg:current_index,node:n.node_id,branch:idx}"
-                        :key="idx">
-                        <rect x="0" y="0"
-                                :width="x_width()" :height="y_coord(1)"  />
+                        @click="edit_focus={dlg:current_index,node:n.node_id,branch:idx}" :key="idx">
+                        <rect x="0" y="0" :width="x_width()" :height="y_coord(1)"  />
                         <text v-if="b.type==DialogBranchType.jump_to_node" :x="grid_width/2" :y="grid_y/2">(jump)</text>
                         <text v-else class="text" v-svg-ellipsis="grid_width-5" x="5" :y="grid_y/2" :title="b.text" :key="b.text">{{ b.text }}</text>
                         <text class="cond" v-if="b.condition" :key="b.condition" :x="grid_width-2" :y="grid_y-2">{{ b.condition }}</text>
@@ -784,11 +801,16 @@ function insert_const(s:string) {
                 <x-section>
                     <x-section-title>Node</x-section-title>
                     <x-form>
-                        <div class="label"><span></span><div class="more r">
-                            <button @click="add_branch">Add Branch</button>
-                            <button @click="delete_node">Delete node</button>
+                        <div class="label"><span>Node type</span><div class="more h"><select v-model.number="selected_node.node_type">
+                            <option :value="DlgNodeType.standard">Branching</option>
+                            <option :value="DlgNodeType.battle">Battle</option>
+                            <option :value="DlgNodeType.shopping">Shopping</option>
+                        </select>
+                         <select v-if="selected_node.node_type == DlgNodeType.shopping" v-model.number="selected_node.shop_id" ref="shop_list"><option :value="selected_node.shop_id">loading...</option></select>
+                         <button @click="add_branch" v-if="!selected_node.node_type">Add Branch</button>
+                         <button @click="delete_node">Delete node</button>                                
                         </div></div>
-                        <label><span>Name (not visible)</span><input type="text" v-model="selected_node.name"></label>
+                        <label><span>Name (not visible)</span><input type="text" v-model="selected_node.name"></label>                        
                         <label><span>Action (code)</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_node.action"/></label>
                         <label><span>Description (optional, visible)</span><textarea type="text" rows="3"
                             :value="selected_node.description ??''"
@@ -858,14 +880,15 @@ function insert_const(s:string) {
                                 </select>
                             <button :disabled="selected_branch.target === null" @click="selected_branch.target = null">Exit dialog</button>
                             <button :disabled="selected_branch.target !== null" @click="add_node_branch">Add node</button>
-                        </div></div>
+                            </div>
+                        </div>
                         <div class="label"><span>Condition</span>
                             <div class="more">
                                 <select v-model="selected_branch.condition">
                                     <option value="">(none)</option>
                                     <option v-for="(v,k) of cur_story.conditions" :key="k" :value="k">{{ k }}</option>
                                 </select>
-                                <button :disabled="!selected_branch.condition" @click="edit_condition(selected_branch.condition)">Edit</button>
+                                <button :disabled="!selected_branch.condition" @click="edit_condition(selected_branch.condition || '')">Edit</button>
                                 <button @click="edit_condition('')">Add</button>                                
                             </div>
                         </div>
@@ -1079,6 +1102,11 @@ text.title {
     fill: #444;
 }
 
+.node text.battle ,.node text.shopping {
+    text-anchor: end;
+    font-size: 2rem;
+}
+
 .choice.jump_to_node rect {
     fill:white;
 }
@@ -1130,11 +1158,14 @@ text.title {
     overflow: auto;
 }
 div.label div.more {
-    text-align: left;
-    white-space: nowrap;
+    display:flex;
+    gap: 0.2rem;
 }
 div.label div.more.r {
-       text-align: right;
+    justify-content: end;
+}
+div.label div.more.h > *:first-child{
+    flex-grow: 1;
 }
 div.label div.more > *{
     margin: 0.2rem;

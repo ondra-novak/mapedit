@@ -376,15 +376,30 @@ export interface DialogBranch {
 
 export interface DialogAction {
     source: string ;
-    ast: Record<string, any>|null ;
+    ast: any[]|null ;
 }
+
+export const DlgNodeType = {
+    standard: 0,
+    battle: 1,
+    shopping: 2
+} as const
+
+export const DlgNodeTypeStr = Object.entries(DlgNodeType).reduce((a,b)=>{
+    a[b[1]] = b[0];
+    return a;
+},[] as string[]);
+
+
 
 export interface DialogNode {
     name: string;
-    picture: string;
-    description: string;    
-    action: DialogAction;
+    picture?: string;
+    description?: string;    
+    action?: DialogAction;
     branches: DialogBranch[];
+    node_type: typeof DlgNodeType[keyof typeof DlgNodeType];
+    shop_id?: number;
 }
 
 export interface DialogStory {
@@ -403,10 +418,8 @@ export class DialogManager {
     static new_node() : DialogNode{
         return {
             branches:[],
-            action:{ast:{},source:""},
-            description:"",
-            picture:"",
-            name:""
+            name:"",
+            node_type: DlgNodeType.standard
         };
     }
 
