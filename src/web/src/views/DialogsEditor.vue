@@ -68,6 +68,7 @@ async function save_all() {
     const bin = enc.encode(json_data);
     ignore_modified = true;
     await server.putDDLFile("DIALOGY.JSON", bin.buffer, AssetGroup.MAPS);    
+    dialogs.compile();
 }
 
 watch(()=>props.active,()=>{

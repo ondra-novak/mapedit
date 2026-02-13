@@ -1,13 +1,13 @@
-import { BinaryIterator, make1DArray, type Schema } from "./binary";
+import { BinaryIterator, BinaryWriter, make1DArray, type Schema } from "./binary";
 import type { CharacterStats, CharacterWeaponBonus } from "./common_defs";
 import type { directions } from "./map_structs";
 
 class DialogParagraphDef {
     header = {
         id: 0,
-        alt: 0,     //never used in original dialog scheme
-        visited: false, //not used in Steam Version
-        first: false    //not used in Steam Version
+        alt: 0,     //if id != alt, go alt for first time, so id == alt to turn off this feature
+        visited: false, //true when visited
+        second_visit: false    //true if visited second time 
     }
     position = 0;
 
@@ -18,112 +18,16 @@ class DialogParagraphDef {
                 id:      0x00007FFF,
                 alt:     0x3FFF8000,
                 visited: 0x40000000,
-                first:   0x80000000,
+                second_visit:   0x80000000,
             }],
             position: "uint32"
         };
     }
 }
 
-/*
-type DialogCondition = ["and", DialogCommand[]] | ["or", DialogCommand[]] | ["not", DialogCommand[]];
-
-
-const DialogOperator = {
-    "=":32,
-    ">":35,
-    "<":33,
-    ">=":36,
-    "<=":34,
-    "<>":37,
-}
-
-export type DialogCommandDef = {
-    show_desc: string,
-    show_emote: string,
-    save_char: number,
-    load_char: number,
-    not: DialogCondition,
-    and: DialogCondition,
-    or: DialogCondition,
-    char_select:{
-        ability:keyof typeof CharacterStats,
-        limit: number,
-        can_duplicate: boolean
-    },
-    manual_char_select: {
-        name: string,
-        female: boolean
-    }
-    goto: number,
-    choice: [string, number],
-    dialog_select: number,
-    visited:number,
-    picture:string,
-    echo:string,
-    add_book:number,
-    clear_visited: number,
-    random100:number,
-    has_item:number,
-    create_item:number,
-    destroy_item:number,
-    add_money:number,
-    sub_money:number,
-    start_battle:[],
-    send_action: [number, typeof directions],
-    relocate_group: [number, typeof directions],
-    run_animation: {
-        name: string,
-        speed: number,
-        rep?:boolean
-    },
-    update_story: string,
-    test_flag:number,
-    dialog_select_jump: null,
-    unknown: [number|string][],
-    local_pgf: number,
-    start_shop: number,
-    join:number,
-    char_input:{
-        prompt: string,
-        goto: number,
-        dead? : boolean
-    },
-    practice: [(keyof typeof CharacterStats) | (keyof typeof CharacterWeaponBonus), number, number?],
-    test_ability: [(keyof typeof CharacterStats) | (keyof typeof CharacterWeaponBonus), keyof typeof DialogOperator, number],
-    has_rune:[number, number],
-    activate_rune:[number, number],
-    deactivate_rune:[number, number],
-    has_money:number,
-    dark_screen:[number, number],
-    sleep: number,
-    feast: number,
-    whole_group:null,
-    enable_global_map:boolean,
-    current_sector:[keyof typeof DialogOperator],
-    cast_spell:number,
-    play_sound:string,
-
-
-
-
-
-
-
-
-    
-}
-
-type DialogCommand =
-  {
-    [K in keyof DialogCommandDef]:
-      [K, DialogCommandDef[K]]
-  }[keyof DialogCommandDef]
-
-*/
   
 interface Instruction {
-    short?: number,
+    value?: number,
     text?: string,
     variable? :number
 }
@@ -141,9 +45,22 @@ function read_instruction(iter: BinaryIterator) : Instruction {
             iter.seek_rel(-1);
             return {text:s};
         }
-        case 2: return {short: iter.parse("int16")};
+        case 2: return {value: iter.parse("int16")};
         case 3: return {variable: iter.parse("int16")};        
         default: throw Error(`Unknown type ${type}`);
+    }
+}
+
+function write_instruction(iter: BinaryWriter, instr: Instruction) {
+    if ("value" in instr) {
+        iter.write("uint8",2);
+        iter.write("int16",instr.value);
+    } else if ("text" in instr) {
+        iter.write("uint8",1);
+        iter.write("int16",instr.text);
+    } else  if ("variable" in instr) {
+        iter.write("uint8",3);
+        iter.write("int16",instr.variable);
     }
 }
 
@@ -268,8 +185,8 @@ export class DialogDef {
                 while(true) {                
                     label_map.set(iter.tell(), out.length);
                     const instr_code = read_instruction(iter);
-                    if (instr_code.short === undefined) throw Error(`Parse error, instruction ${JSON.stringify(instr_code)}`);
-                    const c = instr_code.short;
+                    if (instr_code.value === undefined) throw Error(`Parse error, instruction ${JSON.stringify(instr_code)}`);
+                    const c = instr_code.value;
                     const instr = DialogDef.instruction_table[c];
                     if (!instr) out.push(["?unknown",[instr_code]]);
                     else {
@@ -278,16 +195,16 @@ export class DialogDef {
                         for (let i = 0; i < arg_cnt; ++i) {
                             args.push(read_instruction(iter));                        
                         }
-                        if (c >= 169 && c<=171 && args[0].short !== undefined) {
-                            fill_jump.push([iter.tell()+args[0].short,out.length]);
+                        if (c >= 169 && c<=171 && args[0].value !== undefined) {
+                            fill_jump.push([iter.tell()+args[0].value,out.length]);
                         } else if (c == 167) {
-                            state.local_pgf = args[0].short || state.local_pgf;
-                        } else if ((c == 139 || c == 140 || c == 141 || c == 142 || c == 146 || c == 145 || c== 166) && args[0].short !== undefined) {
-                            args[0].short = args[0].short+state.local_pgf;
-                        } else if ((c == 143 )&& args[1].short !== undefined) {
-                            args[1].short = args[1].short+state.local_pgf;
-                        } else if (( c==175 || c == 189)&& args[1].short) {
-                            args[1].short = args[1].short+state.local_pgf;
+                            state.local_pgf = args[0].value || state.local_pgf;
+                        } else if ((c == 139 || c == 140 || c == 141 || c == 142 || c == 146 || c == 145 || c== 166) && args[0].value !== undefined) {
+                            args[0].value = args[0].value+state.local_pgf;
+                        } else if ((c == 143 )&& args[1].value !== undefined) {
+                            args[1].value = args[1].value+state.local_pgf;
+                        } else if (( c==175 || c == 189)&& args[1].value) {
+                            args[1].value = args[1].value+state.local_pgf;
                         }
                         
                         out.push([instr[0], args]);
@@ -299,12 +216,12 @@ export class DialogDef {
                 fill_jump = fill_jump.filter(r=>{
                     const ofs = r[0];
                     const ln = r[1];
-                    const v = out[ln][1][0].short;
+                    const v = out[ln][1][0].value;
                     if (v) {
                         const addr = ofs;
                         const lb = label_map.get(addr);
                         if (lb) {
-                            out[ln][1][0].short = lb;
+                            out[ln][1][0].value = lb;
                             return false;
                         }
                     }
@@ -411,6 +328,17 @@ export interface DialogStory {
     name: string;
 }
 
+interface DialogNodeMap {
+    nodes : (DialogStory|DialogNode)[];
+    map : Map<DialogStory|DialogNode, number>;
+    stories : Map<DialogNode, DialogStory>;
+};
+
+function instruction_size(i: Instruction) {
+    if ("text" in i) return 1+i.text!.length+1;  //text instruction has 1+text_length+zero
+    else return 3;  //otherwise 3 bytes
+}
+
 export class DialogManager {
     _dlg: Record<number, DialogStory> = {};
     _consts: Record<string, DialogConstant> = {};
@@ -470,4 +398,103 @@ export class DialogManager {
         this._consts = s["constants"] || {};
     }
 
+    create_node_map() : DialogNodeMap {        
+        const nodes : (DialogNode|DialogStory)[] = [];
+        const map : Map<DialogNode|DialogStory, number> = new Map;
+        const stories : Map<DialogNode, DialogStory> = new Map;
+        for (const id in this._dlg) {
+            const st = this._dlg[id];
+            const vid = parseInt(id) *128;
+            nodes[vid] = st;
+            map.set(st, vid);
+        }
+        let idx = 0;
+        for (const id in this._dlg) {
+            const st = this._dlg[id];
+            for (const subid in st.nodes) {                
+                while (nodes[idx]) ++idx;
+                nodes[idx] = st.nodes[subid];
+                map.set(st.nodes[subid], idx);
+                stories.set(st.nodes[subid], st);
+            }
+        }
+
+        return {map, nodes, stories};
+    }
+
+    compile_node(nd: DialogStory| DialogNode, mp: DialogNodeMap) : Instruction[]{
+        const out : Instruction [] =[];
+        if (nd.description) {
+            out.push({value:128});
+            out.push({text:nd.description});
+        }
+        if (nd.picture) {
+            out.push({value:147});
+            out.push({text:nd.picture});
+        }
+        if ("nodes" in nd) {
+            this.compile_story(nd as DialogStory, mp, out);
+        } else {
+            this.compile_node2(nd as DialogNode,  mp, out);
+        }
+        
+
+        return out;
+    }
+
+    compile_story(st: DialogStory, mp: DialogNodeMap, out: Instruction[]) {
+
+        st.speakers.forEach((sp,idx)=>{
+            switch (sp.type) {
+                case DialogSpeakerType.attribute:
+                    out.push({value:22});       //nahodne
+                    out.push({value:sp.attribute || 0}); 
+                    out.push({value:sp.param || 99});
+                    out.push({value:130}); //save_name
+                    out.push({value:idx+1});
+                    break;
+                case DialogSpeakerType.random:
+                    out.push({value:22});       //nahodne
+                    out.push({value:0}); 
+                    out.push({value:0});
+                    out.push({value:130}); //save_name
+                    out.push({value:idx+1});
+                    break;
+                case DialogSpeakerType.xicht:
+                    out.push({value:201});       //pc_xicht
+                    out.push({value:sp.param}); 
+                    out.push({value:130}); //save_name
+                    out.push({value:idx+1});
+                    break;
+                case DialogSpeakerType.character:
+                    out.push({value:29});       //character slot
+                    out.push({value:sp.param}); 
+                    out.push({value:130}); //save_name
+                    out.push({value:idx+1});
+                    break;
+                default:
+                    break; //unset
+            }
+        })
+        const nd = st.nodes[0]; //goto start paragraph
+        if (nd) {
+            const t = mp.map.get(nd);
+            if (t !== undefined) {
+                out.push({value:139}); //goto paragraph
+                out.push({value:t});    //pgf id
+            }
+        }
+    }
+
+    compile_node2(nd: DialogNode, mp: DialogNodeMap, out: Instruction[]) {
+        switch (nd.node_type) {
+            case DialogNo
+        }
+    }
+
+    compile() {
+        console.log(this.create_node_map());
+    }
+
 }
+

@@ -74,6 +74,7 @@ cond && {
 - **is_female** - contains true, if current character is female
 - **is_male** - contains true, if current character is male
 - **character_sector** - contains sector of current character - applicable to non-random speakers - negative if at different map
+- **enemy** - contains true if dialog is associated with an enemy (there is current enemy)
 
 ### Functions
 
@@ -105,6 +106,13 @@ cond && {
  - **practice_to(stat.%, value)** - sets stat to given value
  - **timepass(seconds, game_hours)** - dark screen for given seconds, game time passes game_hours
  - **eat(price)** - add food and water to all characters in given dialog, price for each
- 
+ - **change_music(str)** - change music - playlist "song1 song2 song3..."
+ - **play_sound(str)** - play sound effect
+ - **replace_monster(m)** - replace current moster by different monster
+ - **replace_monsters(m,n)** - replace all monsters m in level by monsters n
+ - **replace_monsters(m,n,s,r)** - replace all monsters m in level by monsters n on sector (s) and given radius (r) in squares
+ - **cast_spell(n)** - cast given spell, it is casted current character.
+ - **cast_to_enemy(n)** - cast given spell to current enemy 
+
 
 
