@@ -67,8 +67,23 @@ export const CharacterStats = {
 export const CharacterStatsNames = [
     "Strength", "Magic", "Speed", "Dexterity", "Max HP","Max Vitality","Max mana","Defense Low","Defense High",
     "Attack Low", "Attack High","Protection Fire","Protection Water","Protection Earth","Protection Air","Protection Mind",
-    "HP Regeneration","Mana Regeneration","VP regeneration","Magic attack Low", "Magic attack High","Magic attack element","Damagae","Effects"
+    "HP Regeneration","Mana Regeneration","VP regeneration","Magic attack Low", "Magic attack High","Magic attack element","Damage","Effects"
 ] as const;
+
+function make_identifiers(prefix: string, list:readonly string[]) {
+    const out : Record<string, number> = {};
+    for (let i = 0; i < list.length; ++i) {
+        const n = CharacterStatsNames[i];
+        if (typeof n == "string") {
+            const m = n.toLowerCase().replace(/[^a-z0-9]/g, "_");
+            const s =  `${prefix}${m}`;
+            out[s] = i;
+        }
+    }
+    return out;
+}
+
+export const CharacterStatVariables = Object.freeze(make_identifiers("stat.",CharacterStatsNames));
 
 export const CharacterStatsMinMaxs = [
     /*"VLS_SILA":*/    [0,100],
@@ -143,3 +158,7 @@ export const CharacterWeaponBonus = {
         TPW_OST: 6,
         TPW_MAX: 7,
 } as const;
+
+export const CharacterWeaponBonusStr = ["Sword","Axe","Hammer","Staff","Dagger","Bow","Other"];
+
+export const CharacterWeaponBonusVariables = Object.freeze(make_identifiers("weapon_bonus.",CharacterWeaponBonusStr));
