@@ -335,11 +335,12 @@ export interface DialogStory {
     name: string;
 }
 
-interface DialogNodeMap {
-    nodes : (DialogStory|DialogNode)[];
-    map : Map<DialogStory|DialogNode|number, number>;
-    stories : Map<DialogNode, DialogStory>;
-};
+export type DialogIdentifierList = Record<string, {
+    read?: boolean,
+    write?: boolean
+    slot: number;
+}>;
+
 
 function instruction_size(i: Instruction) {
     if ("text" in i) return 1+i.text!.length+1;  //text instruction has 1+text_length+zero
@@ -350,6 +351,7 @@ function instruction_size(i: Instruction) {
 export class DialogManager {
     _dlg: Record<number, DialogStory> = {};
     _consts: Record<string, DialogConstant> = {};
+    _identifiers: DialogIdentifierList = {};
 
     static new_node() : DialogNode{
         return {
@@ -397,13 +399,14 @@ export class DialogManager {
     }
 
     save() : string {
-        return JSON.stringify({"dialogs":this._dlg,"constants":this._consts});
+        return JSON.stringify({"dialogs":this._dlg,"constants":this._consts, "identifiers": this._identifiers});
     }
 
     load(txt:string) {
         const s = JSON.parse(txt);;
         this._dlg = s["dialogs"];
         this._consts = s["constants"] || {};
+        this._identifiers = s["identifiers"] || {};
     }
 
     compile(consts: Record<string, DialogConstant> ) {
@@ -459,10 +462,10 @@ const functionList: FunctionList =
 };
 
 export class DialogCompileError extends Error {
-  location: DialogNode|null;
+  location: [number, number]|null;
   cause?: unknown;
 
-  constructor(location: DialogNode|null, message: string, cause?: unknown) {
+  constructor(location: [number, number]|null, message: string, cause?: unknown) {
     super(message);
     this.name = "CompileError";
     this.location = location;
@@ -470,36 +473,58 @@ export class DialogCompileError extends Error {
   }
 }
 
+
 class DialogCompiler {
 
     
 
-    stories: Record<number, DialogStory>;
-    nodes: DialogNodeMap;
     consts: Record<string, DialogConstant> ;        
-    identifiers: Map<DialogStory|null, {map: Record<string, [number, number]>, cntr:number} >= new Map;
+    identifiers:  DialogIdentifierList;
+    used_slots = new Set<number>;
     cur_node_id:number = 0;
     cur_node: DialogNode|null = null;
 
-    static create_node_map(d: DialogManager) : DialogNodeMap {        
-        const nodes : (DialogNode|DialogStory)[] = [];
-        const map : Map<DialogNode|DialogStory|number, number> = new Map;
-        const stories : Map<DialogNode, DialogStory> = new Map;
+    nodes : (DialogStory|DialogNode)[] = [];
+    map : Map<DialogStory|DialogNode, number> = new Map;
+    local_map : Map<DialogStory|DialogNode, number> = new Map;
+    stories : Map<DialogNode, DialogStory> = new Map;
+    
+
+    node_id_from_target(node: DialogNode, target: number|null) {
+        if (target === null) return 0;
+        const st = this.stories.get(node);
+        if (!st) {
+            this.compile_error("Internal error: node_id_from_target - no story from node");
+            return 0;
+        }
+        const tnode = st.nodes[target];
+        const id = this.map.get(tnode);
+        if (typeof id != "number") {
+            this.compile_error("Internal error: node_id_from_target - can't map node to id");
+            return 0;
+        }
+        return id;
+    }
+
+
+    create_node_map(d: DialogManager)  {        
         for (const id in d._dlg) {
             const st = d._dlg[id];
-            const vid = parseInt(id) *128;
-            nodes[vid] = st;
-            map.set(st, vid);
+            const iid = parseInt(id);
+            const vid = iid *128;
+            this.nodes[vid] = st;
+            this.map.set(st, vid);
+            this.local_map.set(st, iid);
         }
         let idx = 1;
         for (const id in d._dlg) {
             const st = d._dlg[id];
             for (const subid in st.nodes) {                
-                while (nodes[idx]) ++idx;
-                nodes[idx] = st.nodes[subid];
-                map.set(parseInt(subid), idx);
-                map.set(st.nodes[subid], idx);
-                stories.set(st.nodes[subid], st);
+                while (this.nodes[idx]) ++idx;
+                this.nodes[idx] = st.nodes[subid];
+                this.map.set(st.nodes[subid], idx);
+                this.stories.set(st.nodes[subid], st);
+                this.local_map.set(st.nodes[subid], parseInt(subid));
             }
         }
         const exitNode : DialogNode = {
@@ -507,52 +532,65 @@ class DialogCompiler {
             branches:[],      
             name:""      
         }
-        nodes[0] = exitNode;
-        map.set(exitNode, 0);
-
-        return {map, nodes, stories};
+        this.nodes[0] = exitNode;
+        this.map.set(exitNode, 0);
     }
 
 
     constructor(dlgm: DialogManager, external_consts: Record<string, DialogConstant> ) {
-        this.nodes = DialogCompiler.create_node_map(dlgm);
+        this.create_node_map(dlgm);
+        this.identifiers = dlgm._identifiers;
         this.consts = Object.assign(Object.assign({},external_consts), dlgm._consts);
-        this.stories = dlgm._dlg;
+        for (const s in this.identifiers) {
+            const iinfo = this.identifiers[s];
+            this.used_slots.add(iinfo.slot);
+            iinfo.read = false;
+            iinfo.write = false;
+        }
+    }
+
+    find_node_location(node: DialogNode|null) : [number, number]|null {
+        if (node === null) return null;
+        const story = this.stories.get(node);
+        if (!story) return null;
+        const story_id = this.local_map.get(story);
+        const node_id = this.local_map.get(node);
+        if (typeof story_id == "number" && typeof node_id == "number") {
+            return [story_id, node_id];
+        }
+        return null;
+
     }
 
     compile(): Instruction[][] {
 
         try {
-            return this.nodes.nodes.map(nd=>{
+            return this.nodes.map(nd=>{
                 return this.compile_node(nd);
             })
         } catch (e) {
-            throw new DialogCompileError(this.cur_node, (e as Error).message, e);
+            let s = "unknown location";
+            const loc = this.find_node_location(this.cur_node);
+            if (loc) s = `story #${loc[0]}, node #${loc[1]}`;
+            throw new DialogCompileError(loc, (e as Error).message + ` at ${s}`, e);
         }
     }
 
     reg_id(s: string, assignment: boolean) {
-        const st = (this.cur_node  && this.nodes.stories.get(this.cur_node )) || null;
-        let m = this.identifiers.get(st);        
-        if (!m) {
-            this.identifiers.set(st, m = {cntr:0,map:{}});            
-        }
-        let v = m.map[s];
+        let v = this.identifiers[s];
         if (!v) {
-            if (m.cntr == MAX_IDENTIFIERS) this.compile_error("Too many variables!");
-            v = m.map[s] = [m.cntr, 0];
-            ++m.cntr;            
+            let id = 0;
+            while (id <= MAX_IDENTIFIERS && this.used_slots.has(id)) ++id;            
+            if (id == MAX_IDENTIFIERS)  this.compile_error(`Too many variables! There is limit for variable count: ${MAX_IDENTIFIERS} variable for whole adventure`);
+            v = this.identifiers[s] = {slot: id};
         }
-        if (assignment) v[1] |= 1;
-        else v[1] |= 2;
-        return v[0];
+        if (assignment) v.write = true; else v.read = true;
+        return v.slot;
     }
 
     is_id(s: string) : boolean{
-        const st = (this.cur_node  && this.nodes.stories.get(this.cur_node )) || null;
-        let m = this.identifiers.get(st);
-        if (!m) return false;
-        return !!m.map[s];
+        let v = this.identifiers[s];
+        return !!v;
     }
 
 
@@ -612,7 +650,7 @@ class DialogCompiler {
         })
         const nd = st.nodes[0]; //goto start paragraph
         if (nd) {
-            const t = this.nodes.map.get(nd);
+            const t = this.map.get(nd);
             if (t !== undefined) {
                 out.push({value:139}); //goto paragraph
                 out.push({value:t});    //pgf id
@@ -632,7 +670,7 @@ class DialogCompiler {
 
     compile_node2(nd: DialogNode, out: Instruction[]) {
 
-        this.cur_node_id = this.nodes.map.get(nd) || 0;
+        this.cur_node_id = this.map.get(nd) || 0;
         this.cur_node = nd;
 
         if (nd.action && nd.action.ast) {
@@ -643,11 +681,11 @@ class DialogCompiler {
             const brnch : Instruction[] = [];
             const condinstr : Instruction[] = [];
             if (b.condition) {
-                const st = this.nodes.stories.get(nd);
+                const st = this.stories.get(nd);
                 if (st) {
                     const cond = st.conditions[b.condition];
                     if (cond && cond.ast) {
-                        this.compile_ast(cond.ast, condinstr);
+                        this.pop_item(this.compile_ast(cond.ast, condinstr), condinstr);
                     }
                 }
             }            
@@ -655,7 +693,8 @@ class DialogCompiler {
                 brnch.push({value:132}); //load_name;
                 brnch.push({value:b.speaker});
             }
-            const target =(b.target === null)?0:(this.nodes.map.get(b.target) || 0);
+            //todo špatný target
+            const target =this.node_id_from_target(nd, b.target);
             switch (b.type) {
                 case DialogBranchType.addstory:
                     brnch.push({value:162}); //add to story                                        
@@ -677,6 +716,7 @@ class DialogCompiler {
                     brnch.push({value:144});
                     brnch.push({value:139})
                     brnch.push({value:target})
+                    break;
                 case DialogBranchType.selchar:
                     brnch.push({value:175}); //ask who
                     brnch.push({text: b.text})
@@ -713,6 +753,7 @@ class DialogCompiler {
             case DlgNodeType.standard:
                 if (nd.branches.length) {
                     out.push({value:164});  //dialog select
+                    return;
                 }
                     
 
@@ -726,39 +767,60 @@ class DialogCompiler {
 
     //return true, if push item on stack
     compile_ast(ast: any[], out: Instruction[]) : boolean {
-        if (ast.length == 0) return true;
+        if (ast.length == 0) return false;
         const s = ast[0];
+        if (!s) return false; //temporary fix, ast was originally initialized as {};
         switch (s) {
-            case "str":  this.compile_error("String cannot be used in expression"); return true;
-            case "num": out.push({value:ast[1] as number});return false;
-            case "id":  return this.compile_identifier(ast[0] as string, out);
+            case "str":  this.compile_error("String cannot be used in expression"); return false;
+            case "num": out.push({value: 1},{value:ast[1] as number});return true;
+            case "id":  return this.compile_identifier(ast[1] as string, out);
             case "call": {
                 const n = ast[1];
-                const def = functionList[n];
-                if (!def) this.compile_error(`Unknown function ${n}`);
                 const args = ast.slice(2).reverse();
-                if (args.length != def[0].length) this.compile_error(`Function ${n} has incorrect count of arguments: Expected ${def[0].length}, found ${args.length}`);
-                const arginstr : Instruction[] = [{value:def[1]}];                
-                args.forEach((a,idx)=>{
-                    const pos = args.length-idx-1;
-                    const d = def[0][pos];
-                    switch (d) {
-                        case "s": if (a[0] != "str") this.compile_error(`Function ${n} expected string as argument ${pos+1}`);
-                                  arginstr.push({text: a[1]});
-                                  break;
-                        case 'n': {
-                            const dummy : Instruction[] = [];
-                            this.compile_ast(a, dummy);
-                            if (dummy[0].value === 1 && dummy.length == 2) {
-                                arginstr.push(dummy[1]);
-                            } else {
-                                out.push(...dummy);
-                                arginstr.push({pop:true});
+                if (n == "condition") {
+                    if (args.length != 1) {
+                        this.compile_error(`Function ${n} must have 1 argument`);
+                    }
+                    if (args[0][0] != "str") {
+                        this.compile_error(`Function ${n} expected string`);
+                    }
+                    const cond_name = args[0][1] as string;
+                    if (this.cur_node) {
+                        const st = this.stories.get(this.cur_node);
+                        if (st) {
+                            const cond = st.conditions[cond_name];
+                            if (cond && cond.ast) {
+                                return this.compile_ast(cond.ast, out);
                             }
                         }
                     }
-                })
-                out.push(...arginstr);
+                    this.compile_error(`Condition ${cond_name} is not defined`);
+                } else {
+                    const def = functionList[n];
+                    if (!def) this.compile_error(`Unknown function ${n}`);
+                    if (args.length != def[0].length) this.compile_error(`Function ${n} has incorrect count of arguments: Expected ${def[0].length}, found ${args.length}`);
+                    const arginstr : Instruction[] = [];                
+                    args.forEach((a,idx)=>{
+                        const pos = args.length-idx-1;
+                        const d = def[0][pos];
+                        switch (d) {
+                            case "s": if (a[0] != "str") this.compile_error(`Function ${n} expected string as argument ${pos+1}`);
+                                    arginstr.unshift({text: a[1]});
+                                    break;
+                            case 'n': {
+                                const dummy : Instruction[] = [];
+                                const dirconst = this.compile_likely_constant(a, out);
+                                if (dirconst) {
+                                    arginstr.unshift(dirconst);
+                                } else {
+                                    arginstr.unshift({pop:true});
+                                }
+                            }
+                        }
+                    })
+                    out.push({value:def[1]},...arginstr);
+                    return false;
+                }
             }
             case ";": {
                 const n = ast.length-1;
@@ -841,27 +903,39 @@ class DialogCompiler {
         }
     }
 
+    compile_likely_constant(ast: any[], out: Instruction[]) {
+        const dummy : Instruction[] =  [];
+        this.push_iff(this.compile_ast(ast, dummy), dummy);
+        if (dummy.length == 2 && dummy[0].value == 1) {
+            return dummy[1];
+        } else {
+            out.push(...dummy);
+            return null;
+        }
+
+    }
+
     compile_assignment(left: any[], right: any[], out: Instruction[]) {
         if (left[0] == "id") {
             const s: string = left[1];
             if (s.startsWith("stat.")) {
                 const id = CharacterStatVariables[s];
                 if (id !== undefined) {
-                    this.push_iff(this.compile_ast(right, out),out);
+                    const dirval = this.compile_likely_constant(right, out);
                     out.push({value:176}); //attributes
                     out.push({value:id});
-                    out.push({pop:true}); //pop as argument
+                    if (dirval) out.push(dirval);else out.push({pop:true}); //pop as argument
                 } else {
                     this.compile_error(`Unknown stat: ${s} not in ${Object.keys(CharacterStatVariables).join(",")}`);
                 }                
             } else if (s.startsWith("weapon_bonus.")) {
                 const id = CharacterWeaponBonusVariables[s];
                 if (id !== undefined) {
-                    this.push_iff(this.compile_ast(right, out),out);
+                    const dirval = this.compile_likely_constant(right, out);
                     out.push({value:25}); //equipment
                     out.push({value:176}); //attributes
                     out.push({value:id+100});
-                    out.push({pop:true}); //pop as argument
+                    if (dirval) out.push(dirval);else out.push({pop:true}); //pop as argument
                 } else {
                     this.compile_error(`Unknown bonus slot: ${s} not in ${Object.keys(CharacterWeaponBonusVariables).join(",")}`);
                 }
@@ -869,17 +943,53 @@ class DialogCompiler {
                 this.compile_error(`Cannot assign to a constant: ${s}`);
             } else {
                 const d: Instruction[] = [];
-                this.compile_identifier(s, d);
-                if (d.length < 2 || d[0].value !== 1) {
-                    this.compile_error(`Cannot assign to this variable: ${s}`);
+                if (typeof this.compile_building_ident(s, d) == "boolean") {
+                    this.compile_error(`Cannot assign to this variable: ${s}`);    
                 }
-                this.push_iff(this.compile_ast(right, out),out);
-                out.push({value:2});
-                out.push({value:this.reg_id(s,true)});
+                const dirval = this.compile_likely_constant(right, out);
+                if (dirval) {
+                    out.push({value:192});
+                    out.push({value:this.reg_id(s,true)});
+                    out.push(dirval);
+                } else {
+                    out.push({value:2});
+                    out.push({value:this.reg_id(s,true)});
+                }
             }
         } else {
             this.compile_error("internal error - assignment to non-identifier");            
         }    
+    }
+
+    compile_building_ident(s: string, out: Instruction[]) : boolean | null {
+        switch (s) {
+            case "face_id": out.push({value:34});return true;
+            case "first_visited":out.push({value:166},{value:this.cur_node_id});return false;
+            case "whole_group": out.push({value:185});return false;
+            case "slot_count": out.push({value:27});return true;
+            case "is_present": out.push({value:41});return false;
+            case "money": out.push({value:42});return true;
+            case "gender": out.push({value:26});return true;
+            case "character_sector": out.push({value:35});return true;
+            case "slot_present": out.push({value:28});return true;
+            case "enemy": out.push({value:43});return false;                
+            case "north": out.push({value:1},{value:0});return true;                
+            case "east": out.push({value:1},{value:1});return true;                
+            case "south": out.push({value:1},{value:2});return true;                
+            case "west": out.push({value:1},{value:3});return true;                
+            case "true": out.push({value:138},{value:1});return false;                
+            case "false": out.push({value:138},{value:0});return false;                
+            case "position.sector": out.push({value:47});return true;
+            case "position.direction": out.push({value:48});return true;
+            case "random": out.push({value: 49});return true;
+            default :
+                if (s in this.consts) {
+                    out.push({value:1}) //push;
+                    out.push({value:this.consts[s].value});            
+                    return true;
+                }
+                return null;
+        }
     }
 
     //return true, if push item on stack
@@ -912,52 +1022,15 @@ class DialogCompiler {
             }
             return true;
         } else {
-            switch (s) {
-                case "face_id": out.push({value:34});return true;
-                case "first_visited":out.push({value:166},{value:this.cur_node_id});return false;
-                case "whole_group": out.push({value:185});return false;
-                case "slot_count": out.push({value:27});return true;
-                case "is_present": out.push({value:41});return false;
-                case "money": out.push({value:42});return true;
-                case "gender": out.push({value:26});return true;
-                case "character_sector": out.push({value:35});return true;
-                case "slot_present": out.push({value:28});return true;
-                case "enemy": out.push({value:43});return false;                
-                case "north": out.push({value:1},{value:0});return true;                
-                case "east": out.push({value:1},{value:1});return true;                
-                case "south": out.push({value:1},{value:2});return true;                
-                case "west": out.push({value:1},{value:3});return true;                
-                case "true": out.push({value:138},{value:1});return false;                
-                case "false": out.push({value:138},{value:0});return false;                
-                case "position.sector": out.push({value:47});return true;
-                case "position.direction": out.push({value:48});return true;
-                case "random": out.push({value: 49});return true;
-                default :
-                    if (s in this.consts) {
-                        out.push({value:1}) //push;
-                        out.push({value:this.consts[s].value});            
-                    } else {
-                        if (this.is_id(s)) {
-                            //can also refer condition
-                            if (this.cur_node) {
-                                const st = this.nodes.stories.get(this.cur_node);
-                                if (st && st.conditions[s] && st.conditions[s].ast) {
-                                    return this.compile_ast(st.conditions[s].ast, out);
-                                }
-                            }
-                        }
-                        out.push({value:1});
-                        out.push({variable:this.reg_id(s,false)});
-                    }
-                    return true;
-            }
+            const r = this.compile_building_ident(s, out);
+            if (typeof r == "boolean") return r;
+            out.push({value:1});
+            out.push({variable:this.reg_id(s,false)});
+            return true;
         }        
     }
 
-    resolve_call(name: string, param_count: number, out: Instruction[]): boolean {
 
-        return false;
-    }
 
 }
 

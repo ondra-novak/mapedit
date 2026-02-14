@@ -69,9 +69,9 @@ async function save_all() {
     ignore_modified = true;
     await server.putDDLFile("DIALOGY.JSON", bin.buffer, AssetGroup.MAPS);    
     console.log(dialogs.compile(facts.value.getAllFacts().reduce((a,b)=>{
-            a[b.key] = {b.id, b.description};
+            a[b.key] = {value:b.id, desc:b.description};
             return a;
-        },{})
+        },{} as Record<string, DialogConstant>)
     ));
 }
 

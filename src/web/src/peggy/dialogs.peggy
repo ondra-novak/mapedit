@@ -57,7 +57,6 @@ Multiplicative
 Primary
   = Call
   / Number
-  / String
   / Identifier
   / "(" _ a:Expression _ ")" {return a;}
   / "{" _ a:Sequence _ "}" {return a;}
@@ -67,11 +66,13 @@ Primary
 
 Call
   = name:Identifier _ "(" _ args:Arguments? _ ")" {
-      return node("call", name, ...args);
+      return node("call", name[1], ...args);
     }
 
+ExpressionOrString = Expression / String
+
 Arguments
-  = head:Expression tail:(_ "," _ Expression)* {
+  = head:ExpressionOrString tail:(_ "," _ ExpressionOrString)* {
       return [head, ...tail.map(t => t[3])];
     }
 
