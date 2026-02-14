@@ -70,7 +70,7 @@ export const CharacterStatsNames = [
     "HP Regeneration","Mana Regeneration","VP regeneration","Magic attack Low", "Magic attack High","Magic attack element","Damage","Effects"
 ] as const;
 
-function make_identifiers(prefix: string, list:readonly string[]) {
+export function make_identifiers(prefix: string, list:readonly string[]) {
     const out : Record<string, number> = {};
     for (let i = 0; i < list.length; ++i) {
         const n = CharacterStatsNames[i];

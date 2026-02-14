@@ -1,6 +1,6 @@
 {
   function node( op, ...args) {
-    return [op, ... args] ;
+    return [op, ...args] ;
   }
 }
 
@@ -14,7 +14,7 @@ Sequence
     )*
     _ ";"?
   {
-    return node( "seq",first,...rest);          
+    return node( ";",first,...rest);          
   }
 
   
@@ -62,11 +62,12 @@ Primary
   / "(" _ a:Expression _ ")" {return a;}
   / "{" _ a:Sequence _ "}" {return a;}
   / "+" _ a:Number  {return a;}
-  / "-" _ arg:Number {return node("-", arg); }
+  / "!" _ a:Number  {return node("!", arg);}
+  / "-" _ arg:Number {return node("--", arg); }
 
 Call
   = name:Identifier _ "(" _ args:Arguments? _ ")" {
-      return node("call", ... args);
+      return node("call", name, ...args);
     }
 
 Arguments

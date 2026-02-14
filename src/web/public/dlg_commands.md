@@ -69,12 +69,20 @@ cond && {
 - **first_visited** - contains true, if current dialog node is visited for the first time. Contains false otherwise
 - **whole_group** - contains true, if all characters are participating in current dialog
 - **slot_count** - contains count of used slots in current party 1-6
+  **slot_present** - contains count of presented characters
 - **is_present** - contains true, if current character is present - applicable to non-random speakers
 - **money** - contains money
-- **is_female** - contains true, if current character is female
-- **is_male** - contains true, if current character is male
+- **gender** - 0 = male, 1 = female
 - **character_sector** - contains sector of current character - applicable to non-random speakers - negative if at different map
 - **enemy** - contains true if dialog is associated with an enemy (there is current enemy)
+- **north** - 0
+- **east** - 1
+- **south** - 2
+- **west** - 3
+- **true** - contains true value, which is stored as 1 , but use this in conditions instead numbers
+- **false** - contains false value, which is stored as 0 , but use this in conditions instead numbers
+- **position.sector** - contains current sector
+- **position.direction** - contains current direction
 
 ### Functions
 
@@ -110,9 +118,10 @@ cond && {
  - **play_sound(str)** - play sound effect
  - **replace_monster(m)** - replace current moster by different monster
  - **replace_monsters(m,n)** - replace all monsters m in level by monsters n
- - **replace_monsters(m,n,s,r)** - replace all monsters m in level by monsters n on sector (s) and given radius (r) in squares
+ - **replace_monsters_radius(m,n,s,r)** - replace all monsters m in level by monsters n on sector (s) and given radius (r) in squares
  - **cast_spell(n)** - cast given spell, it is casted current character.
  - **cast_to_enemy(n)** - cast given spell to current enemy 
+ - **enable_global_map(b)** - enable or disable global map
 
 
 

@@ -1,3 +1,4 @@
+import { make_identifiers } from "./common_defs";
 import { keybcs2string, string2keybcs } from "./keybcs2";
 import Hive from "@/utils/hive"
 
@@ -53,6 +54,8 @@ export const HumanWearPlaceName = [
     "Bag slot","Upper body","Lower body","Head","Feet","Robe","Neck","Left hand","Right hand"
 ] as const;
 
+
+export const HumanWearPlaceVariables = make_identifiers("equipment.", HumanWearPlaceName);
 
 class Iterator {
     lines:string[] = [];
