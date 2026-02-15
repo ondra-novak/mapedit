@@ -214,9 +214,13 @@ bool SkeldalExeControl::stop() {
     return _instance.stop();
 }
 
-void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir )
+void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir , int ghost_form_flag)
 {
-    _command_callback(std::format("TELEPORT {} {} {}", map, sector,dir));
+    _command_callback(std::format("TELEPORT {} {} {} {}", map, sector,dir, ghost_form_flag));
+}
+
+void SkeldalExeControl::test_dialog(int id) {
+    _command_callback(std::format("TEST_DIALOG {}", id));
 }
 
 void SkeldalExeControl::reload_map() {

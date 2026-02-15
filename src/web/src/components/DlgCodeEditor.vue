@@ -9,6 +9,19 @@ type Annotation = { from: Pos; to: Pos };
 
 const text = ref("");
 
+const emit = defineEmits<{
+  (e: 'focus'): void
+  (e: 'blur'): void
+}>()
+
+function onFocus() {
+  emit('focus')
+}
+
+function onBlur() {
+  emit('blur')
+}
+
 function paste_str(value: string) {
     const el = textareaRef.value;
     if (value && el) {
@@ -164,7 +177,7 @@ watch(model, update_model);
         <div class="wrapper">
             <!-- textarea -->
             <textarea ref="textareaRef" spellcheck="false" v-model="text" @scroll="onScroll"
-                @change="compile_update_now" class="textarea" />
+                @change="compile_update_now" class="textarea" @focus="onFocus" @blur="onBlur"/>
             <!-- mirror -->
             <div ref="mirrorRef" class="mirror"> {{ text }} </div>
             <!-- overlay -->

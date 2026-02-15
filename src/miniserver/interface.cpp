@@ -658,6 +658,24 @@ void WebInterface::ws_preview_stop(const WsRpc::Request &req) {
     }
 
 }
+
+void WebInterface::ws_preview_test_dialog(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+        return;
+    }
+    int id = req.params[0].as<int>();
+    std::filesystem::path ddlpath(_user_dir/_current_ddl);
+    if (ddlpath != _game_control->get_current_ddlpath()) {
+        return req.send_error(409,"Conflict");
+    }
+
+    _game_control->test_dialog(id);
+    req.send_response(true);
+
+}
+
 void WebInterface::ws_preview_teleport(const WsRpc::Request &req) {
     std::lock_guard _(_mx);
     if (!_game_control) {
@@ -667,13 +685,16 @@ void WebInterface::ws_preview_teleport(const WsRpc::Request &req) {
     std::string map = req.params[0]["map"].as<std::string>();
     unsigned int sect = req.params[0]["sector"].as<unsigned int>();
     unsigned int side = req.params[0]["side"].as<unsigned int>();
+    auto ghost = req.params[0]["ghost"];
+    int ghost_form = -1;
+    if (ghost.is_number()) ghost_form = ghost.as<int>();
 
     std::filesystem::path ddlpath(_user_dir/_current_ddl);
     if (ddlpath != _game_control->get_current_ddlpath()) {
         return req.send_error(409,"Conflict");
     }
 
-    _game_control->teleport_to(map,sect,side);
+    _game_control->teleport_to(map,sect,side,ghost_form);
     req.send_response(true);
 
 }

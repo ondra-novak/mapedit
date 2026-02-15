@@ -1,0 +1,4623 @@
+{"128": [[
+            "local_pgf",[{"value": 128}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_ZLAT.HI"}]
+        ],[
+            "add_desc",[{ "text": "V pěkném domě vedle náměstí má svou dílnu zlatník. Téměř okamžitě po příchodu skupinky cizinců a ještě k tomu bojovníků vstal od své práce a se slabými známkami nervozity se tvé družině začal věnovat."}]
+        ],[
+            "test_flag",[{"value": 22}]
+        ],[
+            "goto_iff",[{"value": 130}]
+        ],[
+            "test_flag",[{"value": 21}]
+        ],[
+            "goto_iff",[{"value": 149}]
+        ],[
+            "has_item",[{"value": 72}]
+        ],[
+            "goto_iff",[{"value": 148}]
+        ],[
+            "goto_paragraph",[{"value": 130}]
+        ]
+    ],
+    "130": [[
+            "starting_shop",[{"value": 8}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "131": [[
+            "echo",[{ "text": "\"A co by to mělo být?\" zeptal se zvědavě zlatník?"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 132}]
+        ]
+    ],
+    "132": [[
+            "add_choice",[{"value": 133},{ "text": "\"Našli jsme poklad skřetího krále! Máš o něj zájem?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "133": [[
+            "echo",[{ "text": "\"Vážně? No zájem by byl, přijde na to, co za něj budete chtít?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 134}]
+        ]
+    ],
+    "134": [[
+            "add_choice",[{"value": 135},{ "text": "%3l\"Získat ten poklad nebylo vůbec snadné,\" začal[,a] ze široka %n, \"mnohokrát jsme stáli tváří v tvář smrti, bojovali s mnoha skřety a navíc...\""}]
+        ],[
+            "add_choice",[{"value": 136},{ "text": "%1l\"Co takhle jeden tisíc zlatých?\", zkusil[,a] to opatrně %n."}]
+        ],[
+            "add_choice",[{"value": 137},{ "text": "\"My to necháme na tobě, co ty bys za něj dal?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "135": [[
+            "echo",[{ "text": "\"Dobrá, dobrá, přejděme k věci! Nabízím Vám jeden a půl tisíce, berete?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 138}]
+        ]
+    ],
+    "136": [[
+            "echo",[{ "text": "Zlatník téměř okamžitě prohlásil: \"Tak platí. Můžeme si plácnout.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "destroy_item",[{"value": 72}]
+        ],[
+            "add_money",[{"value": 1000}]
+        ],[
+            "set_flag",[{"value": 22}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "137": [[
+            "echo",[{ "text": "\"Inu,\" prohlásil zlatník a na chvíli se zamyslel, \"Co takhle pět set zlatých.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 139}]
+        ]
+    ],
+    "138": [[
+            "add_choice",[{"value": 140},{ "text": "\"To zní docela rozumně. My to berem.\""}]
+        ],[
+            "add_choice",[{"value": 141},{ "text": "\"Takováhle cena nás jen uráží!\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "139": [[
+            "add_choice",[{"value": 142},{ "text": "%2l\"Hmm, tak třeba ano,\" řekl[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Ne, tohle se nám zdá přeci jen poněkud málo.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "140": [[
+            "destroy_item",[{"value": 72}]
+        ],[
+            "add_money",[{"value": 1500}]
+        ],[
+            "set_flag",[{"value": 22}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "141": [[
+            "echo",[{ "text": "\"Tak tedy dva tisíce, ale to je má poslední nabídka.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 143}]
+        ]
+    ],
+    "142": [[
+            "destroy_item",[{"value": 72}]
+        ],[
+            "add_money",[{"value": 500}]
+        ],[
+            "set_flag",[{"value": 22}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "143": [[
+            "add_choice",[{"value": 144},{ "text": "%3l\"No vidíš že to šlo,\" prohlásil[,a] %n, když usoudil[,a], že smlouvání už dospělo ke svému konci, \"tahle cena už je dobrá, to bereme.\""}]
+        ],[
+            "add_choice",[{"value": 145},{ "text": "\"To je stále málo.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "144": [[
+            "echo",[{ "text": "Mumlaje si nápadně nahlas cosi o zlodějích a loupeži za bílého dne, začal zlatník odpočítávat dohodnutou sumu."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "destroy_item",[{"value": 72}]
+        ],[
+            "add_money",[{"value": 2000}]
+        ],[
+            "set_flag",[{"value": 22}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "145": [[
+            "echo",[{ "text": "\"V tom případě je mi líto pánové,\" prohlásil zlatník a otočil se zpět ke své práci."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "146": [[
+            "add_choice",[{"value": 147},{ "text": "\"Rádi bychom něco koupili.\""}]
+        ],[
+            "add_choice",[{"value": 131},{ "text": "%3l\"Měli bychom pro tebe něco speciálního,\" ujal[,a] se okamžitě slova %n, \"máš zájem?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Ničím.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "147": [[
+            "starting_shop",[{"value": 8}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "148": [[
+            "echo",[{ "text": "\"Vítejte v mém krámku cizinci, čím mohu sloužit?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 21}]
+        ],[
+            "goto_paragraph",[{"value": 146}]
+        ]
+    ],
+    "149": [[
+            "echo",[{ "text": "\"Vy jste tu znovu? Co pro vás mohu udělat tentokrát?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 146}]
+        ]
+    ],
+    "256": [[
+            "local_pgf",[{"value": 256}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_ZLOD.HI"}]
+        ],[
+            "add_desc",[{ "text": "Na konci tajné chodby vedoucí z trůnního sálu jsi nalezl místnost s pokladem skřetího krále. Jak se zdá nejsi tu první, někdo tě předběhl a ten někdo se právě sklání nad pokladem. Je to mladý muž, evidentně zloděj, kterého tvůj příchod velmi vyděsil."}]
+        ],[
+            "goto_paragraph",[{"value": 257}]
+        ]
+    ],
+    "257": [[
+            "echo",[{ "text": "Sotva se zlodějíček trochu vzpamatoval, začal ze sebe chrlit lavinu slov: \"Cože? Co... co tu děláte!? A jak jste se sem proboha dostali?\" Při tom se, stále ještě trochu nervózní, dívá za záda tvé družiny."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 258}]
+        ]
+    ],
+    "258": [[
+            "add_choice",[{"value": 260},{ "text": "%1lCo tu děláme? Ale my jsme jen šli po šipkách s nápisem \"ke skřetímu pokladu,\" prohlásil[,a] s notnou dávkou ironie %n. \"Hlavně jsme ovšem otevřeli tuhle tajnou chodbu, nebo si vážně myslíš, že tady na tebe ten poklad čekal?\""}]
+        ],[
+            "add_choice",[{"value": 259},{ "text": "%2l\"Po tom ti celkem nic není, seber se a zmiz nebo ti vyprášíme kožich, mizero!\" obořil[,a] se na něj %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "259": [[
+            "echo",[{ "text": "Zloděj se ještě naposledy podíval na hromadu zlata a drahých kamenů a po té vyběhl z místnosti. Náhle tě přepadl pocit, že jsi právě odmítl někoho, kdo se pro tebe v budoucnu měl stát nepostradatelný."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "260": [[
+            "echo",[{ "text": "\"Aha,\" prohlásil zloděj zamyšleně, \"tak takhle to bylo. Já jsem totiž věděl, že tady někde ta místnost musí být. Zkoušel jsem velmi opatrně tlačit a tahat za určité kameny, přičemž kolem mne celou tu dobu stále někdo chodil, takže když se stěna nakonec odsunula, tak jsem se nad tím moc nepřemýšlel a prostě jsem do ní vlezl.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 261}]
+        ]
+    ],
+    "261": [[
+            "add_choice",[{"value": 259},{ "text": "\"Tak, teď když už víš, že jsme cestu k pokladu otevřeli my, nemáš tady už dohromady co dělat.\""}]
+        ],[
+            "add_choice",[{"value": 262},{ "text": "%3l\"A to jsi se dostal až sem, okolo všech stráží aniž by tě kdokoliv spatřil?\", otázal[,a] se známkami obdivu v hlase %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "262": [[
+            "echo",[{ "text": "Zloděj se zatvářil jako ztělesněná skromnost, takže nemohlo být pochyb, že tím říká ANO a zároveň jak je na to pyšný."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 263}]
+        ]
+    ],
+    "263": [[
+            "add_choice",[{"value": 264},{ "text": "%1l\"Takový jako ty by se nám mohl hodit,\" řekl[,a] zamyšleně %n. \"Nechceš se k nám přidat?\""}]
+        ],[
+            "add_choice",[{"value": 259},{ "text": "%2lKdo lže, ten krade.\", utrousil[,a] %n. \"No to sedí, tak a teď vypadni!\" dodal[,a] už o poznání hlasitěji."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "264": [[
+            "echo",[{ "text": "\"A co máte v plánu?\" zeptal se zvědavě zloděj."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 265}]
+        ]
+    ],
+    "265": [[
+            "add_choice",[{"value": 266},{ "text": "\"Tak to bude trochu problém, naše plány jsou poněkud nekonkrétní. Víme, že musíme pomoci Rovenlandu od jakéhosi nebezpečí na jihu ostrova, ale co je to za nebezpečí a jak mu máme zabránit, to se teprve pokusíme zjistit.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "266": [[
+            "echo",[{ "text": "\"Aha, takže to budete muset jít i do TEMNÉHO LESA,\" přešel zamyšleně skutečný obsah předchozího sdělení zloděj. \"Asi s vámi půjdu. Sice nevěřím, že Rovenlandu hrozí nějaké jiné nebezpečí než vybílení městské pokladnice a to je ještě navíc hrozba, kterou mám plně pod kontrolou, ale na druhou stranu nevím, kdy se mi znovu naskytne příležitost jít s partou dobrých bojovníků do jižní části ostrova.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 267}]
+        ]
+    ],
+    "267": [[
+            "echo",[{ "text": "\"Tak tedy platí. Říká se mi \"Roland, král zlodějů\", ale vy mi říkejte prostě Roland.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 268}]
+        ]
+    ],
+    "268": [[
+            "join_character",[{"value": 0}]
+        ],[
+            "add_to_story",[{ "text": "Na konci Skřetích jeskyní jsi nalezl poklad a ke tvé družině se připojil nový člen Roland."}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "384": [[
+            "local_pgf",[{"value": 384}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_MAPA.HI"}]
+        ],[
+            "add_desc",[{ "text": "Stranou všeho ruchu jsi nalezl kresliče map ponořeného do své práce. Zprvu si ani nevšiml hřmotného příchodu tvé družiny. Po chvíli však přeci jen, byť velmi nerad, vzhlédl od své práce a začal se ti věnovat."}]
+        ],[
+            "test_flag",[{"value": 23}]
+        ],[
+            "goto_iff",[{"value": 32767}]
+        ],[
+            "first_visited",[{"value": 384}]
+        ],[
+            "goto_iff",[{"value": 385}]
+        ],[
+            "goto_paragraph",[{"value": 406}]
+        ]
+    ],
+    "385": [[
+            "echo",[{ "text": "Momentík.... jenom si tady něco...."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 386}]
+        ]
+    ],
+    "386": [[
+            "echo",[{ "text": "\"Tak, už se vám mohu věnovat. Čím posloužím?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 387}]
+        ]
+    ],
+    "387": [[
+            "add_choice",[{"value": 388},{ "text": "\"Rádi bychom měli nějakou mapu Rovenlandu, pokud takové máš.\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Ale nic, my se jen přišli podívat.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "388": [[
+            "echo",[{ "text": "Kreslič pohotově odpověděl: \"Jistě, standardní mapa Rovenlandu stojí padesát zlatých.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 389}]
+        ]
+    ],
+    "389": [[
+            "add_choice",[{"value": 390},{ "text": "\"To je dobrá cena a ta mapa je jak přesná?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"V tom případě nemáme zájem\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "390": [[
+            "echo",[{ "text": "\"V místech které popisuje je velmi přesná a lety prověřená,\" znejistěl trochu stařík."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 391}]
+        ]
+    ],
+    "391": [[
+            "add_choice",[{"value": 392},{ "text": "%1lCo to znamená: \"V místech které popisuje?\", zeptal[,a] se %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "392": [[
+            "echo",[{ "text": "\"To znamená,\" začal opatrně kreslič, \"že na ní není ta část ostrova, do které se žádný smrtelník sám nevydá, pokud k tomu nemá opravdu dobrý důvod. Ti co si mysleli, že k tomu důvod mají se už nikdy nevrátili.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 393}]
+        ]
+    ],
+    "393": [[
+            "add_choice",[{"value": 394},{ "text": "\"A neměl bys nějakou, kde je ostrov zanesen celý? Víš, náš problém je v tom, že my tam totiž zrovna jít MUSÍME!\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "%3l\"Tak to abychom tam raději také nechodili, že? Sbohem,\" prohlásil[,a] %n a měl[,a] se k odchodu."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "394": [[
+            "echo",[{ "text": "\"Inu... Mám ještě jednu starou mapu, kterou kreslil snad ještě můj děd, ale nevím jak moc je přesná, navíc je to památka. Vlastně ani nevím, jestli ji chci prodat.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 395}]
+        ]
+    ],
+    "395": [[
+            "add_choice",[{"value": 396},{ "text": "\"Dobrá, ale my ji opravdu potřebujeme. Co bys říkal stu zlatých?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Když to nejde, tak to nejde. Nedá se nic dělat. Snad příště.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "396": [[
+            "echo",[{ "text": "\"Já opravdu nevím...,\" mne si kreslič zamyšleně bradu."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 397}]
+        ]
+    ],
+    "397": [[
+            "add_choice",[{"value": 398},{ "text": "\"Tak tedy stodvacet zlatých.\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"V pořádku, nevíš, nevíš. Nedá se nic dělat. Sbohem\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "398": [[
+            "echo",[{ "text": "\"Ale je to přeci jen rodinná památka...,\" kroutí se dál kreslič."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 399}]
+        ]
+    ],
+    "399": [[
+            "add_choice",[{"value": 32767},{ "text": "\"Tak si ji nechej,\" vzdává to nakonec družina."}]
+        ],[
+            "add_choice",[{"value": 400},{ "text": "\"Nabízíme ti sto padesát zlatých.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "400": [[
+            "echo",[{ "text": "\"Snad... ale opravdu si nejsem jist, zda vůbec mohu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 401}]
+        ]
+    ],
+    "401": [[
+            "add_choice",[{"value": 402},{ "text": "\"Dobře tak dvěstě zlatých.\""}]
+        ],[
+            "add_choice",[{"value": 403},{ "text": "%2l\"Poslyš dědku,\" vložil[,a] se do toho %n, \"nemůžeme se takhle dohadovat celý den, jestli chceš ještě někdy vidět východ slunce, tak to vezmeš za těch stopadesát a budeš rád, že to tak dobře dopadlo!!!\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Tak si ji nechej.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "402": [[
+            "has_money",[{"value": 210}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "\"Dobrá, tak tedy dvěstědeset zlatých a jsme domluveni,\" prohlásil vydřiduch a s úsměvem otevřel kasu."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 404}]
+        ],[
+            "echo",[{ "text": "\"Na mapu nemáte dost peněz.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "403": [[
+            "has_money",[{"value": 150}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "Kreslič v úleku odněkud vytáhl žádanou mapu, beze slov přepočítal peníze a vypadalo to, že je opravdu rád jak to dopadlo. Konec konců, škodný na tom nebude."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 405}]
+        ],[
+            "echo",[{ "text": "\"Na mapu nemáte dost peněz.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "404": [[
+            "pay",[{"value": 210}]
+        ],[
+            "set_flag",[{"value": 23}]
+        ],[
+            "enable_glmap",[{"value": 1}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "405": [[
+            "pay",[{"value": 150}]
+        ],[
+            "set_flag",[{"value": 23}]
+        ],[
+            "enable_glmap",[{"value": 1}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "406": [[
+            "echo",[{ "text": "Ach, to jste vy? Co pro vás mohu udělat tentokrát?"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 387}]
+        ]
+    ],
+    "512": [[
+            "local_pgf",[{"value": 512}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_HOSP.HI"}]
+        ],[
+            "add_desc",[{ "text": "Stejně jako v každém vesmíru také v Caredbaru stojí v centru všeho dění hospoda. Přivítala vás charakteristická směs přebíjejících se hlasů a pachů. Usedli jste ke stolu blízko výčepu a počkali až k vám přijde hostinský."}]
+        ],[
+            "goto_paragraph",[{"value": 513}]
+        ]
+    ],
+    "513": [[
+            "echo",[{ "text": "\"Co to bude?\", zeptal se hostinský."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 514}]
+        ]
+    ],
+    "514": [[
+            "add_choice",[{"value": 516},{ "text": "\"Nejsme zdejší a byli bychom vám zavázáni, kdybyste nám mohl říci něco o Rovenlandu.\""}]
+        ],[
+            "add_choice",[{"value": 518},{ "text": "%1l\"Pivo pro všechny,\" reagoval[,a] okamžitě %n."}]
+        ],[
+            "add_choice",[{"value": 515},{ "text": "\"Přišli jsme nakoupit nějaké zásoby před naší cestou.\""}]
+        ],[
+            "add_choice",[{"value": 529},{ "text": "\"Potřebujeme najmout pokoj a odpočinout si?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Díky, ale nic.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "515": [[
+            "starting_shop",[{"value": 6}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "516": [[
+            "echo",[{ "text": "\"Jistě, ale co si dáte?\" nenechal se odbýt hostinský."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 519}]
+        ]
+    ],
+    "517": [[
+            "has_money",[{"value": 20}]
+        ],[
+            "jump_not_iff",[{"value": 6}]
+        ],[
+            "echo",[{ "text": "Hostinský se vrátil k výčepu, natočil rundu a za chvíli vám ji donesl zpět ke stolu. Ještě si nechal na dřevo vysázet dvacet zlatých, utřel si ruce do zástěry a pak se jako na povel rozpovídal: \"Dobře, že jste přišli zrovna sem. Těžko někde najdete lepší a čerstvější novinky než u mě. Co byste teda chtěli vědět?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "pay",[{"value": 20}]
+        ],[
+            "goto_paragraph",[{"value": 520}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo nenaléváme,\" prohlásil ledovým hlasem hostinský."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "518": [[
+            "has_money",[{"value": 20}]
+        ],[
+            "jump_not_iff",[{"value": 6}]
+        ],[
+            "echo",[{ "text": "Hostinský se vrátil k výčepu, natočil rundu a za chvíli vám ji donesl zpět ke stolu. Ještě si nechal na dřevo vysázet dvacet zlatých, otřel si ruce do zástěry a pak se jako na povel rozpovídal: \"Jsem rád, že jste přišli zrovna sem. Taky koukám, přicházíte zdaleka a takoví jako vy si jistě budou chtít popovídat. Pochybuji, že byste někde jinde našli lepší zprávy z Rovenlandu než u mě, ať už chcete vědět cokoliv a přiznám se, že i já se rád dozvím něco o cizích krajích. Nejdřív se ale ptejte vy.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "pay",[{"value": 20}]
+        ],[
+            "goto_paragraph",[{"value": 520}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo nenaléváme,\" prohlásil ledovým hlasem hostinský."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "519": [[
+            "add_choice",[{"value": 517},{ "text": "%1l\"Pivo pro všechny,\" odpověděl[,a] nakonec odevzdaně %n."}]
+        ],[
+            "add_choice",[{"value": 515},{ "text": "\"Přišli jsme nakoupit nějaké zásoby před naší cestou.\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Díky, ale nic.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "520": [[
+            "add_choice",[{"value": 521},{ "text": "\"Něco obecně o Rovenlandu, jak je velký, kde co je a tak.\" shodli se všichni na otázce"}]
+        ],[
+            "add_choice",[{"value": 522},{ "text": "%3l\"Proč se všichni tak bojí jižní části ostrova?\" zajímal[,a] se %n."}]
+        ],[
+            "add_choice",[{"value": 523},{ "text": "%1l\"Co takhle Rovenland a magie?\", zeptal[,a] se %n."}]
+        ],[
+            "add_choice",[{"value": 524},{ "text": "%2l\"Slyšeli jsme, i když ne moc nahlas, že se Rovenland pomalu vylidňuje,\" nadhodil[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"To je všechno díky.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "521": [[
+            "echo",[{ "text": "\"Slyšel jsem,\" začal zvolna hospodský, \"že i když tady teď žije tolik lidí, byl dřív Rovenland země skřítků. Ale když jsem před třiadvaceti lety přišel, nebylo to už moc poznat. Našel jsem tady příležitost kvůli které jsem odešel z domu a tak jsem tady zůstal. Jen kousek za městem na sever je přístav a dřív sem chodila spousta obchodníků. Rovenland byla známá obchodní křižovatka, ale teď už je to všechno pryč. Na východě dryády, na západě ti mrňaví zmetci skřeti a na jihu bůh ví co.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 525}]
+        ]
+    ],
+    "522": [[
+            "echo",[{ "text": "\"Ještě dřív, než se v soutěsce usadil troll a dalo se tam projít, přicházely od lovců zprávy o nejrůznější divokých bestiích. Těch několik co se naposledy vrátilo, mluvilo dokonce o nemrtvých. Možná to jsou vampíři, možná něco jiného, ale je skoro jisté, že v Temném lese je na nás připravená armáda nemrtvých a nebýt toho trolla, už nás dávno rozsápali. To vám říkám já,\" vykládal horlivě hospodský. \"V každém případě, až tady uvidím první kostru, balím a odjíždím. Kšeft, nekšeft,\" pravil nakonec rozhodně."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 525}]
+        ]
+    ],
+    "523": [[
+            "echo",[{ "text": "%1l\"Prevíti mizerný,\" řekl hospodský a odplivl si na zem, \"se vší úctou,\" poznamenal pak směrem k místu kde seděl[,a] %n. \"Beztak je to všechno jejich vina.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 527}]
+        ]
+    ],
+    "524": [[
+            "echo",[{ "text": "\"To je naprostá pravda,\" přikyvoval horlivě hostinský. \"Nikdo už tady prostě nechce žít. Taky proč? Mimo město už není bezpečno. Obchody váznou a to zase způsobuje další odliv, hlavně těch mladých. Já vím, že tady v Caredbaru to tak nevypadá, ale to je jen otázka času. Navíc byste museli znát Rovenland dřív.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 525}]
+        ]
+    ],
+    "525": [[
+            "add_choice",[{"value": 526},{ "text": "\"Můžeme se ještě na něco zeptat?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Tak díky, to je všechno.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "526": [[
+            "echo",[{ "text": "\"Ale jistě, co byste chtěli vědět?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 520}]
+        ]
+    ],
+    "527": [[
+            "add_choice",[{"value": 528},{ "text": "%1l\"Proč myslíš, že to je vina mágů a co vůbec udělali?\", zeptal[,a] se %n.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "528": [[
+            "echo",[{ "text": "\"No co co, všechno. Nebo skoro všechno. To přeci nemůže být samo sebou, to co se tady kolem děje, ne?\" řekl trochu zmateně hospodský a bylo jasné, že nemá velký smysl v tomto tématu pokračovat."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 525}]
+        ]
+    ],
+    "529": [[
+            "isall",[]
+        ],[
+            "jump_iff",[{"value": 6}]
+        ],[
+            "nahodne",[{"value": 0}]
+        ],[
+            "echo",[{ "text": "\"Měli bychom počkat na ostatní, ať jsme pohromadě,\" prohlásil[,a] %n"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Výborně. Cena pokoje na jednu noc je 50 zl, na den 100 zl. S Jídlem navíc 20 zl na osobu. V ceně jídla je večeře a snídaně.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 530}]
+        ]
+    ],
+    "530": [[
+            "add_choice",[{"value": 531},{ "text": "\"Pokoj pouze na jednu noc (50 zl)\""}]
+        ],[
+            "add_choice",[{"value": 532},{ "text": "\"Pokoj a jídlo na jednu noc (50 zl a 20 zl na osobu)\""}]
+        ],[
+            "add_choice",[{"value": 533},{ "text": "\"Pokoj a jídlo na celý den (100 zl a 20 zl na osobu)\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Děkujeme, ale rozmysleli jsme si to\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "531": [[
+            "has_money",[{"value": 50}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "sleep",[{"value": 12}]
+        ],[
+            "pay",[{"value": 50}]
+        ],[
+            "exit_dialog",[]
+        ],[
+            "echo",[{ "text": "\"Vidím, že nemáte dost peněz. V tom případě bohužel.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "532": [[
+            "eat",[{"value": 20}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "Nemáte u sebe dost peněz na zaplacení jídla."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "has_money",[{"value": 50}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pay",[{"value": 50}]
+        ],[
+            "sleep",[{"value": 12}]
+        ],[
+            "eat",[{"value": 0}]
+        ],[
+            "exit_dialog",[]
+        ],[
+            "echo",[{ "text": "\"Vidím, že nemáte dost peněz. V tom případě bohužel...\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "533": [[
+            "eat",[{"value": 20}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "Nemáte u sebe dost peněz na zaplacení jídla."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "has_money",[{"value": 100}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pay",[{"value": 100}]
+        ],[
+            "sleep",[{"value": 24}]
+        ],[
+            "eat",[{"value": 0}]
+        ],[
+            "goto_paragraph",[{"value": 534}]
+        ],[
+            "echo",[{ "text": "\"Vidím, že nemáte dost peněz. V tom případě bohužel.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "534": [[
+            "add_choice",[{"value": 533},{ "text": "Zaplatit pokoj na další den..."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "Odejít"}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "640": [[
+            "local_pgf",[{"value": 640}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "picture",[{ "text": "DLG_MAG1.HI"}]
+        ],[
+            "add_desc",[{ "text": "V nenápadném domě na kraji města se před lety usadil elfí učenec a mistr magie. Zřídil zde svou školu a malý obchod s magickými předměty, který ovšem po většinu času zeje prázdnotou. To, jak se zdá, mágovi nevadí. Příchod skupinky cizinců v něm však vzbudil neskrývaný zájem."}]
+        ],[
+            "first_visited",[{"value": 640}]
+        ],[
+            "goto_iff",[{"value": 641}]
+        ],[
+            "goto_paragraph",[{"value": 642}]
+        ]
+    ],
+    "641": [[
+            "echo",[{ "text": "\"Vítejte v mém domě, co vás přivádí do těchto končin a jak vám mohu pomoci?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 643}]
+        ]
+    ],
+    "642": [[
+            "echo",[{ "text": "\"Rád vás znovu vidím, jak vám mohu pomoci tentokrát?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 643}]
+        ]
+    ],
+    "643": [[
+            "add_choice",[{"value": 644},{ "text": "\"Chtěli bychom si jen něco koupit.\""}]
+        ],[
+            "add_choice",[{"value": 645},{ "text": "\"Rádi bychom se přiučili něčemu z vašeho umění, mistře.\""}]
+        ],[
+            "add_choice",[{"value": 646},{ "text": "\"Jsme zde noví a chtěli bychom se nejprve trochu zorientovat, mohli bychom vám položit pár otázek o Rovenlandu?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Dnes nijak.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "644": [[
+            "starting_shop",[{"value": 9}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "645": [[
+            "echo",[{ "text": "\"A v jakém směru byste se chtěli vzdělat?\", otázal se elf."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 647}]
+        ]
+    ],
+    "646": [[
+            "echo",[{ "text": "\"Ale jistě, jen se ptejte.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 650}]
+        ]
+    ],
+    "647": [[
+            "add_choice",[{"value": 648},{ "text": "\"Potřebovali bychom jednoho z nás naučit základům magie.\""}]
+        ],[
+            "add_choice",[{"value": 649},{ "text": "\"Potřebovali bychom, aby si jeden z nás u tebe rozšířil své znalosti magie.\""}]
+        ],[
+            "add_choice",[{"value": 656},{ "text": "%1l\"Velmi rád[,a] bych se naučil[,a] vyšší magii\", požádal[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 657},{ "text": "\"Mohli bychom nejdříve vědět, co kolik stojí?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "648": [[
+            "has_money",[{"value": 600}]
+        ],[
+            "jump_not_iff",[{"value": 28}]
+        ],[
+            "ask_who",[{ "text": "\"Dobrá,\" pravil mág a rozhlédl se po družině, \"ukažte mi tedy toho,  koho mám učit?\""},{"value": 647}]
+        ],[
+            "test_vls",[{"value": 1},{"value": 33},{"value": 20}]
+        ],[
+            "jump_not_iff",[{"value": 15}]
+        ],[
+            "pract_to",[{"value": 1},{"value": 20}]
+        ],[
+            "pract_to",[{"value": 6},{"value": 35}]
+        ],[
+            "add_rune",[{"value": 40}]
+        ],[
+            "add_rune",[{"value": 12}]
+        ],[
+            "add_rune",[{"value": 31}]
+        ],[
+            "pay",[{"value": 600}]
+        ],[
+            "dark_screen",[{"value": 3},{"value": 168}]
+        ],[
+            "echo",[{ "text": "'Základní týdenní výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "has_rune",[{"value": 40}]
+        ],[
+            "jump_not_iff",[{"value": 20}]
+        ],[
+            "echo",[{ "text": "\"Základy už ale máš, v tomto směru tě již nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "add_rune",[{"value": 40}]
+        ],[
+            "add_rune",[{"value": 12}]
+        ],[
+            "add_rune",[{"value": 31}]
+        ],[
+            "pay",[{"value": 600}]
+        ],[
+            "dark_screen",[{"value": 3},{"value": 168}]
+        ],[
+            "echo",[{ "text": "'Základní týdenní výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo nikoho učit nebudu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "649": [[
+            "has_money",[{"value": 800}]
+        ],[
+            "jump_not_iff",[{"value": 36}]
+        ],[
+            "ask_who",[{ "text": "\"Dobrá,\" pravil mág a rozhlédl se po družině, \"ukažte mi tedy toho,  koho mám učit?\""},{"value": 647}]
+        ],[
+            "test_vls",[{"value": 1},{"value": 35},{"value": 19}]
+        ],[
+            "jump_not_iff",[{"value": 33}]
+        ],[
+            "test_vls",[{"value": 1},{"value": 33},{"value": 30}]
+        ],[
+            "jump_not_iff",[{"value": 17}]
+        ],[
+            "pract_to",[{"value": 1},{"value": 30}]
+        ],[
+            "pract_to",[{"value": 6},{"value": 45}]
+        ],[
+            "add_rune",[{"value": 1}]
+        ],[
+            "add_rune",[{"value": 41}]
+        ],[
+            "add_rune",[{"value": 30}]
+        ],[
+            "pay",[{"value": 800}]
+        ],[
+            "dark_screen",[{"value": 5},{"value": 744}]
+        ],[
+            "echo",[{ "text": "'Měsíční rozšířený výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "has_rune",[{"value": 40}]
+        ],[
+            "jump_not_iff",[{"value": 22}]
+        ],[
+            "echo",[{ "text": "\"V tomto směru tě již nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "add_rune",[{"value": 1}]
+        ],[
+            "add_rune",[{"value": 41}]
+        ],[
+            "add_rune",[{"value": 30}]
+        ],[
+            "add_rune",[{"value": 40}]
+        ],[
+            "add_rune",[{"value": 12}]
+        ],[
+            "add_rune",[{"value": 31}]
+        ],[
+            "pay",[{"value": 800}]
+        ],[
+            "dark_screen",[{"value": 5},{"value": 744}]
+        ],[
+            "echo",[{ "text": "'Měsíční rozšířený výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Nemohu tě učit, nemáš základy a nechápal bys o čem mluvím.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo tě učit nebudu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "650": [[
+            "add_choice",[{"value": 651},{ "text": "%1l\"Jediné informace, které o Rovenlandu máme pochází od učence Freghara. Ten psal něco o jakémsi muži, zřejmě mágovi, který prý na tomto ostrově žil nebo snad stále žije,\" nadhodil[,a] se %n."}]
+        ],[
+            "add_choice",[{"value": 652},{ "text": "%2l\"Proč se všichni tak bojí jižní části ostrova?\" zeptal[,a] se %n."}]
+        ],[
+            "add_choice",[{"value": 654},{ "text": "\"Co je pravdy na tom, že Rovenland je místo, kde bohové odpočívali po té, co stvořili svět?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "651": [[
+            "echo",[{ "text": "\"To měl pravděpodobně na mysli Nimetha. Ten zřejmě ještě žije, takoví jako on totiž jen tak neumírají, ale kde se nachází právě teď? Těžko říct! Údajně pochází z tohoto ostrova a říká se, že žije, kdesi na severu, ale já sám jsem jej ještě nikdy neviděl.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 655}]
+        ]
+    ],
+    "652": [[
+            "echo",[{ "text": "\"Myslím, že za to mohou z velké části legendy a strach lidí. Dříve se na jihu totiž normálně žilo a prý tam bylo i město, ale jak se začal Rovenland vylidňovat, postupně se život na jihu vytratil. Dnes pokud vím vedou do jižní části, to znamená do Temného lesa, jak tomu říkají Caredbarští jen dvě cesty. Soutěska hlídaná trollem strážcem, na kterou narazíte, když půjdete lesem od hlavní brány na jih a nebo je ještě jedna cesta, ale ta vede z lesa dryád, kterým jen tak někdo neprojde.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 653}]
+        ]
+    ],
+    "653": [[
+            "echo",[{ "text": "\"To znamená,\" pokračoval elf, \"že se tam odváží jen málo kdo. Ti kteří to zkusili se už nevrátili, což dalo vzniknout mnoha dalším legendám, které přirozený strach lidí zase jen posílily.\" Mág se na chvíli odmlčel aby pak trochu tišeji dopověděl: \"V poslední době však i já začínám cítit narůstající koncentraci magie, která se odtamtud šíří a to nikdy nevěstí nic dobrého.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 655}]
+        ]
+    ],
+    "654": [[
+            "echo",[{ "text": "\"Možné je všechno. Rovenland je skutečně doslova nabitý magií, kterou tady lze čerpat doslova z čehokoliv. Ze země, z rostlin nebo například z tohoto stolu,\" řekl mág a poklepal klouby o stůl."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 655}]
+        ]
+    ],
+    "655": [[
+            "add_choice",[{"value": 650},{ "text": "\"Můžeme se ještě na něco zeptat?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Díky za čas, moc jste nám pomohl.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "656": [[
+            "has_money",[{"value": 1200}]
+        ],[
+            "jump_not_iff",[{"value": 26}]
+        ],[
+            "test_vls",[{"value": 1},{"value": 35},{"value": 29}]
+        ],[
+            "jump_not_iff",[{"value": 23}]
+        ],[
+            "has_rune",[{"value": 42}]
+        ],[
+            "jump_not_iff",[{"value": 9}]
+        ],[
+            "echo",[{ "text": "\"Už tě nemohu ničemu naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "add_rune",[{"value": 42}]
+        ],[
+            "add_rune",[{"value": 11}]
+        ],[
+            "add_rune",[{"value": 3}]
+        ],[
+            "add_rune",[{"value": 40}]
+        ],[
+            "add_rune",[{"value": 12}]
+        ],[
+            "add_rune",[{"value": 31}]
+        ],[
+            "add_rune",[{"value": 1}]
+        ],[
+            "add_rune",[{"value": 41}]
+        ],[
+            "add_rune",[{"value": 30}]
+        ],[
+            "pay",[{"value": 1200}]
+        ],[
+            "dark_screen",[{"value": 10},{"value": 2232}]
+        ],[
+            "echo",[{ "text": "%1l'Po třech měsících usilovného studia je %n konečně mistr.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Nemáš dostatečné znalosti na to, abych tě vyškolil na mistra.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo tě učit nebudu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "657": [[
+            "test_flag",[{"value": 26}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "\"Ceny už jsem vám jednou říkal, přepisovali jste si je do nějaké  knihy. \""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "%1l\"Ale jistě,\" prohlásil mág a podal družině svitek s cenami, který  %n ihned přepsal[,a] do knihy."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "add_to_book",[{"value": 11}]
+        ],[
+            "set_flag",[{"value": 26}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "768": [[
+            "local_pgf",[{"value": 768}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_UBOJ.HI"}]
+        ],[
+            "add_desc",[{ "text": "Na okraji města stojí velký dům s prostorným dvorem, který slouží jako cvičná aréna pro výuku nejrůznějších bojových technik snad se všemi druhy zbraní, které existují. Z jedněch dveří vyšel družině vstříc vysoký silný muž o jehož dobrodružné minulosti jdou v Caredbaru úplné legendy."}]
+        ],[
+            "first_visited",[{"value": 768}]
+        ],[
+            "goto_iff",[{"value": 769}]
+        ],[
+            "goto_paragraph",[{"value": 770}]
+        ]
+    ],
+    "769": [[
+            "echo",[{ "text": "\"Vítejte v mém domě cizinci,\" přivítal je starý bojovník v jehož oku příchod družiny dobrodruhů zažehl dávno vyhaslý plamen. \"Co vás ke mě přivádí a jak vám mohu pomoci?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 771}]
+        ]
+    ],
+    "770": [[
+            "echo",[{ "text": "\"Rád vás znovu vidím,\" pravil mistr a bylo vidět, že to myslí vážně. \"S čím vám mohu pomoci tentokrát?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 771}]
+        ]
+    ],
+    "771": [[
+            "add_choice",[{"value": 772},{ "text": "%2l\"Velmi rádi bychom se od vás učili, mistře,\" řekl[,a] se známkou úcty v hlase %n."}]
+        ],[
+            "add_choice",[{"value": 790},{ "text": "%1l\"Chtěli bychom se jen zeptat na pár věcí,\" odpověděl[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Nic nepotřebujeme.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "772": [[
+            "echo",[{ "text": "\"Rád vás vycvičím,\" odpověděl mistr, \"ale řekněte v čem?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 773}]
+        ]
+    ],
+    "773": [[
+            "add_choice",[{"value": 774},{ "text": "\"Jde nám hlavně o základy boje a základní trénink pro jednoho z nás.\""}]
+        ],[
+            "add_choice",[{"value": 775},{ "text": "\"Potřebujeme zocelit dalším tréninkem.\""}]
+        ],[
+            "add_choice",[{"value": 776},{ "text": "\"V lepším ovládnutí zbraní.\""}]
+        ],[
+            "add_choice",[{"value": 777},{ "text": "%3l\"Nejdříve bychom chtěli vědět, kolik vaše služby stojí,\" požádal[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "774": [[
+            "has_money",[{"value": 700}]
+        ],[
+            "jump_not_iff",[{"value": 26}]
+        ],[
+            "ask_who",[{ "text": "\"Kdo se tedy chce stát bojovníkem, koho mám učit?\" rozhlédl se  mistr po družině."},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 0},{"value": 35},{"value": 20}]
+        ],[
+            "jump_not_iff",[{"value": 18}]
+        ],[
+            "test_vls",[{"value": 3},{"value": 35},{"value": 20}]
+        ],[
+            "jump_not_iff",[{"value": 10}]
+        ],[
+            "echo",[{ "text": "\"Základy už máš, už tě nemám v tomto směru co učit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "pract_to",[{"value": 0},{"value": 20}]
+        ],[
+            "pract_to",[{"value": 3},{"value": 20}]
+        ],[
+            "pract_to",[{"value": 5},{"value": 40}]
+        ],[
+            "pay",[{"value": 700}]
+        ],[
+            "dark_screen",[{"value": 3},{"value": 5}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "pract_to",[{"value": 0},{"value": 20}]
+        ],[
+            "pract_to",[{"value": 3},{"value": 20}]
+        ],[
+            "pract_to",[{"value": 5},{"value": 40}]
+        ],[
+            "pay",[{"value": 700}]
+        ],[
+            "dark_screen",[{"value": 3},{"value": 5}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo vás učit nemohu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "775": [[
+            "echo",[{ "text": "\"Rád vás budu učit dál,\" souhlasil mistr, \"ale v jakém směru?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 778}]
+        ]
+    ],
+    "776": [[
+            "echo",[{ "text": "\"Jaký konkrétní typ zbraně máte na mysli?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 779}]
+        ]
+    ],
+    "777": [[
+            "test_flag",[{"value": 25}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "\"Ceny už jsem vám jednou říkal, přepisovali jste si je do  nějaké knihy. \""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "%1l\"Ale jistě,\" prohlásil bojovník a podal družině svitek s cenami, který  %n ihned přepsal[,a] do knihy."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "add_to_book",[{"value": 12}]
+        ],[
+            "set_flag",[{"value": 25}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "778": [[
+            "add_choice",[{"value": 780},{ "text": "\"Jedná se hlavně o rychlost.\""}]
+        ],[
+            "add_choice",[{"value": 781},{ "text": "\"Jde hlavně o sílu.\""}]
+        ],[
+            "add_choice",[{"value": 782},{ "text": "\"Obratnost, to je to, oč tu běží.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "779": [[
+            "add_choice",[{"value": 783},{ "text": "\"Meč.\""}]
+        ],[
+            "add_choice",[{"value": 784},{ "text": "\"Sekeru.\""}]
+        ],[
+            "add_choice",[{"value": 785},{ "text": "\"Kladivo.\""}]
+        ],[
+            "add_choice",[{"value": 786},{ "text": "\"Hole.\""}]
+        ],[
+            "add_choice",[{"value": 787},{ "text": "\"Střelné zbraně\""}]
+        ],[
+            "add_choice",[{"value": 788},{ "text": "\"Bodné zbraně.\""}]
+        ],[
+            "add_choice",[{"value": 789},{ "text": "\"Speciální zbraně.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "780": [[
+            "has_money",[{"value": 900}]
+        ],[
+            "jump_not_iff",[{"value": 19}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat na rychlost?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 2},{"value": 35},{"value": 19}]
+        ],[
+            "jump_not_iff",[{"value": 16}]
+        ],[
+            "test_vls",[{"value": 2},{"value": 33},{"value": 30}]
+        ],[
+            "jump_not_iff",[{"value": 13}]
+        ],[
+            "pract_to",[{"value": 2},{"value": 30}]
+        ],[
+            "pay",[{"value": 900}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Už tě nemohu vytrénovat abys byl rychlejší.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale nemáš základy. Tenhle trénink by ti nebyl k   ničemu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo vás učit nemohu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "781": [[
+            "has_money",[{"value": 800}]
+        ],[
+            "jump_not_iff",[{"value": 19}]
+        ],[
+            "ask_who",[{ "text": "\"Kdo chce být silnější, koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 0},{"value": 35},{"value": 19}]
+        ],[
+            "jump_not_iff",[{"value": 16}]
+        ],[
+            "test_vls",[{"value": 0},{"value": 33},{"value": 30}]
+        ],[
+            "jump_not_iff",[{"value": 13}]
+        ],[
+            "pract_to",[{"value": 0},{"value": 30}]
+        ],[
+            "pay",[{"value": 800}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Pod mým vedením už nemůžeš být silnější, nežli jsi nyní.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale nemáš základy. Tenhle trénink by ti nebyl k   ničemu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo vás učit nemohu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "782": [[
+            "has_money",[{"value": 800}]
+        ],[
+            "jump_not_iff",[{"value": 19}]
+        ],[
+            "ask_who",[{ "text": "\"Kdo chce být obratnější?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 3},{"value": 35},{"value": 19}]
+        ],[
+            "jump_not_iff",[{"value": 16}]
+        ],[
+            "test_vls",[{"value": 3},{"value": 33},{"value": 30}]
+        ],[
+            "jump_not_iff",[{"value": 13}]
+        ],[
+            "pract_to",[{"value": 3},{"value": 30}]
+        ],[
+            "pay",[{"value": 800}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale obratnější už se můžeš stát jen praxí.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale nemáš základy. Tenhle trénink by ti nebyl k   ničemu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Zadarmo vás učit nemohu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "783": [[
+            "has_money",[{"value": 300}]
+        ],[
+            "jump_not_iff",[{"value": 14}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 100},{"value": 33},{"value": 3}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pract",[{"value": 100},{"value": 1},{"value": 3}]
+        ],[
+            "pay",[{"value": 300}]
+        ],[
+            "dark_screen",[{"value": 3},{"value": 6}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"S mečem už tě nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale zdarma mé služby nejsou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "784": [[
+            "has_money",[{"value": 300}]
+        ],[
+            "jump_not_iff",[{"value": 14}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 101},{"value": 33},{"value": 3}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pract",[{"value": 101},{"value": 1},{"value": 3}]
+        ],[
+            "pay",[{"value": 300}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Se sekerou už tě nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale zdarma mé služby nejsou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "785": [[
+            "has_money",[{"value": 300}]
+        ],[
+            "jump_not_iff",[{"value": 14}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 102},{"value": 33},{"value": 3}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pract",[{"value": 102},{"value": 1},{"value": 3}]
+        ],[
+            "pay",[{"value": 300}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"S kladivem už tě nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale zdarma mé služby nejsou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "786": [[
+            "has_money",[{"value": 300}]
+        ],[
+            "jump_not_iff",[{"value": 14}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 103},{"value": 33},{"value": 3}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pract",[{"value": 103},{"value": 1},{"value": 3}]
+        ],[
+            "pay",[{"value": 300}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"S holí už tě nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale zdarma mé služby nejsou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "787": [[
+            "has_money",[{"value": 300}]
+        ],[
+            "jump_not_iff",[{"value": 14}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 105},{"value": 33},{"value": 3}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pract",[{"value": 105},{"value": 1},{"value": 3}]
+        ],[
+            "pay",[{"value": 300}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"S nožem už tě nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale zdarma mé služby nejsou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "788": [[
+            "has_money",[{"value": 300}]
+        ],[
+            "jump_not_iff",[{"value": 14}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 104},{"value": 33},{"value": 3}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pract",[{"value": 104},{"value": 1},{"value": 3}]
+        ],[
+            "pay",[{"value": 300}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"S lukem ani kuší už tě nemohu nic naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale zdarma mé služby nejsou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "789": [[
+            "has_money",[{"value": 300}]
+        ],[
+            "jump_not_iff",[{"value": 14}]
+        ],[
+            "ask_who",[{ "text": "\"Koho mám trénovat?\""},{"value": 0}]
+        ],[
+            "test_vls",[{"value": 106},{"value": 33},{"value": 3}]
+        ],[
+            "jump_not_iff",[{"value": 11}]
+        ],[
+            "pract",[{"value": 106},{"value": 1},{"value": 3}]
+        ],[
+            "pay",[{"value": 300}]
+        ],[
+            "dark_screen",[{"value": 4},{"value": 8}]
+        ],[
+            "echo",[{ "text": "'Výcvik je ukončen.'"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Nic dalšího už tě nemohu naučit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Je mi líto, ale zdarma mé služby nejsou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "790": [[
+            "echo",[{ "text": "\"Jistě, jen se ptejte, rád vám odpovím,\" odvětil mistr."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 791}]
+        ]
+    ],
+    "791": [[
+            "add_choice",[{"value": 792},{ "text": "%1l\"Slyšeli jsme, že se teď z jihu stala jedna velká bojová aréna,\" nadhodil[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 793},{ "text": "\"Existuje nějaká účinná zbraň, něco speciálního, s čím byste nás mohl naučit zacházet?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Už nic, díky.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "792": [[
+            "echo",[{ "text": "\"Dalo by se to tak nazvat,\" odpověděl váhavě mistr. \"Alespoň podle toho co se říká ve městě určitě.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 797}]
+        ]
+    ],
+    "793": [[
+            "echo",[{ "text": "Starý bojovník se chvíli zamyslel a řekl: \"Vy máte asi na mysli avalonskou ocel...\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 794}]
+        ]
+    ],
+    "794": [[
+            "add_choice",[{"value": 795},{ "text": "%1l\"Neměli jsme na mysli nic konkrétního,\" odpověděl[,a] %n. \"Co je to avalonská ocel?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "795": [[
+            "test_flag",[{"value": 24}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "\"Je taková legenda,\" dal se do vysvětlování mistr, \"která vypráví o bájné zbroji vykované kováři z Avalonu. Ta prý toho, který ji nosí, učiní téměř neporazitelným. Nikdo už vlastně neví, kdo byli kováři z Avalonu a odkud se vzali. Stejně jako nikdo přesně neví v čem bylo kouzlo oné zbroje. Zůstala jen ta legenda. Koneckonců, svitek jsem vám už dával.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 796}]
+        ],[
+            "echo",[{ "text": "\"Je taková legenda,\" dal se do vysvětlování mistr, \"která vypráví o bájné zbroji vykované kováři z Avalonu. Ta prý toho, který ji nosí, učiní téměř neporazitelným. Nikdo už vlastně neví, kdo byli kováři z Avalonu a odkud se vzali. Stejně jako nikdo přesně neví v čem bylo kouzlo oné zbroje. Zůstala jen ta legenda. Koneckonců, někde ji tady mám.\" Mistr se otočil k poličce s hromádkou svitků, jeden vyňal a podal jej družině."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "add_to_book",[{"value": 10}]
+        ],[
+            "set_flag",[{"value": 24}]
+        ],[
+            "goto_paragraph",[{"value": 796}]
+        ]
+    ],
+    "796": [[
+            "add_choice",[{"value": 790},{ "text": "\"Můžeme se ještě na něco zeptat?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Díky za čas, to je všechno, co jsme chtěli vědět.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "797": [[
+            "add_choice",[{"value": 798},{ "text": "\"Ale co vy mistře, co si o tom myslíte, byl jste tam?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "798": [[
+            "echo",[{ "text": "Starý bojovník si povzdechl a posadil se. \"Na Rovenland jsem přijel prožít v klidu zbytek svého života. Boje už mám dost a vlastně jsem si myslel, že bít se už bych ani nesvedl. Přesto, když se začaly šířit zprávy o armádě nemrtvých, která se formuje na jihu, začali mi lidé naznačovat a později mě otevřeně přemlouvat, abych se Tam vydal. Nevím co si mysleli, že bych sám zmohl, kdyby všechny ty pověsti měly být pravda.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 799}]
+        ]
+    ],
+    "799": [[
+            "echo",[{ "text": "\"Každopádně jsem nakonec souhlasil a šel tam. Chtěl jsem prostě vycházet s místními a mít svůj klid. Bylo to peklo a můj návrat byl vlastně zázrak. Nikdy jsem nikomu úplně neřekl, co jsem tam skutečně viděl. Myslím, že jakkoliv hrůzné legendy, které si po večerech vyprávějí jsou zase jen legendami. Dokud nemají jistotu, že to co si vyprávějí je z velké části pravda, pak stále zbývá prostor pro naději.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 800}]
+        ]
+    ],
+    "800": [[
+            "add_choice",[{"value": 801},{ "text": "%1l\"A je to tedy pravda, to o armádě nemrtvých?\" otázal[,a] se znovu %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "801": [[
+            "echo",[{ "text": "\"Jak jsem řekl, z části ano. Je pravda, že když překročíte hory, potkáte nemrtvé na každém kroku a nejen je, ale není to žádná organizovaná armáda, která se formuje proti Caredbaru. Už jsem to viděl mnohokrát před tím. Jsou to jen průvodci zla, kteří se objeví všude, kde se něco opravdu zlého probouzí k životu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 796}]
+        ]
+    ],
+    "896": [[
+            "local_pgf",[{"value": 896}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "picture",[{ "text": "DLG_DRUI.HI"}]
+        ],[
+            "add_desc",[{ "text": "%1l Chráněni kouzly \"Začarovaného lesa\" žijí Druidové nerušeni v prostorném srubu uprostřed čisté přírody. Pokud sami nechtějí, obyčejný smrtelník je nepotká. Tvá družina však navzdory tomuto pravidlu dorazila až na práh jejich obydlí, což nutně u skupiny Druidů vyvolává mnoho otázek. Slova se ujal jejich vůdce, se kterým se %n dal[,a] ihned do řeči."}]
+        ],[
+            "test_flag",[{"value": 50}]
+        ],[
+            "goto_iff",[{"value": 32767}]
+        ],[
+            "first_visited",[{"value": 896}]
+        ],[
+            "goto_iff",[{"value": 897}]
+        ],[
+            "goto_paragraph",[{"value": 906}]
+        ]
+    ],
+    "897": [[
+            "echo",[{ "text": "Starší Druid dobře skryl své překvapení a v klidu promluvil: \"Vítejte v našem příbytku, přicházíte-li v míru cizinci. Jací bohové vás dovedli až k našemu dobře střeženému sídlu?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 898}]
+        ]
+    ],
+    "898": [[
+            "add_choice",[{"value": 899},{ "text": "%1l\"Spíše nežli bohové nám pomohl mudrc žijící na severu v přístavu a jeho talisman, který nám pomohl překonat některá kouzla střežící tento les a vaše soukromí,\" odpověděl[,a] hbitě %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "899": [[
+            "echo",[{ "text": "\"Nithi Ebet je náš přítel a jeho přátelé jsou i našimi přáteli,\" řekl již o poznání volněji Druid."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 900}]
+        ]
+    ],
+    "900": [[
+            "echo",[{ "text": "\"Přejděme ale k věci,\" poznamenal, \"jistě jste nás nepřišli navštívit jen náhodou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 901}]
+        ]
+    ],
+    "901": [[
+            "add_choice",[{"value": 902},{ "text": "%1l\"Vlastně jsme zde úplnou náhodou.\" přiznal[,a] %n, \"Naše poslání nás nutí pokusit se najít mága Nimetha, proto jsme vstoupili do Začarovaného lesa, protože jsme doufali, že jej zde nalezneme.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "902": [[
+            "echo",[{ "text": "\" \"Bílá věž\", sídlo mága Nimetha, je na severu lesa, ale to už jste možná sami zjistili. Když už jste však zde, co kdybyste na chvíli zůstali a povyprávěli nám o svém poslání.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 903}]
+        ]
+    ],
+    "903": [[
+            "add_choice",[{"value": 32767},{ "text": "\"Velmi rádi bychom zůstali a povídali si tu s vámi, ale čas běží a my ho opravdu nemáme nazbyt. Snad někdy příště.\""}]
+        ],[
+            "add_choice",[{"value": 904},{ "text": "%1l\"To rozhodně není špatný nápad,\" zamyslel[,a] se %n, \"když nic jiného, mohli bychom si vzájemně dobře popovídat a dozvědět se něco nového.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "904": [[
+            "echo",[{ "text": "Uběhlo mnoho hodin v příjemném rozhovoru. Nejprve %n vyprávěl[,a] o Fregharovi, proroctví, jejich cestě i poslání, které mají před sebou a pak i Druidové přidali své rady, kterak si hrdinové mohou ulehčit práci. Nakonec starý Druid předal družině jakýsi svitek a malý stromek se slovy:"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 905}]
+        ]
+    ],
+    "905": [[
+            "echo",[{ "text": "\"Tento strom je posvátný. Nemá sice nijakou zvláštní moc, ale my i dryády si jej velmi vážíme. Protože vaše kroky vás na vaší pouti jistě zavedou i k dryádám, použijte jej jako dar jejich královně. A co se týká svitku, ten vám jednoduše může také cosi objasnit, záleží jen na vás jak s jeho textem naložíte.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "add_to_book",[{"value": 6}]
+        ],[
+            "create_item",[{"value": 143}]
+        ],[
+            "set_flag",[{"value": 50}]
+        ],[
+            "add_to_story",[{ "text": "V začarovaném lese jsi mluvil s Druidy, kteří ti dali posvátný strom."}]
+        ],[
+            "goto_paragraph",[{"value": 908}]
+        ]
+    ],
+    "906": [[
+            "echo",[{ "text": "\"Znovu se setkáváme, znamená to snad, že vaše poslání je u konce a můžeme si v klidu promluvit?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 907}]
+        ]
+    ],
+    "907": [[
+            "add_choice",[{"value": 32767},{ "text": "\"Velmi rádi bychom zůstali a povídali si tu s vámi, ale naše poslání ještě neskončilo. Snad někdy příště.\""}]
+        ],[
+            "add_choice",[{"value": 904},{ "text": "%1l\"Ne, ještě jsme neskončili, ale myslíme si, že rozhovor s vám by mohl být přínosný a tolik zas opravdu nespěcháme,\" prohlásil[,a] se %n, \"když nic jiného, mohli bychom si vzájemně dobře popovídat a dozvědět se něco nového."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "908": [[
+            "echo",[{ "text": "S těmito slovy jste se s Druidy rozloučili."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1024": [[
+            "local_pgf",[{"value": 1024}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_KOZE.HI"}]
+        ],[
+            "add_desc",[{ "text": "V každém městě lze kožešníka najít podle pachu. Také v Caredbaru se řemeslník, zabývající se výrobou nejrůznějších kožených předmětů, nachází v úzké uličce naplněné až po okraj výpary louhujících se kůží. Tvá družina si prorazila cestu zápachem a vstoupila do obchodu mistra kožešníka, jehož interiér již kupodivu vypadal zcela normálně."}]
+        ],[
+            "test_flag",[{"value": 27}]
+        ],[
+            "goto_iff",[{"value": 1033}]
+        ],[
+            "has_item",[{"value": 136}]
+        ],[
+            "goto_iff",[{"value": 1025}]
+        ],[
+            "goto_paragraph",[{"value": 1027}]
+        ]
+    ],
+    "1025": [[
+            "echo",[{ "text": "\"Jsem rád, že vás mohu přivítat ve svém obchodě, cizinci,\" prohlásil okamžitě prodavač. \"Čím vám mohu být nápomocen?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 27}]
+        ],[
+            "goto_paragraph",[{"value": 1026}]
+        ]
+    ],
+    "1026": [[
+            "add_choice",[{"value": 1027},{ "text": "\"Rádi bychom si jen něco koupili.\""}]
+        ],[
+            "add_choice",[{"value": 1028},{ "text": "%2l\"Potřebovali bychom od vás něco speciálního, určitou zakázku, pokud takové věci děláte,\" ujal[,a] se slova %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Nijak, jen jsme nahlédli.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1027": [[
+            "starting_shop",[{"value": 4}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "1028": [[
+            "echo",[{ "text": "\"Ale jistě a co by to mělo jako být.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1029}]
+        ]
+    ],
+    "1029": [[
+            "add_choice",[{"value": 1030},{ "text": "%2l\"Potřebovali bychom z této kožešiny tworga vyrobit dobře padnoucí oděv,\" pokračoval[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1030": [[
+            "echo",[{ "text": "\"To by jistě šlo, ale taková práce bude jistě velmi náročná a připraví mě o spoustu času. Tomu také bude odpovídat cena. Za jeden takový oblek si budu nucen říct, a věřte mi, že hrozně nerad, 350 zlatých.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1031}]
+        ]
+    ],
+    "1031": [[
+            "add_choice",[{"value": 1032},{ "text": "%2l\"Takovou cenu jsme v podstatě očekávali, tak nám tedy jeden ten oblek vyrob,\" dokončil[,a] nezvykle krátké vyjednávání %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "Tak tohle si ještě budeme muset rozmyslet."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1032": [[
+            "has_money",[{"value": 350}]
+        ],[
+            "jump_not_iff",[{"value": 13}]
+        ],[
+            "has_item",[{"value": 136}]
+        ],[
+            "jump_not_iff",[{"value": 9}]
+        ],[
+            "destroy_item",[{"value": 136}]
+        ],[
+            "create_item",[{"value": 135}]
+        ],[
+            "pay",[{"value": 350}]
+        ],[
+            "dark_screen",[{"value": 2},{"value": 1}]
+        ],[
+            "jump",[{"value": 12}]
+        ],[
+            "echo",[{ "text": "\"Nikde nevidím kůži, ze které mám oblek vyrobit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "Bohužel na něj nemáte peníze."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1033": [[
+            "has_item",[{"value": 136}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "\"Jsem rád, že vás mohu opět přivítat ve svém obchodě, cizinci,\" prohlásil jako obvykle prodavač. \"Čím vám mohu být nápomocen?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1026}]
+        ],[
+            "starting_shop",[{"value": 4}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "1034": [[
+            "add_choice",[{"value": 1027},{ "text": "\"Rádi bychom si jen něco koupili.\""}]
+        ],[
+            "add_choice",[{"value": 1032},{ "text": "%2l\"Potřebovali bychom od vás znovu ten oblek,\" odvětil[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Nijak, jen jsme nahlédli.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1152": [[
+            "local_pgf",[{"value": 1152}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_NIME.HI"}]
+        ],[
+            "add_desc",[{ "text": "Vystoupil jsi do nejvyššího patra \"Bílé Věže\", hádankami střeženého sídla legendárního mága Nimetha. Přečetl jsi text ze čtyř stříbrných desek umístěných na čtyřech světových stranách. Když jsi dočetl poslední, zaplavila sál jasná bílá záře. Po chvíli zvolna pohasla a před tebou stál starší muž ze kterého vyzařovala nekonečná vyrovnanost, klid a také moc."}]
+        ],[
+            "test_flag",[{"value": 28}]
+        ],[
+            "goto_iff",[{"value": 32767}]
+        ],[
+            "first_visited",[{"value": 1152}]
+        ],[
+            "goto_iff",[{"value": 1153}]
+        ],[
+            "goto_paragraph",[{"value": 1177}]
+        ]
+    ],
+    "1153": [[
+            "echo",[{ "text": "\"Vítám vás ve své věži,\" promluvil jasným hlasem a když mluvil, každý z družiny měl pocit, že mluví přímo k němu. \"Jsem rád, že se s vámi konečně setkávám.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1154}]
+        ]
+    ],
+    "1154": [[
+            "add_choice",[{"value": 1155},{ "text": "Nikdo z družiny se v první chvíli nezmohl na slovo. Až po chvíli řekl, jinak sebevědomý Gralt, první slova: \"Tak je to přeci jen pravda.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1155": [[
+            "echo",[{ "text": "\"Pochyboval jsi snad?\" usmál se Nimeth."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1156}]
+        ]
+    ],
+    "1156": [[
+            "add_choice",[{"value": 1157},{ "text": "\"Nevím, myslím, že jsem spíš jen doufal, že vše co dělám nedělám zbytečně a vše čemu věřím není jen klam.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1157": [[
+            "echo",[{ "text": "\"Vše na světě má svůj smysl, jen my mnohdy nevíme jaký,\" pronesl Nimeth. Na rtech mu stále pohrával slabý úsměv: \"Ale vy jste sem jistě nepřišli jen tak a musíte mít spoustu otázek, že?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1158}]
+        ]
+    ],
+    "1158": [[
+            "add_choice",[{"value": 1159},{ "text": "%1l\"Ano to máme,\" odvětil[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1159": [[
+            "echo",[{ "text": "\"Výborně, tak se ptejte.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1160}]
+        ]
+    ],
+    "1160": [[
+            "add_choice",[{"value": 1161},{ "text": "%1l\"Vlastně máme jen jednu velkou otázku,\" začal %n. \"Proč jsme tady, co se tady stalo, co se právě děje a nebo co se teprve stane, jednoduše jaký je důvod naší přítomnosti zde a jaký je náš úkol. Proč jsme byli vybráni právě my a co by se stalo, kdybychom selhali.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1161": [[
+            "echo",[{ "text": "\"To je příliš mnoho otázek v jedné,\" začal ze široka Nimeth, ale zasloužíte si znát odpověď. Tak tedy, kdysi dávno, když jsem dosáhl jistého stupně v umění magie, jsem se rozhodl, že předám své vědomosti dál. Procestoval jsem mnoho světů a vyhledal pět nejtalentovanějších mladíků jaké jsem byl sto nalézt. Rozhodl jsem se je učit zde na Rovenlandu, protože zde je magie stále nejsilnější a učení zde jde lépe.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1162}]
+        ]
+    ],
+    "1162": [[
+            "echo",[{ "text": "\"Jejich studium šlo dobře a brzy začali dělat velké pokroky, měl jsem z nich opravdu radost. Samozřejmě, že to trvalo měsíce než zvládli svou mysl natolik aby mohli provádět první jednoduchá kouzla a roky než zvládli kouzla, která vidí i laik, ale šlo jim to neobvykle rychle. Málo kdo postupuje tak dobře, pokud má vůbec nadání.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1163}]
+        ]
+    ],
+    "1163": [[
+            "echo",[{ "text": "\"Jejich netrpělivosti jsem nevěnoval žádnou pozornost, protože netrpělivost k tomu zpočátku patří, každý je netrpělivý, když se učí. A tady jsem udělal svou největší chybu. Nevysvětlil jsem jim dostatečně, jakému nebezpečí se vystavují budou-li číst svitky, které jsem jim sám nepodal. Spoléhal jsem slepě na jejich poslušnost.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1164}]
+        ]
+    ],
+    "1164": [[
+            "echo",[{ "text": "\"Tak se jim dostal do ruky i Nogranův svitek, který slibuje nekonečnou moc a velkou slávu tomu, kdo připraví vše tak, jak je v něm napsáno. Tento svitek, však má jediný cíl a tím je otevřít brány do zakázaných dimenzí. Nogran, ten pohůnek všeho zla, jej napsal právě proto, aby zlákal na špatnou cestu právě mladé netrpělivé mágy. Proto je tak důležité aby mistr svým žákům zamezil takové texty číst.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1165}]
+        ]
+    ],
+    "1165": [[
+            "echo",[{ "text": "\"Tak se stalo, že ode mne po deseti letech učení odešli. Každý se uchýlil do světa jednoho živlu aby zvládl za mnohem menší čas, než by potřeboval ke komplexnímu zvládnutí magie, jeden živel. Každý také vytvořil svůj talisman, skrz který čerpá ze země, vody i rostlin, svou moc.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1166}]
+        ]
+    ],
+    "1166": [[
+            "echo",[{ "text": "\"Natral se uchýlil do ledových jeskyní, Bezra zvolil nitro sopky, Takra vystoupil na větrnou horu, Sa-Aqen vybudoval svou podzemní říši v poušti a Teraniel našel své zázemí ve městě, které po té co z něj vyhnal všechny obyvatele nechal zmizet. Když všichni zvládli svůj živel, sešli se na břehu Trakonu a vybudovali tam za pomoci magických sil svou věž. Naplnili ji nestvůrami a pastmi aby je chránili před příchozími a nazvali ji Skeldal.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1167}]
+        ]
+    ],
+    "1167": [[
+            "echo",[{ "text": "\"Tam se už po mnoho měsíců připravují ke svému vrcholnému kouzlu pomocí něhož, ve své nevědomosti, chtějí vládnout světu. Sami však budou prvními, kteří zahynou, neboť nevídaná monstra pak budou pustošit svět a nikde se nezastaví.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1168}]
+        ]
+    ],
+    "1168": [[
+            "echo",[{ "text": "%1l\"Vaším úkolem je zastavit je. Proto jste byli povoláni na tento svět. To je důvod vaší přítomnosti.\" Tak zakončil svou řeč Nimeth a v sále se na chvíli rozhostilo ticho. Pak se však %n začal[,a] znovu ptát."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1169}]
+        ]
+    ],
+    "1169": [[
+            "add_choice",[{"value": 1170},{ "text": "\"Co se tedy od nás čeká? Víme že je máme zastavit, ale jak? Co přesně máme udělat?\""}]
+        ],[
+            "add_choice",[{"value": 1171},{ "text": "%2l\"Odpusť mi mou troufalost, ale ty jsi mnohem lepší mág nežli my a také nejspíš lepší nežli oni, proč tedy jednoduše nejdeš a nezarazíš jim to?\" namítl[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1170": [[
+            "echo",[{ "text": "\"Jděte a přineste jejich talismany. Z podzemí mi přineste Srdce země, z Větrné hory Větrné kladivo, z ledových jeskyní pak Vodu z fontány královny Mithel, z nitra sopky Věčný oheň a z Neviditelného města Svitek myšlenky vítězství. Až tohle všechno budete mít vraťte se ke mě a já vám řeknu víc.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "add_to_book",[{"value": 13}]
+        ],[
+            "goto_paragraph",[{"value": 1172}]
+        ]
+    ],
+    "1171": [[
+            "echo",[{ "text": "\"Protože oni vědí, že jediný kdo je může zastavit jsem já. Nemohu se k věži ani přiblížit aby se o tom nedozvěděli, natož pak jí projít. Pokud bych to byl i dokázal, budu v nejvyšším patře tak slabý, že by mě porazilo i malé dítě.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1173}]
+        ]
+    ],
+    "1172": [[
+            "add_choice",[{"value": 1175},{ "text": "%2l\"Odpusť mi mou troufalost, ale ty jsi mnohem lepší mág nežli my a také nejspíš lepší nežli oni, proč tedy jednoduše nejdeš a nezarazíš jim to?\" namítl[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1173": [[
+            "add_choice",[{"value": 1174},{ "text": "\"Co se tedy od nás čeká? Víme že je máme zastavit, ale jak? Co přesně máme udělat?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1174": [[
+            "echo",[{ "text": "\"Jděte a přineste jejich talismany. Z podzemí mi přineste Srdce země, z Větrné hory Větrné kladivo, z ledových jeskyní pak Vodu z fontány královny Mithel, z nitra sopky Věčný oheň a z Neviditelného města Svitek myšlenky vítězství. Až tohle všechno budete mít vraťte se ke mě a já vám řeknu víc.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "add_to_book",[{"value": 13}]
+        ],[
+            "goto_paragraph",[{"value": 1176}]
+        ]
+    ],
+    "1175": [[
+            "echo",[{ "text": "\"Protože oni vědí, že jediný kdo je může zastavit jsem já. Nemohu se k věži ani přiblížit aby o tom nevěděli, natož pak jí projít. Pokud bych to byl i dokázal, budu v nejvyšším patře tak slabý, že by mě porazilo i malé dítě.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1176}]
+        ]
+    ],
+    "1176": [[
+            "echo",[{ "text": "\"Tak, teď, když víte vše co jste chtěli vědět, měli byste jít, čas nás tlačí,\" rozloučil se s nimi Nimeth"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "add_to_story",[{ "text": "V nejvyšším patře \"Bílé věže\" jsi potkal legendárního mága Nimetha."}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1177": [[
+            "has_item",[{"value": 148}]
+        ],[
+            "jump_not_iff",[{"value": 25}]
+        ],[
+            "has_item",[{"value": 149}]
+        ],[
+            "jump_not_iff",[{"value": 22}]
+        ],[
+            "has_item",[{"value": 150}]
+        ],[
+            "jump_not_iff",[{"value": 19}]
+        ],[
+            "has_item",[{"value": 151}]
+        ],[
+            "jump_not_iff",[{"value": 16}]
+        ],[
+            "has_item",[{"value": 152}]
+        ],[
+            "jump_not_iff",[{"value": 13}]
+        ],[
+            "echo",[{ "text": "\"Vy jste to opravdu dokázali,\" zvolal Nimeth, když vás viděl přicházet se všemi talismany."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1178}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít všech pět talismanů.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít všech pět talismanů.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít všech pět talismanů.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít všech pět talismanů.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít všech pět talismanů.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1178": [[
+            "add_choice",[{"value": 1179},{ "text": "\"Pochyboval jsi snad?\" oplatil Gralt Nimethovi jeho poslední poznámku."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1179": [[
+            "echo",[{ "text": "\"Tak trochu,\" odpověděl Nimeth. \"To nejtěžší vás ale teprve čeká. S těmito ingrediencemi se musíte vypravit do Labyrintu zpívajících vod. Tam sídlí démon. Ten jediný vám z nich může vykovat Meč Odplaty. S ním pak musíte vystoupit do nejvyššího patra Skeldalu a narušit kruh mých pěti odpadlých učedníků.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1180}]
+        ]
+    ],
+    "1180": [[
+            "add_choice",[{"value": 1181},{ "text": "%3l\"Jak se tam ale dostaneme?\" zeptal[,a] se %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1181": [[
+            "echo",[{ "text": "\"Po řece,\" oznámil Nimeth. \"Až sejdete pod věž, budete mít přistavenu na řece loďku, ale dávejte si pozor, Labyrint je nevyzpytatelné místo.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1182}]
+        ]
+    ],
+    "1182": [[
+            "echo",[{ "text": "Na ta slova Nimeth zmizel a družina zůstala sama se svým novým úkolem."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 28}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1280": [[
+            "local_pgf",[{"value": 1280}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_KNIH.HI"}]
+        ],[
+            "add_desc",[{ "text": "Na náměstí stojí honosná budova, která v sobě ukrývá knihovnu. Knihy jsou to poslední co po sobě zanechá každý veliký národ. Právě o tuto paměť národa skřítků z vylidňujícího se Rovenlandu se stará knihovník a jeho syn. Tvá družina vstoupila do jejich tiché svatyně, knihovník odložil jakousi knihu do regálu a začal se ti věnovat."}]
+        ],[
+            "test_flag",[{"value": 32}]
+        ],[
+            "goto_iff",[{"value": 1307}]
+        ],[
+            "test_flag",[{"value": 22}]
+        ],[
+            "goto_iff",[{"value": 1281}]
+        ],[
+            "goto_paragraph",[{"value": 1296}]
+        ]
+    ],
+    "1281": [[
+            "echo",[{ "text": "\"Může vám naše knihovna v něčem pomoci ctění cizinci?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1282}]
+        ]
+    ],
+    "1282": [[
+            "add_choice",[{"value": 1283},{ "text": "\"Myslíme si, že člověk jako vy by nám mohl svými znalostmi i radou pomoci v našem poslání.\""}]
+        ],[
+            "add_choice",[{"value": 1284},{ "text": "\"Rádi bychom nalezli odpovědi na otázky, které máme a možná i na ty, které jsme si zatím nepoložili,\" odvětil[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Asi ne, děkujeme.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1283": [[
+            "echo",[{ "text": "\"Rád vám pomohu, jak budu moci,\" odpověděl knihovník. \"V čem tedy spočívá vaše poslání?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1285}]
+        ]
+    ],
+    "1284": [[
+            "echo",[{ "text": "\"K tomu vám opravdu nejlépe poslouží naše knihovna. Proberte se svitky i knihami, jen dejte pozor a nic neponičte,\" řekl trochu starostlivě knihovník."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1303}]
+        ]
+    ],
+    "1285": [[
+            "add_choice",[{"value": 1286},{ "text": "\"To bude poněkud problematičtější na vysvětlení. Naše cíle se stále topí v dohadech. Víme jen, že jsme byli učencem Fregharem povoláni na tento svět, abychom zabránili jakémusi zlu, které se má šířit z jihu ostrova. Také již víme, že jih Rovenlandu bude zřejmě velmi nebezpečné místo a konečně poslední mlhavou informací je možná existence někoho, kdo, pokud ovšem existuje, by nám mohl pomoci dál.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1286": [[
+            "echo",[{ "text": "%1l Během řeči kterou vedl[,a] %n se jakoby náhodou dostal knihovníkův syn v přerovnávání knih až na doslech. \"Váš příběh je opravdu zajímavý,\" promnul si bradu knihovník. \"Ten muž, kterého měl Freghar na mysli byl pravděpodobně Nimeth, muž-mág z mnoha legend. Já osobně si však myslím, že on sám je jen pouhá legenda, ale víc vám asi nepomohu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1287}]
+        ]
+    ],
+    "1287": [[
+            "add_choice",[{"value": 1288},{ "text": "\"I tak vám velmi děkujeme, snad se někde jinde...\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1288": [[
+            "echo",[{ "text": "\"Počkejte, ještě počkejte,\" vložil se do hovoru knihovníkův syn. \"Já náhodou znám tu legendu na jejímž základě vás Freghar povolal rituálem Krow-Kane.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1289}]
+        ]
+    ],
+    "1289": [[
+            "echo",[{ "text": "\"Eriku neobtěžuj vzácné pány těmi povídačkami od starého Freghara,\" zarazil slova svého syna knihovník s omluvným úsměvem vrženým směrem ke tvé družině.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1290}]
+        ]
+    ],
+    "1290": [[
+            "add_choice",[{"value": 1291},{ "text": "%1l\"Ale jen jej nechte, ať nám poví, co ví,\" poprosil[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1291": [[
+            "echo",[{ "text": "\"Ta legenda říká,\" pokračoval se zadostiučiněním Erik, \"že jednoho dne, až bude světu hrozit nebezpečí pocházející z Rovenlandu, přijdou tři bojovníci, aby se utkali s temnými pány. Dále říká, že bílý, kterého bude tížit jakási vina, jim pomůže. Freghar nebyl blázen, on jediný věděl, že Rovenlandu i světu hrozí nebezpečí.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1292}]
+        ]
+    ],
+    "1292": [[
+            "echo",[{ "text": "\"Také věděl, že až se objevíte, budete potřebovat pomoc a pokud mi to dovolíte, já půjdu s vámi a pomohu vám.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1293}]
+        ]
+    ],
+    "1293": [[
+            "echo",[{ "text": "\"Nikam nepůjdeš,\" rozzlobil se otec. \"To by tak ještě scházelo.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1294}]
+        ]
+    ],
+    "1294": [[
+            "add_choice",[{"value": 1295},{ "text": "\"Správně, jen zůstaň hezky doma chlapče a poslouchej svého otce.\""}]
+        ],[
+            "add_choice",[{"value": 1304},{ "text": "\"Pomoc někoho zdejšího by se nám opravdu mohla hodit.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1295": [[
+            "echo",[{ "text": "\"Erik se nakvašeně otočil a odešel.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1296": [[
+            "echo",[{ "text": "\"Může vám naše knihovna v něčem pomoci ctění cizinci?\" otázal se knihovník."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1297}]
+        ]
+    ],
+    "1297": [[
+            "add_choice",[{"value": 1298},{ "text": "%1l\"Nejsme zdejší a rádi bychom se vás, vzdělaného muže, na něco zeptali, bude-li to možné.\" odpověděl[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Asi ne, děkujeme.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1298": [[
+            "echo",[{ "text": "\"Bude mi potěšením si s vámi popovídat, jen se ptejte.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1299}]
+        ]
+    ],
+    "1299": [[
+            "add_choice",[{"value": 1300},{ "text": "\"Chtěli bychom vědět něco o Rovenlandu jako takovém, co v něm kde je a tak.\""}]
+        ],[
+            "add_choice",[{"value": 1301},{ "text": "\"Kdo žije v Rovenlandu a koho bychom měli navštívit?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1300": [[
+            "echo",[{ "text": "\"Na severu je přístav. Dříve velmi rušný, dnes v něm však nenajdete jedinou loď. Snad jen s vyjímkou případů, kdy někdo opouští Rovenland. Na východě je začarovaný les, tam však raději nechoďte. Také jsou tam dryády a tam už bych vám vůbec neradil chodit. Na západě jsou \"Skřetí jeskyně\" a na jihu, kam už dnes nikdo nechodí, jsou jen lesy, pláně, pouště a pod starou sopkou prý bývalo město.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1302}]
+        ]
+    ],
+    "1301": [[
+            "echo",[{ "text": "Knihovník se usmál, \"Asi nejdůležitější bude starosta a velekněz. Ti žijí v těch pěkných domech v horním Caredbaru. Být vám, tak bych určitě zavítal do hospody tady na náměstí, ale tam jste už možná byli. Také bych vám doporučil navštívit kresliče map. Ten by vám mohl hodně pomoci. Bydlí kousek na východ za náměstím. To je asi tak všechno. To víte, Caredbar je dnes klidné malé město.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1302}]
+        ]
+    ],
+    "1302": [[
+            "add_choice",[{"value": 1300},{ "text": "\"Chtěli bychom vědět něco o Rovenlandu jako takovém, co v něm kde je a tak.\""}]
+        ],[
+            "add_choice",[{"value": 1301},{ "text": "\"Kdo žije v Rovenlandu a koho bychom měli navštívit?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Děkujeme, víme už vše, co jsme chtěli.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1303": [[
+            "test_flag",[{"value": 29}]
+        ],[
+            "jump_not_iff",[{"value": 18}]
+        ],[
+            "test_flag",[{"value": 30}]
+        ],[
+            "jump_not_iff",[{"value": 15}]
+        ],[
+            "test_flag",[{"value": 31}]
+        ],[
+            "jump_not_iff",[{"value": 9}]
+        ],[
+            "echo",[{ "text": "Nenalezli jste již nic zajímavého."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "dark_screen",[{"value": 1},{"value": 1}]
+        ],[
+            "echo",[{ "text": "Prohrabali jste se inventářem knihovny a našli jste \"Lexikon labyrintu zpívajících vod.\" Máte pocit, že by se vám v budoucnu mohl hodit."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 31}]
+        ],[
+            "add_to_book",[{"value": 8}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "Nenalezli jste zatím nic zajímavého."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "dark_screen",[{"value": 1},{"value": 1}]
+        ],[
+            "echo",[{ "text": "%1l Prohrabali jste se inventářem knihovny a našli jste svitek, který vás zaujal. %n jej ihned přepsal[,a] do knihy"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 29}]
+        ],[
+            "add_to_book",[{"value": 9}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1304": [[
+            "echo",[{ "text": "\"Ty nikam nepůjdeš Eriku, rozumíš!\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1305}]
+        ]
+    ],
+    "1305": [[
+            "echo",[{ "text": "\"Ale ano otče,\" nedal se Erik. \"Já už jsem se dávno rozhodl. To, že ty i všichni ostatní přehlížíte slova takového velkého muže jakým byl Freghar je politováníhodné, ale je to vaše věc. Já však hodlám těmto pánům pomoci v něčem o čem si myslím, že je správné. Kromě toho, ve společnosti lidí, kteří sami prošli \"Skřetími Jeskyněmi\", ve kterých nezůstala snad duše živá, jak se mi doneslo, budu v bezpečí.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1306}]
+        ]
+    ],
+    "1306": [[
+            "echo",[{ "text": "S těmito slovy se Erik otočil a odešel s družinou."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 32}]
+        ],[
+            "join_character",[{"value": 1}]
+        ],[
+            "add_to_story",[{ "text": "Proti vůli svého otce se k družině připojil knihovníkův syn Erik."}]
+        ],[
+            "add_rune",[{"value": 20}]
+        ],[
+            "add_rune",[{"value": 22}]
+        ],[
+            "add_rune",[{"value": 44}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1307": [[
+            "echo",[{ "text": "\"Ahoj Eriku, co byste potřebovali tentokrát?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1308}]
+        ]
+    ],
+    "1308": [[
+            "add_choice",[{"value": 1303},{ "text": "\"Otče, rádi bychom se trochu prošli knihami a svitky,\" řekl Erik."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Nic, jen jsem se přišel na tebe podívat.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1408": [[
+            "local_pgf",[{"value": 1408}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_STAR.HI"}]
+        ],[
+            "add_desc",[{ "text": "V jednom, z paláců v severní části Caredbaru se nachází radnice kde sídlí starosta tohoto města. Jako vážená osoba s ním nemůže mluvit jen tak někdo, proto jste se i vy museli nejprve ohlásit u jeho komorníka a vysvětlit mu, jak důležité poslání vás ke starostovi zavedlo. Postarší pán pak přijal tvou družinu ve své pracovně a usadil ji do pohodlných židlí."}]
+        ],[
+            "first_visited",[{"value": 1408}]
+        ],[
+            "goto_iff",[{"value": 1409}]
+        ],[
+            "goto_paragraph",[{"value": 1418}]
+        ]
+    ],
+    "1409": [[
+            "echo",[{ "text": "\"Prý vás do Rovenlandu přivádějí obavy o jeho osud a snad i o osud celého světa,\" začal. \"Takovou hrozbu nemohu jen tak přehlédnout, ale ani jí bez vážného důvodu přijmout. Můžete mi podat nějaké vysvětlení?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1410}]
+        ]
+    ],
+    "1410": [[
+            "add_choice",[{"value": 1411},{ "text": "%1l\"Velmi rádi milosti,\" ujal[,a] se slova %n. \"Koneckonců, proto jsme také tady. Ano, tyto obavy jsou příčinou naší přítomnosti na Rovenlandu. Nebyly to však původně obavy naše, ale učence Freghara. Snad jej znáte. Ten nás také kvůli tomu povolal rituálem Krow-Kane, jak jsme se dočetli z listu, který nám před svou smrtí napsal.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1411": [[
+            "echo",[{ "text": "\"Zadržte, už nemusíte dál pokračovat. Já samozřejmě vím, čeho se Freghar obával, několikrát jsme kvůli tomu spolu hovořili. Je mi líto jeho i vás. Jeho, že své nepodložené obavy zaplatil smrtí a vás, že zde kvůli tomu zbytečně utrácíte svůj jistě drahocenný čas.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1412}]
+        ]
+    ],
+    "1412": [[
+            "add_choice",[{"value": 1413},{ "text": "\"Nemyslíte, že by na tom však mohlo být něco pravdy, když kvůli tomu Freghar dal v sázku vlastní život a nakonec jej také prohrál?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"V tom případě litujeme, že jsme vás obtěžovali, sbohem.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1413": [[
+            "echo",[{ "text": "\"Freghar byl velký muž, který pro Rovenland mnoho vykonal. V posledních dnech jeho života však byl jeho úsudek zastřený. Já jednoduše nemohu riskovat další vylidňování Rovenlandu, jen kvůli výplodům fantazie starého muže.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1414}]
+        ]
+    ],
+    "1414": [[
+            "add_choice",[{"value": 1415},{ "text": "\"Ale co všechny ty zprávy o nemrtvých na jihu ostrova, nezneklidňují vás alespoň trochu? Co ta legenda, která mluví o zlu z Rovenladnu?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1415": [[
+            "echo",[{ "text": "\"Předně ta legenda, kterou máte na mysli je příliš nejasná, vůbec není jisté, zda se v ní mluví o Rovenladnu a hlavně je tisíce let stará. Co mohli před tisíci lety vědět o dnešku? A za druhé, možná se na jihu objevilo pár nemrtvých, ale faktem také je, že mnoho bývalých obchodních měst má problémy s vylidňováním a není to prastarou věštbou, ale jednoduše tím, že celosvětový obchod upadá.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1416}]
+        ]
+    ],
+    "1416": [[
+            "echo",[{ "text": "\"Rozhodně tomu nemůžeme zabránit tak, že budeme lidi strašit povídačkami o konci světa. A teď prosím vás odejděte, mám mnoho práce,\" prohlásil nakonec trochu rozzlobený starosta."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1417}]
+        ]
+    ],
+    "1417": [[
+            "echo",[{ "text": "Tvé družině nezbylo než se opravdu zvednout a odejít. Na druhou stranu se takovýto výsledek dal očekávat. Sám Freghar to koneckonců ve svém listě psal."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1418": [[
+            "echo",[{ "text": "Váš rozhovor se odvíjel přesně ve stejné rovině jako když jste zde byli naposledy. Starosta zůstává neoblomný a trvá na tom, že Rovenlandu žádné nebezpečí nehrozí."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1536": [[
+            "local_pgf",[{"value": 1536}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_KNEZ.HI"}]
+        ],[
+            "add_desc",[{ "text": "S velikostí paláce v němž sídlí nejvyšší kněz boha Artola může soupeřit snad už jen palác caredbarského starosty. Bůh Artol je jediným ze sedmi bohů, který má v Rovenlandu své zastoupení. Tvá družina požádala o slyšení u nejvyššího kněze rovenlandského chrámu a o něco později před něj také předstoupila."}]
+        ],[
+            "test_flag",[{"value": 33}]
+        ],[
+            "goto_iff",[{"value": 1540}]
+        ],[
+            "first_visited",[{"value": 1536}]
+        ],[
+            "goto_iff",[{"value": 1537}]
+        ],[
+            "goto_paragraph",[{"value": 1552}]
+        ]
+    ],
+    "1537": [[
+            "add_choice",[{"value": 1538},{ "text": "%1l\"Vzdáváme čest a slávu bohu Artolovi a jeho nejvyššímu knězi,\" začal[,a] obřadně %n."}]
+        ],[
+            "add_choice",[{"value": 1539},{ "text": "%2l\"Jediný bůh, kterého já uznávám je Kthor,\" nechal[,a] se slyšet %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1538": [[
+            "echo",[{ "text": "\"I vám buď náš nejvyšší pán milostiv,\" prohlásil kněz. \"Co vás k nám přivádí?"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1541}]
+        ]
+    ],
+    "1539": [[
+            "echo",[{ "text": "%2l%n svou řečí dokázal nejvyššího kněze smrtelně urazit. Je jen velmi nepravděpodobné, že by s vámi ještě někdy promluvil."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 33}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1540": [[
+            "echo",[{ "text": "Při vaší poslední návštěvě se vám podařilo nejvyššího kněze smrtelně urazit a všechny vaše další pokusy o navázání kontaktu proto selhávají."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1541": [[
+            "add_choice",[{"value": 1542},{ "text": "%1l\"Veliké břímě, které bylo naloženo na naše bedra. Poslání jehož cílem je nalézt a vymýtit zlo, které se chystá rozmést Caredbar, Rovenland a možná i zbytek světa,\" pokračoval[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 1539},{ "text": "%2l\"O milost vašeho boha se nikdo neprosí. Jediný bůh, kterého o pomoc žádám je Kthor,\" vložil[,a] se do řeči %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1542": [[
+            "echo",[{ "text": "%1l\"Jsem si jist, že by Artol nedopustil něco tak strašného, přesto mi, přiznám se, tvá slova nahánějí obavy, cizin[če,ko]. Mohl[,a] bys mi vaše poslání nějak více objasnit a říci, jak vám také já mohu mýt nápomocen?"}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1543}]
+        ]
+    ],
+    "1543": [[
+            "add_choice",[{"value": 1544},{ "text": "\"Jistě. Tak tedy, naše pouť začala v příbytku učence Freghara v němž jsme se ocitli po té co provedl rituál Krow-Kane. Důvodem proč to udělal je stará legenda podle níž jen tři bojovníci vystoupivší z tohoto rituálu, mohou se postavit protivníkovi jež se ukrývá někde v Rovenlandu. Podle Freghara se právě začala naplňovat všechna znamení z té legendy a proto nás přivolal.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1544": [[
+            "echo",[{ "text": "\"Ano, Freghar. Jak jinak. Muž jehož víra byla tak slabá, že přisuzoval to co se děje v Rovenlandu, nejasným znamením ze starých legend. Je mi líto, že jste byli přivedeni na tento svět tak zbytečně."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1545}]
+        ]
+    ],
+    "1545": [[
+            "add_choice",[{"value": 1546},{ "text": "\"Sám jistě víš, jak dokážou být někdy proroctví přesná a to o kterém mluvíme se skutečně začíná naplňovat.\""}]
+        ],[
+            "add_choice",[{"value": 1539},{ "text": "%2l\"Ignorant, ale konečně co byste čekali od velekněze Artolského boha,\" uzavřel[,a] %n definitivně přístup do chrámu."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1546": [[
+            "echo",[{ "text": "\"Snad, konečně i sám Altor nám zanechal mnohá proroctví, ale tohle opravdu není ono. Rozhlédněte se kolem sebe. Vypadá to snad, jako by měl být konec světa? Přestože s vámi nesouhlasím, rád bych vám nějak pomohl, řekněte jak.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1547}]
+        ]
+    ],
+    "1547": [[
+            "add_choice",[{"value": 1548},{ "text": "%1l\"Dobrá,\" oddechl[,a] si unaveně %n, \"mohl by jste nám, alespoň odpovědět na pár otázek?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1548": [[
+            "echo",[{ "text": "\"Ale jistě, to je to nejmenší co pro vás mohu udělat,\" odvětil velekněz."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1549}]
+        ]
+    ],
+    "1549": [[
+            "add_choice",[{"value": 1550},{ "text": "\"Čím si tedy myslíte, že je způsobeno občasné hlášení o nemrtvých a proč už je jih ostrova, vlastně tak opuštěný?\""}]
+        ],[
+            "add_choice",[{"value": 1551},{ "text": "\"Freghar mluvil o prodlužování noci na úkor dne. Není snad tohle jedno z předpovězených znamení?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Už víme vše, co jsme potřebovali.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1550": [[
+            "echo",[{ "text": "\"Nejdou tak dobře obchody, to je vše. Pokaždé je to tak. Víte Rovenland byl díky své poloze uprostřed dračího moře silným obchodním centrem, ale po té co se otevřeli nové trhy na kontinentě, začali se pomalu obchodníci vytrácet. A samozřejmě tomu také pomohli všechny ty zveličené pověsti o nemrtvých.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1553}]
+        ]
+    ],
+    "1551": [[
+            "echo",[{ "text": "\"Ano, o tom skutečně legendy hovoří, ale nějakého zkracování dne jsem si rozhodně nevšiml, právě proto si myslím, že je to celé nesmyslné.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1553}]
+        ]
+    ],
+    "1552": [[
+            "add_choice",[{"value": 1548},{ "text": "%1l\"I přes to, že s námi nesouhlasíte, mohl byste nám pomoci tak, že nám odpovíte na pár otázek?\" zeptal[,a] se %n.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1553": [[
+            "add_choice",[{"value": 1548},{ "text": "\"Nebude vám vadit, když vám položíme ještě nějakou otázku?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1664": [[
+            "local_pgf",[{"value": 1664}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_MAG2.HI"}]
+        ],[
+            "add_desc",[{ "text": "Po té, co se tvá družina probojovala \"Soutěskou Bloudících Duší\", našla na jejím konci kamenné dveře. Za nimi, proti všemu očekávání, seděl na kameni muž s lehce přivřenými víčky a cosi tiše odříkával. Váš příchod jej zřejmě překvapil mnohem méně nežli vás jeho přítomnost zde. V klidu dořekl svou mantru a otočil se na vás."}]
+        ],[
+            "goto_paragraph",[{"value": 1665}]
+        ]
+    ],
+    "1665": [[
+            "echo",[{ "text": "\"Vítám udatné bojovníky na tomto vskutku neobvyklém místě,\" promluvil jasným sytým hlasem."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1666}]
+        ]
+    ],
+    "1666": [[
+            "add_choice",[{"value": 1667},{ "text": "%1l\"Nečekali jsme, že zde někoho potkáme,\" odvětil[,a] %n, \"ale i ty buď pozdraven poutníku.\""}]
+        ],[
+            "add_choice",[{"value": 1668},{ "text": "%2l\"Co když je to také duch,\" zauvažoval[,a] nahlas %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1667": [[
+            "echo",[{ "text": "\"Ani já jsem nečekal takovou návštěvu. To je koneckonců důvod, proč jsem zde.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1669}]
+        ]
+    ],
+    "1668": [[
+            "echo",[{ "text": "\"Pokud nevěříš, pojď a sáhni si na mne,\" usmál se cizinec."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1670}]
+        ]
+    ],
+    "1669": [[
+            "add_choice",[{"value": 1671},{ "text": "\"Ten důvod, je možná dobrým způsobem jak začít. Smíme vědět kdo jsi a co děláš zde na tomto nebezpečném místě?\" zeptal[,a] se mírně %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1670": [[
+            "add_choice",[{"value": 1671},{ "text": "\"Raději ne, spíš nám řekni, co jsi zač a co tady děláš?\" pokračoval[,a] bojovně naladěn[,á] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1671": [[
+            "echo",[{ "text": "Poutník se shovívavě usmál: \"Možná opravdu máte právo to vědět, když jste vážili tak dlouhou a nebezpečnou cestu až sem. Mé jméno je Gralt. Jsem to, čemu ostatní říkají mág. A proč jsem zde? To je celkem prosté. Málo kde naleznete tak vhodné místo pro zkoušení nebezpečných kouzel jako na konci \"Soutěsky bloudících duší\". Sousedé v Caredbaru nemají pro takové věci moc pochopení.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1672}]
+        ]
+    ],
+    "1672": [[
+            "echo",[{ "text": "\"A nyní mi prosím prozraďte, co sem přivedlo vás,\" požádal mág."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1673}]
+        ]
+    ],
+    "1673": [[
+            "test_flag",[{"value": 34}]
+        ],[
+            "jump_not_iff",[{"value": 4}]
+        ],[
+            "add_choice",[{"value": 1674},{ "text": "\"Hledáme cokoliv, co by nám mohlo pomoci v našem těžkém úkolu, který  nám uložil muž jménem Freghar. Jiný muž, Nithi Ebet, nám naznačil, že  právě zde na konci soutěsky můžeme najít něco, co nám pomůže. Jsi snad  ten, kterého hledáme?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ],[
+            "echo",[{ "text": "\"Hledáme cokoliv, co by nám mohlo pomoci v našem těžkém úkolu, který  nám uložil muž jménem Freghar.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1674}]
+        ]
+    ],
+    "1674": [[
+            "test_flag",[{"value": 34}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "\"Možná. Tak tedy starý Freghar vám dal úkol a Nithi Ebet vám poradil  abyste vyhledali mne? To rozhodně stojí za to abych si toho od vás poslechl  více. Můžete mi nějak přiblížit, jaký úkol vám byl uložen?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1675}]
+        ],[
+            "echo",[{ "text": "\"Možná jsem to já, kdo by vám mohl pomoci, rozhodně abych si však toho  od vás poslechl více. Můžete mi nějak přiblížit, jaký úkol vám byl uložen?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1675}]
+        ]
+    ],
+    "1675": [[
+            "echo",[{ "text": "%1l%n se jal[,a] znovu vyprávět příběh, ve kterém byli povoláni na tento svět aby zabránili jakési hrozbě. Vyprávěl[,a] o nevěřících obyvatelích Caredbaru, o skřetích jeskyních, zkrátka o všem. Mág vyprávění ani jednou nepřerušil a v klidu si vyslechl celý příběh. Už během vyprávění se mu ale na tváři usadil zvláštní výraz."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1676}]
+        ]
+    ],
+    "1676": [[
+            "echo",[{ "text": "%1l\"Vida, vida,\" řekl Gralt když %n skončil[,a], \"tak ledy se snad konečně hnuly. Pokud mi to dovolíte, rád bych se k vám připojil. Bylo by velmi mrzuté, kdybyste  mě odmítli. Vlastně se dá říci, že na vás, v jistém smyslu, čekám celý život.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1677}]
+        ]
+    ],
+    "1677": [[
+            "add_choice",[{"value": 1678},{ "text": "%1l\"Jsme rádi za každou pomoc a uvítáme, když se k nám připojíš,\" řekl[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 1679},{ "text": "\"Ne děkujeme, už tak nás je dost.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1678": [[
+            "echo",[{ "text": "\"V tom případě můžeme vyrazit,\" prohlásil Gralt. \"Nejprve se vrátíme k mladému Ebetovi a pak vzhůru k Nimethovi. Ještě stále snad bydlí v té staré věži v začarovaném lese.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "join_character",[{"value": 2}]
+        ],[
+            "set_flag",[{"value": 35}]
+        ],[
+            "add_rune",[{"value": 32}]
+        ],[
+            "add_rune",[{"value": 13}]
+        ],[
+            "add_rune",[{"value": 35}]
+        ],[
+            "add_to_story",[{ "text": "Na konci Soutěsky bloudících duší se k družině připojil mág jménem Gralt."}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1679": [[
+            "echo",[{ "text": "Gralt posmutněl, pak se vzduch kolem něj zavlnil a on zmizel. Náhle se tě zmocnil tísnivý pocit, že jsi udělal velkou chybu a už ji nikdy neodčiníš. Vše je ztraceno."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1792": [[
+            "local_pgf",[{"value": 1792}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_SOCH.HI"}]
+        ],[
+            "add_desc",[{ "text": "Vešel jsi do sálu, kde při jedné stěně stojí ve výklencích pět soch a proti nim je na zdi zavěšeno pět velkých gongů. Od první chvíle, kdy jsi vstoupil, máš pocit, že sochy, byť nehybné, jsou živé. Nakonec jsi se rozhodl, že se s nimi pokusíš promluvit. Nyní stojíš u krajní levé sochy."}]
+        ],[
+            "first_visited",[{"value": 1792}]
+        ],[
+            "goto_iff",[{"value": 1793}]
+        ],[
+            "goto_paragraph",[{"value": 1800}]
+        ]
+    ],
+    "1793": [[
+            "add_choice",[{"value": 1794},{ "text": "%1l\"Dobrý den,\" pokusil[,a] se %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1794": [[
+            "echo",[{ "text": "\"Cože?\" opáčila  socha tónem, který vás obviňuje z toho, že nemluvíte dost nahlas."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1795}]
+        ]
+    ],
+    "1795": [[
+            "add_choice",[{"value": 1796},{ "text": "%1l\"PŘEJI KRÁSNÝ DEN?\" zkusil[,a] to znovu o poznání hlasitěji %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1796": [[
+            "echo",[{ "text": "\"Ale jděte, jaký pak sen?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1797}]
+        ]
+    ],
+    "1797": [[
+            "add_choice",[{"value": 1798},{ "text": "\"ALE NE SEN, DEN! CHTĚLI JSME SE JEN ZEPTAT NA CESTU.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1798": [[
+            "echo",[{ "text": "\"Ale kdepak, ona už je vdaná, budeš si muset hledat jinou nevěstu."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1799}]
+        ]
+    ],
+    "1799": [[
+            "add_choice",[{"value": 32767},{ "text": "%1l\"Tohle nikam nevede,\" prohlásil[,a] %n, \"zkusíme to jinde.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1800": [[
+            "add_choice",[{"value": 1801},{ "text": "%1l\"Tak jsme tady zas... teda, chtěl[,a] jsme říct: TAK JSME TADY ZAS,\" zakřičel[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1801": [[
+            "echo",[{ "text": "\"A čeho?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1802}]
+        ]
+    ],
+    "1802": [[
+            "echo",[{ "text": "%1lRozhovor se sochou se ubíral tím samým nikam nevedoucím směrem, takže jej %n brzo ukončil[,a]."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1920": [[
+            "local_pgf",[{"value": 1920}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_SOCH.HI"}]
+        ],[
+            "add_desc",[{ "text": "Vešel jsi do sálu, kde při jedné stěně stojí ve výklencích pět soch a proti nim je na zdi zavěšeno pět velkých gongů. Od první chvíle, kdy jsi vstoupil, máš pocit, že sochy, byť nehybné, jsou živé. Nakonec jsi se rozhodl, že se s nimi pokusíš promluvit. Nyní stojíš u druhé sochy z leva."}]
+        ],[
+            "first_visited",[{"value": 1920}]
+        ],[
+            "goto_iff",[{"value": 1921}]
+        ],[
+            "goto_paragraph",[{"value": 1925}]
+        ]
+    ],
+    "1921": [[
+            "add_choice",[{"value": 1922},{ "text": "%1l\"Ehm, přeji krásný den,\" pokusil[,a] se %n nesměle."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1922": [[
+            "echo",[{ "text": "\"Maminka nám říkala, že nemáme mluvit s cizími lidmi.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1923}]
+        ]
+    ],
+    "1923": [[
+            "add_choice",[{"value": 1924},{ "text": "%1l\"No to je správné,\" pokusil[,a] se %n neztratit iniciativu v rozhovoru se sochou, která [mu,jí] odporuje takovýmto zvláštním způsobem, \"ale já se ti představím, jmenuji se %n. Tak a teď když už se známe, můžeme se už spolu bavit?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1924": [[
+            "echo",[{ "text": "\"Ne,\" trvala na svém socha a tím pro ní celý rozhovor skončil."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "1925": [[
+            "add_choice",[{"value": 1926},{ "text": "%1l\"Ahoj...\" pokusil[,a] se %n začít zvesela, aby prolomil[,a] ledy, ale byl[,a] nekompromisně přerušen[,a]."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1926": [[
+            "echo",[{ "text": "\"Už jsem vám říkala, že nám maminka nakázala, že s cizími lidmi se nesmíme bavit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1927}]
+        ]
+    ],
+    "1927": [[
+            "add_choice",[{"value": 1928},{ "text": "\"A kde je vlastně tvoje maminka?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "1928": [[
+            "echo",[{ "text": "\"No maminka stojí támhle úplně vpravo... ne počkejte, vlevo... ne vlastně ne, přeci jen to bude vpravo. Ach jo, která je pravá a která levá? No prostě stojí na kraji stačí?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 1929}]
+        ]
+    ],
+    "1929": [[
+            "add_choice",[{"value": 32767},{ "text": "%1l\"Stačí,\" potvrdil[,a] %n s tím, že už se dozvěděl maximum."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2048": [[
+            "local_pgf",[{"value": 2048}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_SOCH.HI"}]
+        ],[
+            "add_desc",[{ "text": "Vešel jsi do sálu, kde při jedné stěně stojí ve výklencích pět soch a proti nim je na zdi zavěšeno pět velkých gongů. Od první chvíle, kdy jsi vstoupil, máš pocit, že sochy, byť nehybné, jsou živé. Nakonec jsi se rozhodl, že se s nimi pokusíš promluvit. Nyní stojíš u prostřední sochy."}]
+        ],[
+            "first_visited",[{"value": 2048}]
+        ],[
+            "goto_iff",[{"value": 2049}]
+        ],[
+            "goto_paragraph",[{"value": 2062}]
+        ]
+    ],
+    "2049": [[
+            "echo",[{ "text": "\"Už jste mluvili s mojí sestrou?\" vzala si socha zcela neočekávaně slovo dříve, než stačil kdokoliv cokoliv říci."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2050}]
+        ]
+    ],
+    "2050": [[
+            "add_choice",[{"value": 2051},{ "text": "%1l\"Dobrý den,\" nenechal[,a] se zmást %n a pak teprve reagoval[,a] na otázku: \"Která to je?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2051": [[
+            "echo",[{ "text": "\"To je ta s růžovou mozkovou kůrou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2052}]
+        ]
+    ],
+    "2052": [[
+            "add_choice",[{"value": 2053},{ "text": "\"Jakže?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2053": [[
+            "echo",[{ "text": "\"No ta, co je tak nesmyslně šťastná,\" vysvětlovala socha."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2054}]
+        ]
+    ],
+    "2054": [[
+            "add_choice",[{"value": 2055},{ "text": "%1l\"Nesmyslně?\" snažil[,a] se %n se sochou udržet krok."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2055": [[
+            "echo",[{ "text": "\"No ovšem, ona má totiž děti, ale k čemu jí to je, když je už staletí neviděla, protože stojí v jiných výklencích, kam na ně nevidí?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2056}]
+        ]
+    ],
+    "2056": [[
+            "add_choice",[{"value": 2057},{ "text": "\"Aha no jistě, ale třeba...\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2057": [[
+            "echo",[{ "text": "\"Žádný třeba,\" ohradila se socha, \"zkuste se jí třeba zeptat, kdy s nimi byla naposledy na procházce. To by jí snad mohlo otevřít oči."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2058}]
+        ]
+    ],
+    "2058": [[
+            "add_choice",[{"value": 2059},{ "text": "\"Dobře, ale proč bychom něco takového dělali?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2059": [[
+            "echo",[{ "text": "\"Co proč,\" divila se socha, \"přeci abyste jí otevřeli ty oči.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2060}]
+        ]
+    ],
+    "2060": [[
+            "add_choice",[{"value": 2061},{ "text": "%1l\"Nemohli bychom se bavit o něčem jiném?\", snažil[,a] se ze situace vybruslit %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2061": [[
+            "echo",[{ "text": "\"Ne,\" řekla socha uraženě a rozhovor skončil tak náhle jako začal."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2062": [[
+            "echo",[{ "text": "Po posledním rozhovoru se s vámi socha odmítá bavit."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2176": [[
+            "local_pgf",[{"value": 2176}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_SOCH.HI"}]
+        ],[
+            "add_desc",[{ "text": "Vešel jsi do sálu, kde při jedné stěně stojí ve výklencích pět soch a proti nim je na zdi zavěšeno pět velkých gongů. Od první chvíle, kdy jsi vstoupil, máš pocit, že sochy, byť nehybné, jsou živé. Nakonec jsi se rozhodl, že se s nimi pokusíš promluvit. Nyní stojíš u druhé sochy zprava."}]
+        ],[
+            "first_visited",[{"value": 2176}]
+        ],[
+            "goto_iff",[{"value": 2177}]
+        ],[
+            "goto_paragraph",[{"value": 2194}]
+        ]
+    ],
+    "2177": [[
+            "add_choice",[{"value": 2178},{ "text": "%1l\"Ehmm,\" odkašlal[,a] si %n s pocitem, že mluvit se sochou je stále něco nepřirozeného."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2178": [[
+            "echo",[{ "text": "\"No konečně,\" oddechla si socha. \"Už jsem si myslela, že tu budeme čekat na návštěvu dalších sto let.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2179}]
+        ]
+    ],
+    "2179": [[
+            "add_choice",[{"value": 2180},{ "text": "\"Tady asi nemíváte mnoho návštěv, že?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2180": [[
+            "echo",[{ "text": "%1l\"To jsi uhodl[,a]. Tak povídej, co se děje venku, co je nového,\" ptala se dychtivě socha."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2181}]
+        ]
+    ],
+    "2181": [[
+            "add_choice",[{"value": 2182},{ "text": "%1l\"Vlastně toho mnoho není,\" odpověděl[,a] %n. \"Všichni se postupně stěhují pryč a skoro celá země už je vylidněná.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2182": [[
+            "echo",[{ "text": "\"Děláš si legraci? A co slavnosti v Gowernigodu?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2183}]
+        ]
+    ],
+    "2183": [[
+            "add_choice",[{"value": 2184},{ "text": "%1l\"Nevím co myslíš?\" řekl[,a] %n. \"Co je Gowernigod?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2184": [[
+            "echo",[{ "text": "\"To je palác v... no v tom městě na jihu. Nemohu si teď honem vzpomenout jak se jmenuje.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2185}]
+        ]
+    ],
+    "2185": [[
+            "add_choice",[{"value": 2186},{ "text": "\"Aha, tak na jihu právě už nikdo nežije a léta se tam ani nikdo neodvážil.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2186": [[
+            "echo",[{ "text": "\"Ach,\" řekla socha a její kamenná tvář posmutněla."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2187}]
+        ]
+    ],
+    "2187": [[
+            "add_choice",[{"value": 2188},{ "text": "%1l\"Nemohli bychom se teď pro změnu na něco zeptat my?\" odvážil[,a] se %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2188": [[
+            "echo",[{ "text": "\"Ptejte se.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2189}]
+        ]
+    ],
+    "2189": [[
+            "add_choice",[{"value": 2190},{ "text": "\"Když jsme přišli, říkala jsi, že tady uběhnou celá staletí mezi návštěvami. To jsi tady tak dlouho?"}]
+        ],[
+            "add_choice",[{"value": 2191},{ "text": "\"Kdo jsi, kdo jsou ty ostatní sochy a co tu děláte?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2190": [[
+            "echo",[{ "text": "\"No ano, jsme tady už opravdu dlouho. Ani nevím jak vlastně dlouho. Samozřejmě, že nemusíme být celou dobu... \"vzhůru\", to bychom z toho zešíleli, ale i tak je dost velká nuda.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2192}]
+        ]
+    ],
+    "2191": [[
+            "echo",[{ "text": "\"Je mi líto, ale o tom máme zakázáno mluvit. Jediné, co ti snad mohu prozradit, je to, že všechny ostatní sochy jsou moje příbuzné.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2192}]
+        ]
+    ],
+    "2192": [[
+            "add_choice",[{"value": 2190},{ "text": "\"Když jsme přišli, říkala jsi, že tady uběhnou celá staletí mezi návštěvami. To jsi tady tak dlouho?"}]
+        ],[
+            "add_choice",[{"value": 2191},{ "text": "\"Kdo jsi, kdo jsou ty ostatní sochy a co tu děláte?\""}]
+        ],[
+            "add_choice",[{"value": 2193},{ "text": "\"Kdo vám zakázal mluvit o tom, kdo jste?\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Díky, to je všechno\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2193": [[
+            "echo",[{ "text": "\"I o tom máme zakázáno mluvit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2192}]
+        ]
+    ],
+    "2194": [[
+            "add_choice",[{"value": 2195},{ "text": "%1l\"Ahoj,\" oslovil[,a] sochu %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2195": [[
+            "echo",[{ "text": "%1l\"Ahoj,\" odpověděla socha."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2192}]
+        ]
+    ],
+    "2304": [[
+            "local_pgf",[{"value": 2304}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_SOCH.HI"}]
+        ],[
+            "add_desc",[{ "text": "Vešel jsi do sálu, kde při jedné stěně stojí ve výklencích pět soch a proti nim je na zdi zavěšeno pět velkých gongů. Od první chvíle, kdy jsi vstoupil, máš pocit, že sochy, byť nehybné, jsou živé. Nakonec jsi se rozhodl, že se s nimi pokusíš promluvit. Nyní stojíš u krajní pravé sochy."}]
+        ],[
+            "first_visited",[{"value": 2304}]
+        ],[
+            "goto_iff",[{"value": 2305}]
+        ],[
+            "goto_paragraph",[{"value": 2322}]
+        ]
+    ],
+    "2305": [[
+            "add_choice",[{"value": 2306},{ "text": "\"Přeji krásný nový den,\" začal[,a] %n sebejistě aby tak smetl ze stolu všechny případné dohady o tom, zda je normální bavit se s sochou."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2306": [[
+            "echo",[{ "text": "\"Ahoooj,\" prohlásila nadšeně socha. \"Tak ráda vás vidím.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2307}]
+        ]
+    ],
+    "2307": [[
+            "add_choice",[{"value": 2308},{ "text": "\"My už jsme se někdy viděli?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2308": [[
+            "echo",[{ "text": "\"Ne, to ne,\" řekla vesele socha. \"A záleží snad na tom? Hlavě, že se vidíme teď, ne? Mimochodem už jste viděli moje děti?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2309}]
+        ]
+    ],
+    "2309": [[
+            "add_choice",[{"value": 2310},{ "text": "\"Vaše děti?\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2310": [[
+            "echo",[{ "text": "\"No jistě, moje dvě dcery, moje radost, moje všecko. Měly by být napravo ode mě.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2311}]
+        ]
+    ],
+    "2311": [[
+            "add_choice",[{"value": 2312},{ "text": "\"Ach, jestli myslíte ty další sochy, tak...\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2312": [[
+            "echo",[{ "text": "\"Mimochodem, máte děti?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2313}]
+        ]
+    ],
+    "2313": [[
+            "add_choice",[{"value": 2314},{ "text": "\"No to těžko říct, ono se to vždycky tak nějak semele...\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2314": [[
+            "echo",[{ "text": "\"Rozhodně byste měl mít děti, to je to nejlepší co vás kdy může potkat..."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2315}]
+        ]
+    ],
+    "2315": [[
+            "add_choice",[{"value": 2316},{ "text": "\"Vážně?\" snažil[,a] se %n neztratit iniciativu. \"Víte my jsme sem, ale nepřišli kvůli...\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2316": [[
+            "echo",[{ "text": "\"Ta radost, když se narodí a jsou tak maličkatí...\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2317}]
+        ]
+    ],
+    "2317": [[
+            "add_choice",[{"value": 2318},{ "text": "\"My bychom totiž potřebovali...\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2318": [[
+            "echo",[{ "text": "\"...a když pak vyrůstají...\" pokračovala plynule socha zcela mimo tento svět."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2319}]
+        ]
+    ],
+    "2319": [[
+            "add_choice",[{"value": 2320},{ "text": "%1l%n zamával soše před kamennýma očima."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2320": [[
+            "echo",[{ "text": "\"...a batolí se, učí se první slůvka...\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2321}]
+        ]
+    ],
+    "2321": [[
+            "add_choice",[{"value": 32767},{ "text": "%1l%n vida, že se takhle se nikam nedostane, ukončil hovor."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2322": [[
+            "add_choice",[{"value": 32767},{ "text": "Socha je evidentně ochotná bavit se jen o svých dětech a na to nikdo z družiny nemá ani sílu ani náladu."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2432": [[
+            "local_pgf",[{"value": 2432}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_DRYA.HI"}]
+        ],[
+            "add_desc",[{ "text": "Za zlatou brankou se každého z družiny chopili dva páry rukou, rychle, ale pevně, vás spoutali a takto jste byli odvlečeni před krásnou ženu sedící na dřevěném trůnu pod prastarým stromem. Každému z vás věnovala nezúčastněný pohled jaký věnujete dobytčeti těsně před porážkou. Kromě nekonečného opovržení její tvář, která rozhodně nevypadala na věk své majitelky, pak neprozrazovala nic dalšího."}]
+        ],[
+            "first_visited",[{"value": 2432}]
+        ],[
+            "goto_iff",[{"value": 2433}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2433": [[
+            "echo",[{ "text": "\"Zabili jste mnoho mých dívek a stromů,\" pronesla a její slova se při tom táhla jako když popravčí utahuje smyčku. \"Dříve, než vás dám spoutané vhodit do termitiště, abyste alespoň po smrti byli něčemu užiteční, chci vědět, proč jste sem přišli."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2434}]
+        ]
+    ],
+    "2434": [[
+            "echo",[{ "text": "\"Proč se s nimi vůbec bavíš Loxeilo,\" namítla dryáda, která stála za trůnem. \"Měli bychom je hned zabít.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2435}]
+        ]
+    ],
+    "2435": [[
+            "echo",[{ "text": "\"NE!\" pravila královna a pozdvihla zamítavě pravici. \"Chci si je poslechnout. Svému trestu tak jako tak neujdou a já chci slyšet jak budou prosit o svůj život.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2436}]
+        ]
+    ],
+    "2436": [[
+            "add_choice",[{"value": 2438},{ "text": "%1l\"Vznešená královno,\" chopil[,a] se %n příležitosti. \"Věř mi, že do tvého lesa jsme nevstoupili s úmyslem zabíjet, ale chtěli jsme zde hledat pomoc.\""}]
+        ],[
+            "add_choice",[{"value": 2437},{ "text": "%2l\"Když jsme si poradili s vašimi družkami, poradíme si i s vámi,\" prohlásil[,a] %n a vytáhl[,a] zbraň."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2437": [[
+            "echo",[{ "text": "Dryády předstoupily před svou královnu aby ji tak kryly svými těly. Pozvedly své luky a každé se v ruce objevil šíp. Královna mezi tím zmizela kdesi v zeleni prastarého lesa. Bitka s dryádami je již nevyhnutelná, možná zvítězíš, možná že nepřežiješ, ale tvé dobrodružství je už teď v troskách. Bez přispění dryád své poslání nedokončíš."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "start_battle",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2438": [[
+            "echo",[{ "text": "\"Pomoc!?\" vykřikla zlobně dryáda stojící za královnou. \"Máte tu drzost vstoupit do našeho lesa, zabíjet naše sestry a ještě u nás hledat pomoc?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2439}]
+        ]
+    ],
+    "2439": [[
+            "add_choice",[{"value": 2440},{ "text": "%1l\"Nechtěli jsme nikoho zabít ani nikomu ublížit, ale nedali jste nám jinou možnost,\" namítl[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2440": [[
+            "echo",[{ "text": "\"Neměli jste do našeho lesa především vůbec vstupovat.\" prohlásila královna."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2441}]
+        ]
+    ],
+    "2441": [[
+            "has_item",[{"value": 143}]
+        ],[
+            "jump_not_iff",[{"value": 4}]
+        ],[
+            "add_choice",[{"value": 2443},{ "text": "\"Naše poslání nám nedává mnoho na výběr. Máme určitý   úkol a jeho plnění nás zavedlo až před tvůj trůn. Stejně   tak jako nás zavedlo k Druidům, od kterých vám přinášíme   tento posvátný strom.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ],[
+            "echo",[{ "text": "%1l\"Neměli jsme jinou možnost,\" hájil[,a] se %n."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2442}]
+        ]
+    ],
+    "2442": [[
+            "echo",[{ "text": "\"Pakliže je tohle jediná vaše odpověď,\" pravila královna. \"Pak jsme s vámi skončili.\" Lehce pokynula rukou. Na to dryády předstoupily před svou královnu aby ji tak kryly svými těly. Pozvedly své luky a každé se v ruce objevil šíp. Královna mezi tím zmizela kdesi v zeleni prastarého lesa. Bitka s dryádami je již nevyhnutelná, možná zvítězíš, možná že nepřežiješ, ale tvé dobrodružství je už teď v troskách. Bez přispění dryád své poslání nedokončíš."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "start_battle",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2443": [[
+            "echo",[{ "text": "Mezi shromážděnými dryádami to zašumělo. Pak se jejich královna naklonila z trůnu směrem k družině a řekla: \"Velmi mě překvapuje, že vidím tento posvátný strom ve vašich rukou, ale dávná tradice říká, že ten kdo přijde do našeho lesa s tímto stromem zasluhuje naši pomoc.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2444}]
+        ]
+    ],
+    "2444": [[
+            "echo",[{ "text": "Pak pokynula rukou směrem k nejbližší dryádě, ta odněkud vykouzlila pohár, jehož zlatá barva se zaleskla v poledním slunci. Vzala jej od dryády, vstala a grál vám podala."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2445}]
+        ]
+    ],
+    "2445": [[
+            "echo",[{ "text": "\"Tady je to, co od počátku věků vám bylo předurčeno a co jsme vám dnes měly předat. Jen z velké úcty k našim předkyním vás nyní ušetříme a dovolíme vám v klidu opustit les. Jděte a už se nikdy nevracejte.\" Na ta slova se od vás dryády odvrátily."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "destroy_item",[{"value": 143}]
+        ],[
+            "create_item",[{"value": 144}]
+        ],[
+            "add_to_story",[{ "text": "V lese dryád jsi se setkal s jejich královnou, která ti výměnou za posvátný strom dala grál."}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2446": [[
+            "echo",[{ "text": "Dryády ti daly grál, ale to je tak všechno co pro tebe mohou a hlavně chtějí udělat. Asi bude lépe je nedráždit a jít raději pryč."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2560": [[
+            "local_pgf",[{"value": 2560}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "picture",[{ "text": "DLG_DEMO.HI"}]
+        ],[
+            "add_desc",[{ "text": "Uprostřed Labyrintu zpívajících vod tvoje družina nalezla velmi starý oltář. Pomocí grimoáru z městské knihovny vyvolali tvoji mágové démona. Děs z jeho přítomnosti téměř paralyzoval celou družinu. Démon byl přivolán na tento svět proti své vůli a jeho vztek poutá pouze silné kouzlo grimoáru podpořené vůlí tvých mágů. Když démon poprvé promluvil, bylo to jako dotek smrti."}]
+        ],[
+            "test_flag",[{"value": 39}]
+        ],[
+            "goto_iff",[{"value": 32767}]
+        ],[
+            "first_visited",[{"value": 2560}]
+        ],[
+            "goto_iff",[{"value": 2561}]
+        ],[
+            "goto_paragraph",[{"value": 2561}]
+        ]
+    ],
+    "2561": [[
+            "echo",[{ "text": "\"Co ode mě chcete,\" zařval démon strašlivým hlasem jehož barva se pohybovala někde mezi řevem lva a zvukem padající gilotiny."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2562}]
+        ]
+    ],
+    "2562": [[
+            "add_choice",[{"value": 2563},{ "text": "%1lOchromení prvotním strachem překonal[,a] první %n, kter[ý,á] také přečetl[,a] grimoár, který démona vyvolal. Vzal[,a] si slovo a zvolal[,a] hlasem tak pevným jak [mu,ji] jen daná situace dovolovala: \"Vzývám tě ó stvoření temnot, jsem [tvůj,tvá] [pán,paní] a [vládce,vládkyně]. Tvůj život je v mých rukou, tak poslouchej má slova.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2563": [[
+            "echo",[{ "text": "Démon se nejprve zkroutil jako ve strašných mukách a pak zjevně proti své vůli řekl: \"Jsem tvůj sluha a poslouchám. Jaké je tvé přání, můj pane?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2564}]
+        ]
+    ],
+    "2564": [[
+            "add_choice",[{"value": 2565},{ "text": "%1l%n které[mu,] se vypětím na čele perlil pot, vyslovil[,a] svůj příkaz: \"Ó zplozenče pekla, přináším ti Věčný oheň, Srdce země, Větrné kladivo, Vodu z fontány královny Mithel a svitek myšlenky vítězství. Přikazuji ti vykovat z těchto ingrediencí Meč odplaty.\" %n se sice držel[,a] statečně, ale přesto se snažil svou řeč co nejvíce zkrátit."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2565": [[
+            "has_item",[{"value": 148}]
+        ],[
+            "jump_not_iff",[{"value": 25}]
+        ],[
+            "has_item",[{"value": 149}]
+        ],[
+            "jump_not_iff",[{"value": 22}]
+        ],[
+            "has_item",[{"value": 150}]
+        ],[
+            "jump_not_iff",[{"value": 19}]
+        ],[
+            "has_item",[{"value": 151}]
+        ],[
+            "jump_not_iff",[{"value": 16}]
+        ],[
+            "has_item",[{"value": 152}]
+        ],[
+            "jump_not_iff",[{"value": 13}]
+        ],[
+            "echo",[{ "text": "Démon se opět pokusil vymanit z mágova sevření, pak ale seznal, že jeho snažení, alespoň pro tentokrát, nemá smysl a jal se kovat. Věčným ohňem roztavil Srdce země a větrným kladivem vykoval čepel. Když měla čepel správný tvar, schladil ji Vodou z fontány královny Mithel a zpečetil tak její konečnou podobu. Jednoduchým kouzlem pak změnil Větrné kladivo v rukojeť meče a vložil do ní svitek myšlenky vítězství. Meč je hotov."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2566}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít vše co k tomu potřebujete.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít vše co k tomu potřebujete.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít vše co k tomu potřebujete.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít vše co k tomu potřebujete.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ],[
+            "echo",[{ "text": "\"Přijďte až budete mít vše co k tomu potřebujete.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2566": [[
+            "add_choice",[{"value": 2567},{ "text": "%1l\"A nyní ti pohůnku Samaelův naposledy poroučím,\" pronesl[,a] obřadně %n již zcela na pokraji svých sil, \"Vrať se tam odkud si přišel.\" Démon se naposledy pokusil prolomit se mágovou vůlí, ale pak se svět kolem něj zavlnil a on se strašlivým smíchem zmizel."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2567": [[
+            "add_choice",[{"value": 32767},{ "text": "%1l%n se svalil[,a] vyčerpán[,a] k zemi. Družina má co potřebuje a %n bude brzy zase v plné síle. Nyní můžeš vyrazit do Skeldalu a skoncovat navždy s odpadlými mágy."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2688": [[
+            "local_pgf",[{"value": 2688}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_MUZI.HI"}]
+        ],[
+            "add_desc",[{ "text": "V přístavu blízko moře jste, procházejíc po nábřeží, zaslechli nádhernou hudbu. Vycházela ze starého domu a zdálo se, jakoby vás zvuk staré loutny zval dál. Po chvíli váhání jste zaklepali a vešli. Na malé sesli seděl bard a vybrnkával na strunách onu čarovnou melodii, která vás přilákala dovnitř."}]
+        ],[
+            "first_visited",[{"value": 2688}]
+        ],[
+            "goto_iff",[{"value": 2689}]
+        ],[
+            "test_flag",[{"value": 36}]
+        ],[
+            "goto_iff",[{"value": 2699}]
+        ],[
+            "test_flag",[{"value": 35}]
+        ],[
+            "goto_iff",[{"value": 2700}]
+        ],[
+            "goto_paragraph",[{"value": 2699}]
+        ]
+    ],
+    "2689": [[
+            "echo",[{ "text": "\"Jen pojďte dál,\" řekl melodickým hlasem bard, když viděl tvou družinu rozpačitě postávat u dveří. \"A Posaďte se,\" dodal. "}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 34}]
+        ],[
+            "goto_paragraph",[{"value": 2690}]
+        ]
+    ],
+    "2690": [[
+            "add_choice",[{"value": 2691},{ "text": "%3l\"Slyšeli jsme tvou nádhernou píseň a nemohli jsme odolat, abychom nevstoupili a nepozdravili toho, kdo ji hraje,\" řekl[,a] na vysvětlenou %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2691": [[
+            "echo",[{ "text": "Bard se maličko usmál a pak přijal pochvalu s lehkostí někoho, kdo je zvyklý ji přijímat takřka denně: \"Děkuji.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2692}]
+        ]
+    ],
+    "2692": [[
+            "echo",[{ "text": "%2lPak začal znovu hrát a píseň byla stejně okouzlující jako ta předchozí. I jinak tvrd[ý,á] bojov[ník,nice] %n zjihl[,a] a beze spěchu se zaposlouchal[,a] do hudby."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2693}]
+        ]
+    ],
+    "2693": [[
+            "add_choice",[{"value": 2694},{ "text": "%3l\"No, nedá se nic dělat,\" prohlásil[,a], když bard dohrál svou píseň %n, \"ale budeme muset jít, musíme toho ještě mnoho vykonat.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2694": [[
+            "echo",[{ "text": "\"Já vím,\" řekl zcela nečekaně bard."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2695}]
+        ]
+    ],
+    "2695": [[
+            "add_choice",[{"value": 2696},{ "text": "Družina se na něj udiveně podívala."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2696": [[
+            "echo",[{ "text": "\"Vím o vašem poslání i o tom, kdo jej na vaše bedra naložil, co jste již vykonali a co vás ještě čeká,\" pokračoval vážně a náhle vypadal mnohem mnohem starší. \"Ani vy sami jste se u mě nezastavili náhodou.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2697}]
+        ]
+    ],
+    "2697": [[
+            "test_flag",[{"value": 35}]
+        ],[
+            "jump_not_iff",[{"value": 9}]
+        ],[
+            "echo",[{ "text": "\"Vidím, že jste už našli svého nového přítele Gralta, pak mi tedy zbývá už jen dát vám tento svatý symbol,\" při těch slovech vytáhl z jakési bedny zlatý kříž, \"který vám pomůže překonat některé nástrahy začarovaného lesa a také toto,\" opět vytáhl z bedny nový předmět, \"se vám bude v budoucnu hodit,\" řekl a podával jim onen předmět, který představovala sada malých trubiček seřazených od nejmenší po největší."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "create_item",[{"value": 48}]
+        ],[
+            "create_item",[{"value": 141}]
+        ],[
+            "set_flag",[{"value": 30}]
+        ],[
+            "set_flag",[{"value": 36}]
+        ],[
+            "goto_paragraph",[{"value": 2698}]
+        ],[
+            "echo",[{ "text": "\"Mám pro vás radu: Vydejte se do Soutěsky bloudících duší. Tam naleznete něco, co vám velmi pomůže.\" Pak vytáhl z jakési bedny předmět, který představovala sada malých trubiček seřazených od nejmenší po největší. \"Také toto se vám v budoucnu může velmi hodit.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "create_item",[{"value": 141}]
+        ],[
+            "set_flag",[{"value": 30}]
+        ],[
+            "goto_paragraph",[{"value": 2698}]
+        ]
+    ],
+    "2698": [[
+            "echo",[{ "text": "Po té se s nimi bard rozloučil a vyprovodil je před dům. Družina, která se ještě zcela nevzpamatovala z nevšedního zážitku, ani neprotestovala."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2699": [[
+            "echo",[{ "text": "Bard družinu opět vřele přivítal, nabídl jí židle a dal se do hraní. Jen velmi těžko se vám pak odcházelo vstříc novým dobrodružstvím."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2700": [[
+            "echo",[{ "text": "\"Vidím, že jste už našli svého nového přítele Gralta,\" přivítal je bard, \"nyní vás čeká další úkol a k jeho splnění budete potřebovat tento svatý symbol,\" při těch slovech vytáhl z bedny zlatý kříž, \"který vám pomůže překonat některé nástrahy začarovaného lesa.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 36}]
+        ],[
+            "create_item",[{"value": 48}]
+        ],[
+            "goto_paragraph",[{"value": 2701}]
+        ]
+    ],
+    "2701": [[
+            "add_choice",[{"value": 2702},{ "text": "%3l\"Dobrá,\" řekl[,a] %n kter[ého,ou] už tajemné chování jejich přítele začalo dráždit, \"ale stále nám jen dáváš jen rady a věci, které jsou sice velmi užitečné, ale nic nám nevysvětluješ.\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "%1l\"Děkujeme ti,\" řekl[,a] %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2702": [[
+            "echo",[{ "text": "\"A co byste chtěli vědět,\" usmál se bard."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2703}]
+        ]
+    ],
+    "2703": [[
+            "add_choice",[{"value": 2704},{ "text": "\"Kdo jsi?\""}]
+        ],[
+            "add_choice",[{"value": 2705},{ "text": "\"Proč nám pomáháš?"}]
+        ],[
+            "add_choice",[{"value": 2706},{ "text": "\"Jak to, že toho tolik víš o nás i o tom, co máme udělat?"}]
+        ],[
+            "add_choice",[{"value": 2707},{ "text": "\"Nemůžeš nám říci více o tom, co nás ještě čeká?"}]
+        ],[
+            "add_choice",[{"value": 2708},{ "text": "\"Děkujeme ti.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2704": [[
+            "echo",[{ "text": "\"Jmenuji se Nithi Ebet a jsem bard, můj otec byl bard a můj děd byl bard, máme to zkrátka v rodině.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2703}]
+        ]
+    ],
+    "2705": [[
+            "echo",[{ "text": "\"Stejně jako vám bylo souzeno abyste se pokusili vykonat určité věci, tak i mě bylo souzeno, abych vám při tom pomáhal.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2703}]
+        ]
+    ],
+    "2706": [[
+            "echo",[{ "text": "\"Vím, protože potřebuji vědět. Jak bych vám mohl pomoci, kdybych žil v nevědomosti?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2703}]
+        ]
+    ],
+    "2707": [[
+            "echo",[{ "text": "\"To já nevím a obávám se, že to neví nikdo. Výsledek, téhle hry není a ani nemůže být dopředu znám.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2703}]
+        ]
+    ],
+    "2708": [[
+            "echo",[{ "text": "Všichni z tvé družiny mají pocit, že přes vstřícné odpovědi, se nedozvěděli nic nového."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2816": [[
+            "local_pgf",[{"value": 2816}]
+        ],[
+            "nahodne_magie",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 1}]
+        ],[
+            "nahodne_sila",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 2}]
+        ],[
+            "nahodne_obrat",[{"value": 99},{"value": 0}]
+        ],[
+            "save_name",[{"value": 3}]
+        ],[
+            "picture",[{ "text": "DLG_ZENO.HI"}]
+        ],[
+            "add_desc",[{ "text": "Přes hory oddělující severní a jižní část ostrova existují dvě cesty. První je soutěska strážená Trollem strážcem blízko Caredbaru. Druhou cestou je lesní pěšina strážená mýtickým stvořením Zenoxem, napůl člověkem, napůl ptákem. Právě ve chvíli, kdy jsi se pokusil projít touto lesní cestou, zastoupil ti Zenox cestu."}]
+        ],[
+            "test_flag",[{"value": 38}]
+        ],[
+            "goto_iff",[{"value": 2835}]
+        ],[
+            "first_visited",[{"value": 2816}]
+        ],[
+            "goto_iff",[{"value": 2817}]
+        ],[
+            "goto_paragraph",[{"value": 2833}]
+        ]
+    ],
+    "2817": [[
+            "echo",[{ "text": "Pozdvihl pravici dlaní otočenou směrem k družině a pravil: \"Stát, dál ani krok.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2818}]
+        ]
+    ],
+    "2818": [[
+            "add_choice",[{"value": 2819},{ "text": "%2l\"Kdo jsi a proč nám chceš bránit v cestě,\" otázal[,a] se ostře %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2819": [[
+            "echo",[{ "text": "\"Jmenuji se Zenox,\" odpovědělo podivné stvoření \"a strážím tuto cestu.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2820}]
+        ]
+    ],
+    "2820": [[
+            "add_choice",[{"value": 2821},{ "text": "%2l\"My ale potřebujeme projít, tak nám ustup z cesty Zenoxi,\" nedal[,a] se %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2821": [[
+            "echo",[{ "text": "\"NE!\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2822}]
+        ]
+    ],
+    "2822": [[
+            "add_choice",[{"value": 2823},{ "text": "\"V tom případě se připrav na smrt a bojuj,\" řekl[,a] %n a při těch slovech celá družina vytáhla zbraně."}]
+        ],[
+            "add_choice",[{"value": 2824},{ "text": "%1l\"Není snad jiná možnost jak by jsi nám mohl umožnit cestu na druhou stranu?\" pokusil[,a] se %n."}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2823": [[
+            "start_battle",[]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "2824": [[
+            "echo",[{ "text": "\"Ano, taková možnost tu skutečně je,\" připustil Zenox. \"Pokud mi zodpovíte mou otázku, pak vám dovolím projít. \"Pokud však chybíte, pak zemřete. Chcete se snad pokusit?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2825}]
+        ]
+    ],
+    "2825": [[
+            "add_choice",[{"value": 2826},{ "text": "\"Dej nám tedy svou otázku Zenoxi.\""}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Raději si svou otázku nech pro sebe.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2826": [[
+            "echo",[{ "text": "\"Tak tedy dobrá, poslouchejte:\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2827}]
+        ]
+    ],
+    "2827": [[
+            "test_flag",[{"value": 37}]
+        ],[
+            "jump_not_iff",[{"value": 5}]
+        ],[
+            "echo",[{ "text": "\"S hlavou hrdě vztyčenou kráčí ve své vznešenosti. Duši čistou, přesto bojového ducha má. Člověk a zvíře v něm jedním jsou. I přes svou jedinečnost je dnes na vymření, ale má svou zem, ve které je ještě často k vidění. Kdo je ten, koho mám na mysli?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2831}]
+        ],[
+            "echo",[{ "text": "\"Je volný a přeci je spoután. Je každým okamžikem jinde a přeci stále na jednom místě. Měl snad desítky žen, ale láskou stále strádá. Zná každý kout světa a přeci svůj domov stále míjí. Má tisíce tváří a přeci je bez tváře. Kdo to je ten, koho jsem popsal?\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "set_flag",[{"value": 37}]
+        ],[
+            "goto_paragraph",[{"value": 2828}]
+        ]
+    ],
+    "2828": [[
+            "add_choice",[{"value": 2829},{ "text": "\"Bard.\""}]
+        ],[
+            "add_choice",[{"value": 2830},{ "text": "\"Námořník.\""}]
+        ],[
+            "add_choice",[{"value": 2829},{ "text": "\"Kurýr.\""}]
+        ],[
+            "add_choice",[{"value": 2829},{ "text": "\"Milovník."}]
+        ],[
+            "add_choice",[{"value": 2829},{ "text": "\"Herec.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2829": [[
+            "echo",[{ "text": "\"Chyba,\" řekl Zenox a nastala chvíle těžkého ticha. \"Ale vidím až na dno vašich duší a pro tentokrát vás nechám odejít. Nepokoušejte však své štěstí dvakrát.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2830": [[
+            "echo",[{ "text": "\"Správně.\" Zenox ustoupil a nechal vás projít."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "atsector",[{"value": 32},{"value": 8}]
+        ],[
+            "jump_not_iff",[{"value": 6}]
+        ],[
+            "teleport_group",[{"value": 12},{"value": 2}]
+        ],[
+            "jump",[{"value": 7}]
+        ],[
+            "teleport_group",[{"value": 8},{"value": 0}]
+        ],[
+            "set_flag",[{"value": 38}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2831": [[
+            "add_choice",[{"value": 2832},{ "text": "\"Rytíř.\""}]
+        ],[
+            "add_choice",[{"value": 2832},{ "text": "\"Jednorožec.\""}]
+        ],[
+            "add_choice",[{"value": 2830},{ "text": "\"Kentaur.\""}]
+        ],[
+            "add_choice",[{"value": 2832},{ "text": "\"Drak."}]
+        ],[
+            "add_choice",[{"value": 2832},{ "text": "\"Ty.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2832": [[
+            "echo",[{ "text": "\"Chyba,\" řekl Zenox a zaútočil."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "start_battle",[]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2833": [[
+            "echo",[{ "text": "\"Stát, dál ani krok,\" řekl ostře Zenox. \"Říkal jsem vám ať se této cestě raději vyhýbáte.\""}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "goto_paragraph",[{"value": 2834}]
+        ]
+    ],
+    "2834": [[
+            "add_choice",[{"value": 2826},{ "text": "%3l\"Dej nám svou otázku Zenoxi,\" opáčil[,a] %n."}]
+        ],[
+            "add_choice",[{"value": 2823},{ "text": "%2l\"Svou cestu si vybojujeme,\" prohlásil[,a] bojovně %n."}]
+        ],[
+            "add_choice",[{"value": 32767},{ "text": "\"Najdeme si tedy svou cestu jinde.\""}]
+        ],[
+            "dialog_select(0)",[]
+        ]
+    ],
+    "2835": [[
+            "echo",[{ "text": "Zenox ustoupil a nechal vás projít."}]
+        ],[
+            "dialog_select(1)",[]
+        ],[
+            "atsector",[{"value": 32},{"value": 8}]
+        ],[
+            "jump_not_iff",[{"value": 6}]
+        ],[
+            "teleport_group",[{"value": 12},{"value": 2}]
+        ],[
+            "jump",[{"value": 7}]
+        ],[
+            "teleport_group",[{"value": 8},{"value": 0}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2944": [[
+            "local_pgf",[{"value": 2944}]
+        ],[
+            "first_visited",[{"value": 2944}]
+        ],[
+            "goto_iff",[{"value": 2945}]
+        ],[
+            "goto_paragraph",[{"value": 32767}]
+        ]
+    ],
+    "2945": [[
+            "add_rune",[{"value": 1}]
+        ],[
+            "add_rune",[{"value": 2}]
+        ],[
+            "add_rune",[{"value": 3}]
+        ],[
+            "add_rune",[{"value": 4}]
+        ],[
+            "add_rune",[{"value": 5}]
+        ],[
+            "add_rune",[{"value": 6}]
+        ],[
+            "dialog_select_jump",[]
+        ]
+    ],
+    "32765": [[
+            "start_battle",[]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "32766": [[
+            "echo",[{ "text": "Z technických důvodu nelze tento příkaz implementovat použitímpravidel Jindrova scriptu. Je totiž nutné zadat ID číslo obchoduPoužij prosím příkaz 'start_shop(id)' před ukončením dialogu!"}]
+        ],[
+            "exit_dialog",[]
+        ]
+    ],
+    "32767": [[
+            "exit_dialog",[]
+        ]
+    ]
+}

@@ -35,10 +35,11 @@ public:
     void start(std::filesystem::path ddlpath);
     std::filesystem::path get_current_ddlpath() const;
     bool stop();
-    void teleport_to(std::string_view map, int sector, int dir);
+    void teleport_to(std::string_view map, int sector, int dir, int ghost_form_flag);
     void reload_map();
     void console_show(bool show);
     void console_exec(std::string_view cmd);
+    void test_dialog(int id);
 
 
 

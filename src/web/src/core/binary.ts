@@ -263,6 +263,8 @@ export class BinaryBuilder {
     toUint8Array(): Uint8Array {
         return this.#buf.subarray(0, this.#length);
     }
+
+    length() {return this.#length;}
 }
 
 export class BinaryWriter {
@@ -290,6 +292,10 @@ export class BinaryWriter {
                 }
             }
         }
+    }
+
+    length() {
+        return this.buffer.length();
     }
 
     write(schema:Schema, value:any)  {
@@ -378,9 +384,8 @@ export class BinaryWriter {
     }
 
     write_stringz(text : string) : void{
-        const encoder = new TextEncoder();
-        const encodedText = encoder.encode(text);
-        this.buffer.write(encodedText);
+        const bin = new Uint8Array(string2keybcs(text));
+        this.buffer.write(bin);
         this.buffer.write(0); // Append the encoded text followed by a null terminator
     }
 

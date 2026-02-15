@@ -3,7 +3,7 @@ import { HumanWearPlaceVariables } from "./character_structs";
 import { CharacterStatVariables, CharacterWeaponBonus, CharacterWeaponBonusVariables, type CharacterStats } from "./common_defs";
 import type { directions } from "./map_structs";
 
-const MAX_IDENTIFIERS = 32;
+export const MAX_IDENTIFIERS = 100;
 
 class DialogParagraphDef {
     header = {
@@ -61,8 +61,10 @@ function write_instruction(iter: BinaryWriter, instr: Instruction) {
         iter.write("uint8",2);
         iter.write("int16",instr.value);
     } else if ("text" in instr) {
+        const txt = instr.text ?? "";        
+        const cz = 
         iter.write("uint8",1);
-        iter.write("int16",instr.text);
+        iter.write_stringz(txt.substring(0,4000));
     } else  if ("variable" in instr) {
         iter.write("uint8",3);
         iter.write("int16",instr.variable);
@@ -99,6 +101,54 @@ export class DialogDef {
     }
 
     static instruction_table : Record<number, [string, number]>= {
+        1: ["stk_push",1],
+        2: ["stk_pop_var",1],
+        3: ["stk_del",0],
+        4: ["stk_copy",0],
+        5: ["stk_swap",0],
+        6: ["+",0],
+        7: ["-",0],
+        8: ["*",0],
+        9: ["/",0],
+        10: ["&&",0],
+        11: ["||",0],
+        12: ["==",0],
+        13: ["!=",0],
+        14: ["<",0],
+        15: [">",0],
+        16: ["<=",0],
+        17: [">=",0],
+        18: ["un-",0],
+        19: ["un!",0],
+        20: ["push iff",0],
+        21: ["pop iff",0],
+        22: ["speaker",2],
+        23: ["stk_push stat.",1],
+        24: ["stk_push equip.",1],
+        25: ["stk_push weapon_bonus.",1],
+        26: ["stk_push gender",0],
+        27: ["stk_push count_slots",0],
+        28: ["stk_push count_present",0],
+        29: ["speaker_xicht",1],
+        30: ["q_fact",1],
+        31: ["set_fact",1],
+        32: ["reset_fact",1],
+        33: ["teleport_char",3],
+        34: ["stk_push xicht",0],
+        35: ["stk_push sector",0],
+        36: ["change_music",1],
+        37: ["replace_monster",1],
+        38: ["replace_monsters",2],
+        39: ["replace_monsters_r",4],
+        40: ["cast_spell_enemy",1],
+        41: ["is_present",0],
+        42: ["stk_push money",0],
+        43: ["is_enemy_dialog",0],
+        45: ["get_lever",2],
+        46: ["load_level",3],
+        47: ["stk_push viewsector",0],
+        48: ["stk_push viewdir",0],
+        49: ["stk_push random",0],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -171,6 +221,7 @@ export class DialogDef {
         199: ["goto_var",1],
         200: ["drop_character",0],
         201: ["pc_xicht",1],
+        202: ["is_rune",1],
         518: ["set_flag",1],
         519: ["reset_flag",1],
         255: ["exit_dialog",0]
@@ -336,8 +387,8 @@ export interface DialogStory {
 }
 
 export type DialogIdentifierList = Record<string, {
-    read?: boolean,
-    write?: boolean
+    read?: [number, number],
+    write?: [number, number]
     slot: number;
 }>;
 
@@ -412,6 +463,25 @@ export class DialogManager {
     compile(consts: Record<string, DialogConstant> ) {
         const compiler = new DialogCompiler(this, consts);
         return compiler.compile();
+    }
+
+    generate_dat(instructions: Instruction[][]) {
+        const mwr = new BinaryWriter();
+        const datawr = new BinaryWriter();
+        const offsets : DialogParagraphDef[] = [];
+        const count_nodes = instructions.reduce(a=>a+1,0);
+        instructions.forEach((data, id)=>{
+            const pgf = new DialogParagraphDef;            
+            pgf.header={id:id,alt:id,second_visit:false,visited:false};
+            pgf.position = datawr.length() ;
+            offsets[id] = pgf;
+            data.forEach(instr=>write_instruction(datawr, instr));
+        });
+        mwr.write("uint32", count_nodes);
+        mwr.write("uint32", 0);
+        offsets.forEach(x=>mwr.write(x.getSchema(), x));
+        mwr.write_buffer(datawr.getBuffer());
+        return mwr.getBuffer();    
     }
 
 }
@@ -544,8 +614,8 @@ class DialogCompiler {
         for (const s in this.identifiers) {
             const iinfo = this.identifiers[s];
             this.used_slots.add(iinfo.slot);
-            iinfo.read = false;
-            iinfo.write = false;
+            delete iinfo.read;
+            delete iinfo.write;
         }
     }
 
@@ -564,8 +634,9 @@ class DialogCompiler {
 
     compile(): Instruction[][] {
 
+        let out;
         try {
-            return this.nodes.map(nd=>{
+            out = this.nodes.map(nd=>{
                 return this.compile_node(nd);
             })
         } catch (e) {
@@ -574,6 +645,11 @@ class DialogCompiler {
             if (loc) s = `story #${loc[0]}, node #${loc[1]}`;
             throw new DialogCompileError(loc, (e as Error).message + ` at ${s}`, e);
         }
+        for (const n in this.identifiers) {
+            const i = this.identifiers[n];
+            if (i.read && !i.write) throw new DialogCompileError(i.read, `Reference of undefined variable '${n}'` );
+        }
+        return out;
     }
 
     reg_id(s: string, assignment: boolean) {
@@ -584,7 +660,10 @@ class DialogCompiler {
             if (id == MAX_IDENTIFIERS)  this.compile_error(`Too many variables! There is limit for variable count: ${MAX_IDENTIFIERS} variable for whole adventure`);
             v = this.identifiers[s] = {slot: id};
         }
-        if (assignment) v.write = true; else v.read = true;
+        const loc = this.find_node_location(this.cur_node);
+        if (loc) {
+            if (assignment) v.write = loc; else v.read = loc;
+        }
         return v.slot;
     }
 
@@ -689,37 +768,50 @@ class DialogCompiler {
                     }
                 }
             }            
+            let text = b.text ?? "";
             if (b.speaker) {
-                brnch.push({value:132}); //load_name;
-                brnch.push({value:b.speaker});
+                text = `%${b.speaker}l` + text;
             }
             //todo špatný target
             const target =this.node_id_from_target(nd, b.target);
             switch (b.type) {
                 case DialogBranchType.addstory:
                     brnch.push({value:162}); //add to story                                        
-                    brnch.push({text:b.text});
-                    brnch.push({value:139}); //goto paragraph;
-                    brnch.push({value:target});                    
+                    brnch.push({text:text});
+                    if (target == 0) {
+                        brnch.push({value:255}); ///exit
+                    } else {
+                        brnch.push({value:139}); //goto paragraph;
+                        brnch.push({value:target});                    
+                    }
                     break;
                 case DialogBranchType.choice:
                     brnch.push({value:142}); //add choice
                     brnch.push({value:target})
+                    brnch.push({text:text});
                     break;
                 case DialogBranchType.jump_to_node:
-                    brnch.push({value:139}); //goto paragraph;
-                    brnch.push({value:target});         
+                    if (target ) {
+                        brnch.push({value:139}); //goto paragraph;
+                        brnch.push({value:target});         
+                    } else {
+                        brnch.push({value:255}); ///exit
+                    }
                     break;
                 case DialogBranchType.npctalk:
                     brnch.push({value:148});
-                    brnch.push({text:b.text});
-                    brnch.push({value:144});
-                    brnch.push({value:139})
-                    brnch.push({value:target})
+                    brnch.push({text:text});
+                    brnch.push({value:164});
+                    if (target) {
+                        brnch.push({value:139})
+                        brnch.push({value:target})
+                    } else {
+                        brnch.push({value:255}); ///exit
+                    }
                     break;
                 case DialogBranchType.selchar:
                     brnch.push({value:175}); //ask who
-                    brnch.push({text: b.text})
+                    brnch.push({text: text})
                     brnch.push({value:0}); //no jump
                     brnch.push({value:141}); //if !iff goto paragraph
                     brnch.push({value:target});         
@@ -727,7 +819,7 @@ class DialogCompiler {
                 case DialogBranchType.seldead:
                     brnch.push({value:189}); //select dead
                     brnch.push({value:175}); //ask who
-                    brnch.push({text: b.text})
+                    brnch.push({text: text})
                     brnch.push({value:0}); //no jump
                     brnch.push({value:141}); //if !iff goto paragraph
                     brnch.push({value:target});         
@@ -750,9 +842,9 @@ class DialogCompiler {
             case DlgNodeType.battle:
                 out.push({value:157});  //start_battle
                 break;
-            case DlgNodeType.standard:
+            default:
                 if (nd.branches.length) {
-                    out.push({value:164});  //dialog select
+                    out.push({value:144});  //dialog select
                     return;
                 }
                     

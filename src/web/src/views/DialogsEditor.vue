@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { server, type ModifiedFileNotify } from '@/core/api';
-import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant, DlgNodeType} from '@/core/dialog_structs';
+import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant, DlgNodeType, DialogCompileError, MAX_IDENTIFIERS} from '@/core/dialog_structs';
 import { SVGPath } from '@/utils/svg';
 import { computed, reactive, ref,watch } from 'vue';
 import noimage from '@/assets/noimage.svg'
@@ -37,6 +37,7 @@ function load_dialogy() {
                 if (save_state) save_state.set_changed(false);
             })
             current_index.value = null;
+            delay_compile();
     });
 }
 
@@ -68,11 +69,12 @@ async function save_all() {
     const bin = enc.encode(json_data);
     ignore_modified = true;
     await server.putDDLFile("DIALOGY.JSON", bin.buffer, AssetGroup.MAPS);    
-    console.log(dialogs.compile(facts.value.getAllFacts().reduce((a,b)=>{
-            a[b.key] = {value:b.id, desc:b.description};
-            return a;
-        },{} as Record<string, DialogConstant>)
-    ));
+    const code = compile_code(true);
+    if (code !== null) {
+        const bin = dialogs.generate_dat(code);
+        await server.putDDLFile("DIALOGY.DAT", bin, AssetGroup.MAPS);
+        StatusBar.invoke_reload();
+    }
 }
 
 watch(()=>props.active,()=>{
@@ -84,7 +86,7 @@ watch(()=>props.active,()=>{
             StatusBar.register_save_control().then(s=>{
                 save_state = s ;
                 save_state.on_save(save_all);
-                save_state.on_revert(load_dialogy);
+                save_state.on_revert(load_dialogy);                
             });
         }
         image_list =  create_datalist(async ()=>{
@@ -98,8 +100,66 @@ watch(()=>props.active,()=>{
     }
 })
 
-watch(dialogs, ()=>{
+interface CompileReport {    
+    is_error?: boolean;
+    not_referenced?:[string, number, number][];
+    stories?: number;
+    nodes?: number;
+    instructions?: number;
+    variables?: number;
+    error_message?: string;
+    error_location?: [number, number];
+}
+
+const compile_report = reactive<CompileReport>({});
+
+
+function compile_code(cleanup: boolean) {
+    try {
+        Object.keys(compile_report).forEach(x=>delete (compile_report as Record<string, any>)[x]);
+        const code = dialogs.compile(facts.value.getAllFacts().reduce((a,b)=>{
+            a[b.key] = {value:b.id, desc:b.description};
+            return a;
+        },{} as Record<string, DialogConstant>));
+        const unused_identifiers = Object.entries(dialogs._identifiers)
+            .filter(x=>!x[1].read && !x[1].write)
+            .map(x=>x[0]);
+        compile_report.not_referenced = Object.entries(dialogs._identifiers)
+            .filter(x=>!x[1].read && x[1].write)
+            .map(x=>[x[0],x[1].write![0],x[1].write![1]]);
+        
+        compile_report.is_error = false;
+        if (cleanup ) {
+            unused_identifiers.forEach(x=>delete dialogs._identifiers[x]);            
+        }
+        compile_report.stories = Object.keys(dialogs._dlg).length;
+        compile_report.nodes = code.reduce((a)=>a+1,0);
+        compile_report.instructions = code.reduce((a,b)=>a+b.length,0);
+        compile_report.variables = Object.keys(dialogs._identifiers).length;
+        return code;
+    } catch (e) {
+        const err = e as DialogCompileError;
+        compile_report.is_error = true;
+        compile_report.error_message = err.message
+        if (err.location) {
+            compile_report.error_location= err.location;
+        } else {
+            delete compile_report.error_location;
+        }
+        return null;
+
+    }
+}
+
+let delay_compile_tm : number|null|NodeJS.Timeout = null;
+function delay_compile() {
+    if (delay_compile_tm !== null) clearTimeout(delay_compile_tm);
+    delay_compile_tm = setTimeout(()=>compile_code(false), 1000);
+}
+
+watch(()=>dialogs._dlg, ()=>{
     if (save_state) save_state.set_changed(true);    
+    delay_compile();
 },{deep:true})
 
 
@@ -448,11 +508,9 @@ watch(cur_story, ()=>{
 },{deep:true})
 
 watch(current_index, ()=>{
-    if (typeof current_index.value == "number") {
-//        cur_story.value =  dialogs._dlg[current_index.value];
-    } else {
-        return null;
-    }
+    let s = current_index.value;
+    if (s !== null) s = s * 128;
+    StatusBar.set_current_dialog(s);
     edit_focus.value={};
 });
 
@@ -730,6 +788,18 @@ watch(shop_list, async ()=>{
     }
 })
 
+const isEditingCode = ref(false);
+
+function focus_loc(story?: number, node?: number) {
+    if (story === undefined || node === undefined) return;
+    current_index.value = story;
+    setTimeout(()=>{
+        edit_focus.value.node = node;
+        edit_focus.value.dlg = story;
+    }, 10);
+}
+
+
 </script>
 <template>
 <x-workspace :hidden="!active">
@@ -816,7 +886,7 @@ watch(shop_list, async ()=>{
                          <button @click="delete_node">Delete node</button>                                
                         </div></div>
                         <label><span>Name (not visible)</span><input type="text" v-model="selected_node.name"></label>                        
-                        <label><span>Action (code)</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_node.action"/></label>
+                        <label><span>Action (code)</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_node.action" @focus="isEditingCode=true" @blur="isEditingCode=false"/></label>
                         <label><span>Description (optional, visible)</span><textarea type="text" rows="3"
                             :value="selected_node.description ??''"
                             @change="ev=>update_optional_field(ev,dialogs._dlg[edit_focus.dlg!].nodes[edit_focus.node!],'description')"
@@ -833,7 +903,7 @@ watch(shop_list, async ()=>{
                     <x-section-title>Edit condition: {{ selected_condition.name }}</x-section-title>
                     <x-form>                        
                         <label><span>Name</span><input type="text" v-model="selected_condition.name"></label>
-                        <label><span>Code</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_condition.content"/></label>
+                        <label><span>Code</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_condition.content" @focus="isEditingCode=true" @blur="isEditingCode=false"/></label>
                         <div class="label"><span>NOTE: A change is applied everywhere the modified condition is used in the current story</span>
                             <div class="more">
                                 <button @click="save_condition" :disabled="!selected_condition.name">Save & Apply</button>
@@ -905,7 +975,7 @@ watch(shop_list, async ()=>{
                     <x-section-title>Nothing selected</x-section-title>
                 </x-section>
             </template>
-            <x-section v-if="code_editor_el">
+            <x-section v-if="(code_editor_el && !compile_report.is_error) || isEditingCode">
                 <x-section-title>Constants</x-section-title>
                 <div class="list">
                     <input type="search" v-model="constant_filter">
@@ -925,8 +995,32 @@ watch(shop_list, async ()=>{
                         <button @click="showFactDlg = true">Edit facts</button>
                     </div>                    
                 </div>
+            </x-section>            
+            <x-section v-else class="cstat">
+                <x-section-title>Compile status</x-section-title>
+                <div v-if="compile_report.is_error" class="error" @click="focus_loc(compile_report.error_location![0], compile_report.error_location![1])">
+                    <div><div>Status</div>
+                    <div>ERROR</div></div>
+                    <div><div>Message</div>
+                    <div :class="{haveloc: !!compile_report.error_location}"> {{ compile_report.error_message }}</div></div>
+                </div>
+                <div v-else class="success">
+                    <div><div>Status</div>
+                    <div>Success</div></div>
+                    <div><div>Count stories</div>
+                    <div> {{ compile_report.stories }} / 127</div></div>
+                    <div><div>Count nodes</div>
+                    <div> {{ compile_report.nodes }} / 32767</div></div>
+                    <div><div>Count instructions</div>
+                    <div> {{ compile_report.instructions }}</div></div>
+                    <div><div>Count variables</div>
+                    <div> {{ compile_report.variables }} / {{ MAX_IDENTIFIERS }}</div></div>
+                    <div v-if="compile_report.not_referenced?.length"><div class="warning">Warnings</div>
+                    <div><div v-for="v of compile_report.not_referenced" class="warning haveloc" @click="focus_loc(v[1],v[2])" >
+                        Unused variable: {{ v[0] }}
+                    </div></div></div>
+                </div>                
             </x-section>
-            <div v-else></div>
         </div>
     </div>
 
@@ -1211,6 +1305,40 @@ dialog input[type=number] {width:5rem;text-align: center;}
 
 table.consts td:nth-child(3) {
     white-space: nowrap;
+}
+
+.cstat > div > div {
+    display:flex;
+}
+.cstat > div > div > div:first-child::after {
+    content: ":";
+}
+.cstat > div > div > div:first-child {
+    width: 9rem;
+    flex-shrink: 0;
+}
+
+
+.cstat .error {
+    padding: 1rem;
+    color: rgb(174, 82, 82);
+    font-size: 1.2rem;
+}
+.cstat .success {
+    padding: 1rem;
+    color: green;    
+}
+.cstat .success > div > div:last-child {
+    font-size: 1.2rem;
+}
+
+.cstat .success .warning {
+    color: rgb(158, 85, 36);
+}
+
+.haveloc {
+    cursor: pointer;
+    text-decoration: underline;
 }
 
 </style>

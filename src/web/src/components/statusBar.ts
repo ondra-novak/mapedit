@@ -9,6 +9,7 @@ export interface IGameClientControl {
     stop:() =>void;
     reload:()=>void;
     teleport_to:(map_name: string, sector: number, side: number, flags: TeleporToFlags)=>void;
+    test_dialog:(id: number) => void;
     configure:()=>void;
 };
 
@@ -28,11 +29,13 @@ export interface IStatusBar {
     set_map_switch: (name: string, on_click: ()=>void)=>void;  
     register_game_client_cntr: (ifc: IGameClientControl)=>void;
     set_current_sector:(sector: number, side: number, map_save_cb: ()=>Promise<boolean>)=> void;
+    set_current_dialog:(node: number|null)=>void;
     unset_current_sector:()=>void;
     update_connect_status:(status:boolean)=>void;
     update_client_status:(status:boolean)=>void;        
     stop_game:()=>void;
     invoke_teleport:()=>void;
+    invoke_reload:()=>void;
 };
 
 function create_promise() {
@@ -100,6 +103,12 @@ class StatusBar {
     }
     static invoke_teleport() {
         return conn.promise.then(st=>st.invoke_teleport());
+    }
+    static invoke_reload() {
+        return conn.promise.then(st=>st.invoke_reload());
+    }
+    static set_current_dialog(id: number|null) {
+        return conn.promise.then(st=>st.set_current_dialog(id));
     }
 
 };

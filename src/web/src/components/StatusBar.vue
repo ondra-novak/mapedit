@@ -146,6 +146,8 @@ type Location = {
     map_save_cb: ()=>Promise<boolean>;    
 }
 
+const current_dialog = ref<number|null>(null);
+
 
 const location = ref<Location>();
 
@@ -202,6 +204,15 @@ function invoke_teleport() {
         teleport();
     }
 }
+function invoke_reload() {
+    if (client_status.value) {
+        reload_client();
+    }
+}
+
+function set_current_dialog(id : number|null ){
+    current_dialog.value = id;
+}
 
 onMounted(()=>{
     StatusBar.attach_component({
@@ -215,6 +226,8 @@ onMounted(()=>{
         update_client_status,
         stop_game: stop_client,
         invoke_teleport,
+        invoke_reload,
+        set_current_dialog
     })
 })
 
@@ -228,13 +241,16 @@ function stop_client() {
 function reload_client() {
     const gcc = game_client_cntr.value;
     const lc = location.value;
-    const cm = current_map.value;
-    if (gcc && lc && cm) {
-        lc.map_save_cb().then(cont=>{
-            if (cont) {
-                gcc.reload();
-            }
-        });
+    if (gcc) {
+        if (lc) {
+            lc.map_save_cb().then(cont=>{
+                if (cont) {
+                    gcc.reload();
+                }
+            });
+        } else {
+            gcc.reload();
+        }
     }
 }
 
@@ -278,6 +294,13 @@ function show_confirm() {
     },50);
 }
 
+function test_dialog() {
+    const id = current_dialog.value;
+    if (id === null) return;
+    if (!game_client_cntr.value) return;
+    game_client_cntr.value.test_dialog(id);
+}
+
 function gear_clicked() {
     if (game_client_cntr.value) {
         game_client_cntr.value.configure();        
@@ -307,6 +330,7 @@ watch(connect_status, ()=>{
                     <div><button @click="reload_client">Reload</button></div>
                     <div><button @click="teleport" :disabled="!location || !current_map">Teleport</button></div>
                     <div><label><input type="checkbox" v-model="ghost_form">Ghost form</input></label></div>
+                    <div><button @click="test_dialog" :disabled="current_dialog == null">Test dialog</button></div>
                 </template>
                 <template v-else>
                     <div>

@@ -101,6 +101,7 @@ protected:
     void ws_preview_start(const WsRpc::Request &req);
     void ws_preview_stop(const WsRpc::Request &req);
     void ws_preview_teleport(const WsRpc::Request &req);
+    void ws_preview_test_dialog(const WsRpc::Request &req);
     void ws_preview_reload(const WsRpc::Request &req);
     void ws_preview_console_show(const WsRpc::Request &req);
     void ws_preview_console_exec(const WsRpc::Request &req);
@@ -137,6 +138,7 @@ protected:
         {"preview_stop",&WebInterface::ws_preview_stop},
         {"preview_teleport",&WebInterface::ws_preview_teleport},
         {"preview_reload",&WebInterface::ws_preview_reload},
+        {"preview_test_dialog",&WebInterface::ws_preview_test_dialog},
         {"preview_console_show",&WebInterface::ws_preview_console_show},
         {"preview_console_exec",&WebInterface::ws_preview_console_exec},
         {"publish.status", &WebInterface::ws_publish_status},

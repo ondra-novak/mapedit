@@ -159,8 +159,11 @@ export class ApiClient extends WsRpcClient{
         return (await this.call("preview_console_exec",[cmd],[])).data;
     }
 
-    async game_client_teleport(map: string, sector: number, side: number) : Promise<boolean> {
-        return (await (this.call("preview_teleport",[{map,sector,side}],[]))).data;
+    async game_client_teleport(map: string, sector: number, side: number,ghost:number) : Promise<boolean> {
+        return (await (this.call("preview_teleport",[{map,sector,side,ghost}],[]))).data;
+    }
+    async game_client_test_dialog(id: number) : Promise<boolean> {
+        return (await (this.call("preview_test_dialog",[id],[]))).data;
     }
 
     async set_current_ddl(ddl: string) {
