@@ -23,12 +23,7 @@ Assignment
   return node(":=" , left, right);
 } / Expression
 
-Expression = Comparison
-
-Comparison 
-  = left:LogicalAnd _ op:("<" / ">" / "<=" / ">=" / "==" / "!=" ) _ right: Comparison {
-  	return node( op, left, right);
-  } / LogicalOr
+Expression = LogicalOr
 
 LogicalOr
   = left:LogicalAnd _ "||" _ right:LogicalOr {
@@ -37,10 +32,15 @@ LogicalOr
   / LogicalAnd
 
 LogicalAnd
-  = left:Additive _ "&&" _ right:LogicalAnd {
+  = left:Comparison _ "&&" _ right:LogicalAnd {
       return node( "&&", left, right);
     }
-  / Additive
+  / Comparison
+
+Comparison 
+  = left:Additive _ op:( "<=" / ">=" / "==" / "!=" / "<" / ">" ) _ right: Additive {
+  	return node( op, left, right);
+  } / Additive
 
 Additive
   = left:Multiplicative _ op:("+" / "-") _ right:Additive {
@@ -60,9 +60,9 @@ Primary
   / Identifier
   / "(" _ a:Expression _ ")" {return a;}
   / "{" _ a:Sequence _ "}" {return a;}
-  / "+" _ a:Number  {return a;}
-  / "!" _ a:Number  {return node("!", arg);}
-  / "-" _ arg:Number {return node("--", arg); }
+  / "+" _ a:Primary  {return a;}
+  / "!" _ arg:Primary  {return node("!", arg);}
+  / "-" _ arg:Primary {return node("--", arg); }
 
 Call
   = name:Identifier _ "(" _ args:Arguments? _ ")" {

@@ -3,6 +3,7 @@ import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray
 import { StringList1, StringList3 } from "./common_defs";
 import { string2keybcs } from "./keybcs2";
 import Hive from "@/utils/hive";
+import type { TranslateTable } from "./translate";
 
 
 export const ItemSchema : Schema =  {
@@ -226,6 +227,8 @@ TYP_PENIZE: 11,
 TYP_SVITXT: 12,
 TYP_PRACH: 13,
 TYP_OTHER: 14,
+TYP_DLGPICK: 15,
+TYP_DLGUSE: 16,
 } as const;
 
 export const ItemTypeName: string[] = [
@@ -243,7 +246,9 @@ export const ItemTypeName: string[] = [
 	[ItemType.TYP_PENIZE, "Money"],
 	[ItemType.TYP_SVITXT, "Book Page"],
 	[ItemType.TYP_PRACH, "Dust"],
-	[ItemType.TYP_OTHER, "Other"]
+	[ItemType.TYP_OTHER, "Other"],
+    [ItemType.TYP_DLGPICK, "Dialog on pick"],
+    [ItemType.TYP_DLGUSE, "Dialog on use"]
 ].reduce<string[]>((a, b) => {
 	a[b[0] as number] = b[1] as string;
 	return a;
@@ -298,3 +303,17 @@ export const WeaponTypeName = [
 ]
 
 
+export function enemy_generate_translation(e: ItemHive, tbl: TranslateTable) {
+    const target = tbl.openFile("item")
+    e.forEach((x, idx)=>{
+        target.store(`${idx}:n`, x.jmeno);
+        target.store(`${idx}:d`, x.popis)
+    });
+}
+export function enemy_translate(e: ItemHive, tbl: TranslateTable) {
+    const target = tbl.openFile("item")
+    e.forEach((x, idx)=>{
+        x.jmeno = target.translate(`${idx}:n`, x.jmeno);
+        x.popis = target.translate(`${idx}:d`, x.popis);    
+    });
+}

@@ -73,7 +73,7 @@ export const CharacterStatsNames = [
 export function make_identifiers(prefix: string, list:readonly string[]) {
     const out : Record<string, number> = {};
     for (let i = 0; i < list.length; ++i) {
-        const n = CharacterStatsNames[i];
+        const n = list[i];
         if (typeof n == "string") {
             const m = n.toLowerCase().replace(/[^a-z0-9]/g, "_");
             const s =  `${prefix}${m}`;

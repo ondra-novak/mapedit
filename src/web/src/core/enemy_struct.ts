@@ -1,5 +1,6 @@
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, parseSection, splitArrayBuffer, writeSection, type Schema, type SchemaObject, type SchemaType } from "./binary";
 import Hive from '@/utils/hive'
+import type { TranslateTable } from "./translate";
 
 
 const MOBS_INV = 16;
@@ -286,3 +287,12 @@ export const EnemySounds = {
     "MBS_ATTACK": 1,
     "MBS_HIT": 2
 } as const;
+
+export function enemy_generate_translation(e: Enemies, tbl: TranslateTable) {
+    const target = tbl.openFile("enemy")
+    e.forEach((x, idx)=>target.store(`${idx}`, x.name));
+}
+export function enemy_translate(e: Enemies, tbl: TranslateTable) {
+    const target = tbl.openFile("enemy")
+    e.forEach((x, idx)=>{x.name = target.translate(`${idx}`, x.name);});
+}

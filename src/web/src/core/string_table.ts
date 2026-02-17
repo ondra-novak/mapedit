@@ -1,6 +1,7 @@
 import { server } from "./api";
 import { AssetGroup } from "./asset_groups";
 import { enc2string, keybcs2string, string2keybcs } from "./keybcs2";
+import type { TranslateTable } from "./translate";
         
 export function parse_stringtable(txt:string) : string[] {
     return txt.split('\n').map(x=>x.trim())
@@ -18,6 +19,18 @@ export function parse_stringtable(txt:string) : string[] {
             },[] as string[]);        
 }
 
+export function stringtable_generate_translation(name: string, stbl: string[], ttbl: TranslateTable) {
+    const t = ttbl.openFile(name);
+    stbl.forEach((x,idx)=>t.store(`${idx}`, x));
+}
+
+export function stringtable_translation(name: string, stbl: string[], ttbl: TranslateTable) {
+    const t = ttbl.openFile(name);
+    stbl.forEach((_,idx)=>{
+        const v = t.translate(`${idx}`, "");
+        if (v) stbl[idx] = v;
+    });
+}
 
 export function serialize_stringtable(ss:string[]) :string{
     const out = ss.reduce((a,txt,idx)=>{

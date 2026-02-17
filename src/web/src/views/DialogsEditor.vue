@@ -2,7 +2,7 @@
 import { server, type ModifiedFileNotify } from '@/core/api';
 import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant, DlgNodeType, DialogCompileError, MAX_IDENTIFIERS} from '@/core/dialog_structs';
 import { SVGPath } from '@/utils/svg';
-import { computed, reactive, ref,watch } from 'vue';
+import { computed, h, reactive, ref,watch } from 'vue';
 import noimage from '@/assets/noimage.svg'
 import HIFormat from '@/core/hiformat';
 import { create_datalist, type DataListHandle } from '@/utils/datalist';
@@ -18,6 +18,9 @@ import type { WsRpcResult } from '@/core/wsrpc';
 import FactEditor from '@/components/FactEditor.vue';
 import DlgConstsEditor from '@/components/DlgConstsEditor.vue';
 import { shopsFromArrayBuffer } from '@/core/shop_structs';
+import DelayLoadedList from '@/components/DelayLoadedList.vue';
+import getGlobalShops from '@/utils/global_shop_list';
+import HexView from '@/components/HexView.vue';
 
 const dialogs = reactive(new DialogManager);
 let inited = false;
@@ -317,13 +320,13 @@ function center_layout_vertically(layout: Layout): void {
     });
 }
 const node_base_height = 1;
-const node_initial_offset = 8;
+const node_initial_offset = 7;
 
-function create_layout2(story: DialogStory, level_mult:number[] = []) : Layout{
+function create_layout2(story: DialogStory, positions:number[] = []) : Layout{
     const nodes: NodeLayout = [];
     const vias: ViaList = [];
     const arrows: Arrows = [];
-    const alloc: number[] = [node_initial_offset];
+    const alloc: number[] = [];
     const refs: Record<number, Node> = {};
     const tree = DAG_to_tree(story.nodes,0,[0]);
     const level_map = tree_to_LevelMap(tree);
@@ -332,6 +335,7 @@ function create_layout2(story: DialogStory, level_mult:number[] = []) : Layout{
     const queue:(Node|Via)[] = [];    
 
     function add_node(nd: number, level: number, pos: number) {
+        if (pos < positions[nodes.length]) pos = positions[nodes.length];
         const cur_offset = Math.max(alloc[level] || 0, pos);
         const node = story.nodes[nd];
         const height = node_base_height + node.branches.length;
@@ -353,7 +357,7 @@ function create_layout2(story: DialogStory, level_mult:number[] = []) : Layout{
 
     function add_route(cur_level:number, target: number, offset:number, from_via: boolean) {
         const tlevel = level_map[target];
-        const toffset = from_via?offset:((offset-1) / (level_mult[cur_level] ?? 1))*(level_mult[cur_level+1] ?? 1);
+        const toffset = from_via?offset:(offset-2);
         if (tlevel !== undefined) {
             if (tlevel == cur_level+1) {
                 const tref = refs[target];
@@ -420,8 +424,9 @@ function create_layout2(story: DialogStory, level_mult:number[] = []) : Layout{
         }
     }
 
-    add_node(0, level_map[0], node_initial_offset);
-    
+    add_node(0, level_map[0], 0);
+
+      
     while (queue.length) {
         const cur = queue.shift()!;
         const selected_node = cur as Node;
@@ -442,11 +447,12 @@ function create_layout2(story: DialogStory, level_mult:number[] = []) : Layout{
 
     const unused = Object.fromEntries(Object.keys(story.nodes).map(x=>[x,true]));
     for (const k in level_map) delete unused[k];
+    const cnt_levels = alloc.length;
 
     let rmp1 : Record<number, number> = {};
     let rmp2 : Record<number, number> = {};
-    level_mult.forEach((x,idx)=>{
-        
+    for (let idx = 0; idx < cnt_levels;++idx) {
+
         arrows.forEach(a=>{
             if (a.backward && a.from_level == idx) {
                 if (rmp1[a.from_offset] !== undefined) {
@@ -467,7 +473,7 @@ function create_layout2(story: DialogStory, level_mult:number[] = []) : Layout{
         })
         rmp1 = rmp2;
         rmp2 = {};
-    });
+    }
 
 
     const fl : Layout = {nodes,vias,arrows, unused};
@@ -486,17 +492,19 @@ function create_layout(story: DialogStory) {
         level_max_offsets[n.level] = max;
     });
     
-    layout.vias.forEach(v => {
+/*    layout.vias.forEach(v => {
         const max = Math.max(level_max_offsets[v.level] ?? 0, v.offset + 1);
         level_max_offsets[v.level] = max;
-    });
+    });*/
     
     // Find global max to center around
     const global_max = Math.max(...level_max_offsets);
+    const positions = layout.nodes.map(x=>x.level<2?node_initial_offset:
+        ((x.offset+x.height/2) * global_max/(level_max_offsets[x.level]))-x.height);
 
     const mults = level_max_offsets.map(x=>x?global_max/x:1);
 
-    return create_layout2(story, mults);
+    return create_layout2(story,positions);
 }
 
 const diagram = ref<Layout>();
@@ -668,7 +676,7 @@ async function delete_branch() {
         const d = dialogs._dlg[f.dlg];
         const n = d.nodes[f.node];
         const b = n.branches;
-        b.splice(f.branch);        
+        b.splice(f.branch,1);        
         n.branches = b.slice();
         f.branch = undefined;
     }
@@ -772,21 +780,6 @@ function insert_const(s:string) {
     }
 }
 
-const shop_list = ref<HTMLSelectElement>();
-watch(shop_list, async ()=>{
-    const el = shop_list.value;
-    if (el) {
-        const shp = shopsFromArrayBuffer(await server.getDDLFile("SHOPS.DAT"));
-        const v = el.value;
-        while (el.options.length) el.options.remove(0);
-        shp.forEach((x, idx)=>{
-            const opt = document.createElement("option");
-            opt.value = `${idx}`;
-            opt.textContent = x.keeper;
-            el.options.add(opt);
-        });
-    }
-})
 
 const isEditingCode = ref(false);
 
@@ -815,8 +808,8 @@ function focus_loc(story?: number, node?: number) {
             </div>
         </div>
         <div class="node-list">            
-            <select v-if="cur_story && current_index" v-model="edit_focus.node" size="2" @change="edit_focus.branch = undefined;edit_focus.dlg = current_index">
-                <option v-for="(n, id) of cur_story.nodes" :key="id" :value="id" :class="{unused: diagram!.unused[id]}"> #{{ id }} {{ n.name }} </option>
+            <select  v-model="edit_focus.node" size="2" @change="edit_focus.branch = undefined;edit_focus.dlg = current_index ?? 0">
+                <option v-for="(n, id) of cur_story?.nodes " :key="id" :value="id" :class="{unused: diagram!.unused[id]}"> #{{ id }} {{ n.name }} </option>
             </select>
         </div>
     </div>
@@ -881,7 +874,8 @@ function focus_loc(story?: number, node?: number) {
                             <option :value="DlgNodeType.battle">Battle</option>
                             <option :value="DlgNodeType.shopping">Shopping</option>
                         </select>
-                         <select v-if="selected_node.node_type == DlgNodeType.shopping" v-model.number="selected_node.shop_id" ref="shop_list"><option :value="selected_node.shop_id">loading...</option></select>
+                         <DelayLoadedList v-if="selected_node.node_type == DlgNodeType.shopping" v-model="selected_node.shop_id" 
+                            :list="getGlobalShops().then(x=>x.map(y=>({value:y[0],label:y[1]})))" />                         
                          <button @click="add_branch" v-if="!selected_node.node_type">Add Branch</button>
                          <button @click="delete_node">Delete node</button>                                
                         </div></div>
@@ -1008,9 +1002,9 @@ function focus_loc(story?: number, node?: number) {
                     <div><div>Status</div>
                     <div>Success</div></div>
                     <div><div>Count stories</div>
-                    <div> {{ compile_report.stories }} / 127</div></div>
+                    <div> {{ compile_report.stories }} / {{ dialogs._compat?127:32767 }} </div></div>
                     <div><div>Count nodes</div>
-                    <div> {{ compile_report.nodes }} / 32767</div></div>
+                    <div> {{ compile_report.nodes }} / {{ 32767 }}</div></div>
                     <div><div>Count instructions</div>
                     <div> {{ compile_report.instructions }}</div></div>
                     <div><div>Count variables</div>

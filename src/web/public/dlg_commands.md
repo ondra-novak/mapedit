@@ -66,7 +66,7 @@ cond && {
 - **equipment.%** - access to equipment of the current character
 - **weapon_bonus.%** - access to weapon bonus of the current character
 - **face_id** - retrieve current characted face id
-- **first_visited** - contains true, if current dialog node is visited for the first time. Contains false otherwise
+- **first_visited** - contains true, if current node was visited for first time 
 - **whole_group** - contains true, if all characters are participating in current dialog
 - **slot_count** - contains count of used slots in current party 1-6
   **slot_present** - contains count of presented characters
@@ -83,6 +83,8 @@ cond && {
 - **false** - contains false value, which is stored as 0 , but use this in conditions instead numbers
 - **position.sector** - contains current sector
 - **position.direction** - contains current direction
+- **battle** - contains true, if currently in battle
+- **held_item** - contains id of item held before dialog started. This item is no longer held, it was put into inventory. -1 for none
 
 ### Functions
 
@@ -102,7 +104,7 @@ cond && {
  - **load_level(n,s,d)** - transfer party to different level (name, sector, dir)
  - **teleport_character(n,s,d)** - teleport current character to different level (name, sector, dir), making them inaccessible until party reaches the level
  - **create_item(n)** - create item and give it to party
- - **destroy_item(n)** - destroy item (if have_item returns true)
+ - **destroy_item(n)** - destroy item (if have_item returns true). 
  - **add_to_book(n)** - copy book page (n - page)
  - **select_speaker(n)** - make speaker as current
  - **set_speaker(n)** - set current character as speaker at given slot
@@ -119,9 +121,13 @@ cond && {
  - **replace_monster(m)** - replace current moster by different monster
  - **replace_monsters(m,n)** - replace all monsters m in level by monsters n
  - **replace_monsters_radius(m,n,s,r)** - replace all monsters m in level by monsters n on sector (s) and given radius (r) in squares
+ - **teleport_enemies(f,t,d)** - teleport enemies from sector `f` to sector `t`, direction `d`
+ - **teleport_current_enemy(t,d)** - teleport current enemy to sector `t`, direction `d`
+ - **send_enemy(f, t)** - send any enemy from sector `f` to sector `t`. The path must exist. When enemy can't reach the target, path is discarded
+ - **send_current_enemy(t)** - send current enemy to sector `t`
  - **cast_spell(n)** - cast given spell, it is casted current character.
  - **cast_to_enemy(n)** - cast given spell to current enemy 
  - **enable_global_map(b)** - enable or disable global map
-
+ 
 
 

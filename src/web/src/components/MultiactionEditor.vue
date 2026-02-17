@@ -10,6 +10,9 @@ import globalGetItems from '@/utils/global_item_list';
 import { SVGDrawing, SVGPath } from '@/utils/svg';
 import FactEditor from './FactEditor.vue';
 import { condition_proxy } from '@/core/bitproxy';
+import DelayLoadedList from './DelayLoadedList.vue';
+import getGlobalDialogs from '@/utils/global_dialog_list';
+import getGlobalShops from '@/utils/global_shop_list';
 
 
 
@@ -677,10 +680,12 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
         </template>
         <template v-else-if="(focused_item instanceof TMA_TEXT) && script">       
             <template v-if="focused_item.header.action == ActionType.DIALG">
-                <label><span>Dialog ID</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.textindex"></input></label>
+                <label><span>Dialog</span>
+                    <DelayLoadedList v-model="focused_item.textindex" :list="getGlobalDialogs().then(x=>x.map(y=>({value:y[0],label:y[1]})))"/></label>
             </template>
             <template v-else-if="focused_item.header.action == ActionType.SSHOP">
-                <label><span>Shop ID</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.textindex"></input></label>
+                <label><span>Shop</span>
+                    <DelayLoadedList v-model="focused_item.textindex" :list="getGlobalShops().then(x=>x.map(y=>({value:y[0],label:y[1]})))" /></label>
             </template>
             <template v-else>
                 <template v-if="focused_item.header.action == ActionType.MUSIC">

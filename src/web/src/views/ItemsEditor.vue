@@ -13,6 +13,9 @@ import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import BitCheckbox from '@/components/BitCheckbox.vue';
 import AbilitySheet from '@/components/AbilitySheet.vue';
 import EffectSheet from '@/components/EffectSheet.vue';
+import { spellsFromArrayBuffer } from '@/core/spell_structs';
+import DelayLoadedList from '@/components/DelayLoadedList.vue';
+import getGlobalDialogs from '@/utils/global_dialog_list';
 
 const selected_item = ref<number|null>(null);
 
@@ -285,6 +288,19 @@ watch(change_icon_popup, ()=>{
 })
 
 
+async function load_spells() {
+    const out : {value:number, label:string}[] = [{value:0,label:"(none)"}];
+    try {   
+        const spls = spellsFromArrayBuffer(await server.getDDLFile("KOUZLA.DAT"));
+        spls.forEach((x,idx)=>idx?out.push({value:idx, label:x.spellname}):0);
+    } catch (e) {
+    }
+    return out;
+}
+async function load_dialogs() {
+    return (await getGlobalDialogs()).map(x=>({value:x[0],label:x[1]}));
+}
+    
 watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true});
 </script>
 <template>
@@ -330,6 +346,9 @@ watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true}
                 <label v-if="form.druh == ItemType.TYP_RUNA"><span>Rune</span><select v-model="form.user_value">
                     <option v-for="(n,i) of runeList" :key="i" :value="i">{{ n  }}</option>
                 </select></label>
+                <label v-if="form.druh == ItemType.TYP_DLGPICK || form.druh == ItemType.TYP_DLGUSE"><span>Dialog</span>
+                    <DelayLoadedList v-model="form.user_value" :list="load_dialogs()" />
+                </label>
                 <label v-if="form.druh == ItemType.TYP_JIDLO || form.druh == ItemType.TYP_VODA"><span>Hours</span><input type="number"  v-model="form.user_value" v-watch-range min="1" max="9999"/></label>
                 <label v-if="form.druh == ItemType.TYP_SVITXT"><span>Book page</span><input type="number"  v-model="form.user_value" v-watch-range min="0" max="9999"/></label>
                 <label v-if="form.druh == ItemType.TYP_VRHACI"><span>Split on destroy</span><input type="number"  v-model="form.user_value" v-watch-range min="0" max="4"/></label>
@@ -354,7 +373,7 @@ watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true}
                         <template v-if="form.druh != ItemType.TYP_UTOC && form.druh != ItemType.TYP_SVITEK && form.druh != ItemType.TYP_LEKTVAR">
                             <input type="checkbox" :checked="form.magie > 0" @change="form.magie=($event.target as HTMLInputElement).checked?1:0"> enabled 
                         </template>
-                    </span><input type="number" v-model="form.spell"  v-watch-range min="0" max="10000"/></label>
+                    </span><DelayLoadedList v-model="form.spell" :list="load_spells()" class="spells"/></label>
                 </template>
                 <label  v-if="form.umisteni == ItemWearPlace.PL_BATOH"><span>Capacity</span><input type="number" v-watch-range min="1" max="24" v-model="form.nosnost"/></label>
                 <label><BitCheckbox v-model="form.flags" :mask="0x1"/><span>Destroy on impact</span></label>
@@ -607,6 +626,9 @@ background-position: 0px 2px, 4px 35px, 29px 31px, 34px 6px;
 
 x-form label input[type="text"] {
     width: 10rem;
+}
+.spells {
+    width: 6rem;
 }
 
 </style>

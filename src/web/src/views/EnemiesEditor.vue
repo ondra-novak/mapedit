@@ -17,6 +17,8 @@ import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import BitCheckbox from '@/components/BitCheckbox.vue';
 import AbilitySheet from '@/components/AbilitySheet.vue';
 import EffectSheet from '@/components/EffectSheet.vue';
+import DelayLoadedList from '@/components/DelayLoadedList.vue';
+import getGlobalDialogs from '@/utils/global_dialog_list';
 
 
 
@@ -395,7 +397,9 @@ const Abilities=[
                         <option value="8">Attack at wimpy</option>
                         <option value="9">Held on place</option>
                     </select></label>
-                    <label><span>Dialog number</span><input v-watch-range type="number" v-model="form.dialog" min="0" max="32767"></label>
+                    <label><span>Dialog</span>
+                        <DelayLoadedList v-model="form.dialog" :list="getGlobalDialogs().then(x=>[{value:-1,label:'(none)'}].concat(x.map(y=>({value:y[0], label:y[1]}))))" size="1"/>
+                        </label>
                 </x-form>
             </x-section>
             <x-section>

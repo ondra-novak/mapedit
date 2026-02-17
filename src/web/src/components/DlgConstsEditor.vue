@@ -7,6 +7,7 @@ import globalGetEnemies from '@/utils/global_enemy_list';
 import globalGetItems from '@/utils/global_item_list';
 import { ref, watch } from 'vue';
 import MaskedInput from './MaskedInput.vue';
+import DelayLoadedList from './DelayLoadedList.vue';
 
 
 const model = defineModel< Record<string, DialogConstant> >();
@@ -19,49 +20,51 @@ const new_desc = ref("");
 
 async function load_items() {
     const lst = await globalGetItems();
-    list_items.value = lst.map((x,idx)=>[idx, x.jmeno]  as [number,string])
+    return  lst.map((x,idx)=>[idx, x.jmeno]  as [number,string])
             .sort((a,b)=>a[1].localeCompare(b[1]));
 }
 
 async function load_enemies() {
     const lst = await globalGetEnemies();
-    list_items.value = lst.map((x,idx)=>[idx, x.name] as [number,string])
+    return  lst.map((x,idx)=>[idx, x.name] as [number,string])
             .sort((a,b)=>a[1].localeCompare(b[1]));
 }
 
 async function load_shops() {
     const data = await server.getDDLFile("SHOPS.DAT");
     const lst = shopsFromArrayBuffer(data);
-    list_items.value = lst.map((x, idx)=>[idx,x.keeper] as [number,string])
+    return lst.map((x, idx)=>[idx,x.keeper] as [number,string])
             .sort((a,b)=>a[1].localeCompare(b[1]));
 }
 async function load_charactes() {
     const data = await server.getDDLFile("POSTAVY.DAT");
     const chrs = humanDataFromArrayBuffer(data).characters;
-    list_items.value = chrs.map((x, idx)=>[idx,x.jmeno]);
+    return chrs.map((x, idx)=>[idx,x.jmeno]  as [number,string]);
 }
 
 
-async function  update_list() {
+async function get_list() : Promise<[number,string][]> {
     const t = sel_type.value;
-    if (!t) return;
+    if (!t) return Promise.resolve([]);
     switch (t) {
-        case 1:await load_items();break;
-        case 2:await load_enemies();break;
-        case 3:await load_shops();break;
-        case 4:await load_charactes();break;
+        case 1:return await load_items();
+        case 2:return await load_enemies();
+        case 3:return await load_shops();
+        case 4:return await load_charactes();        
+        default: return Promise.resolve([]);
     }
-    update_desc();
 }
 
 const typenames = [
     "Number","Item","Enemy","Shop","Character"
 ];
 
-let desc_untouched: boolean = true;
+
+
+const desc_untouched = ref<boolean>(true);
 
 function update_desc() {
-    if (desc_untouched) {
+    if (desc_untouched.value) {
         const t =sel_type.value;
         const n = new_number.value;
         const v = list_items.value.find(x=>x[0] == n);
@@ -75,7 +78,7 @@ function update_desc() {
 function add_item() {
     if (model.value) {
         model.value[new_ident.value] = {desc: new_desc.value, value: new_number.value};
-        desc_untouched = true;
+        desc_untouched.value = true;
         new_desc.value = "";
         new_ident.value = "";
     }
@@ -87,7 +90,14 @@ function delete_item(k:string) {
     }
 }
 
-watch(sel_type, update_list);
+async function load_list() {
+    const l = await get_list()
+    list_items.value = l;
+    update_desc();
+    if (l) return l.map(x=>({value:x[0] as number,label:x[1] as string}))
+    else return [];
+
+}
 
 </script>
 <template>
@@ -113,14 +123,12 @@ watch(sel_type, update_list);
             </label>
             <label><span>Value</span>
                 <input v-if="sel_type==0" v-model="new_number" type="number" v-watch-range min="-32767" max="32767">
-                <select v-else v-model="new_number" @change="update_desc">
-                    <option v-for="x of list_items" :key="x[0]" :value="x[0]"> {{  x[1] }}</option>
-                </select>
+                <DelayLoadedList v-else :key="sel_type" v-model="new_number" :list="load_list()" />
             </label>
-            <label><span>Identifier:</span><MaskedInput v-model="new_ident" :mask="/^[a-zA-Z_][a-zA-Z0-9_]*$/" /></label>
             <label><span>Description</span>
                 <input v-model="new_desc" type="text" @change="desc_untouched = false">
             </label>
+            <label><span>Identifier:</span><MaskedInput v-model="new_ident" :mask="/^[a-zA-Z_][a-zA-Z0-9_]*$/" /></label>
             <div class="b">
                 <button :disabled="new_ident.length == 0" @click="add_item">Add</button>
             </div>

@@ -2,6 +2,7 @@ import { BinaryIterator, BinaryWriter, make1DArray, type Schema } from "./binary
 import { HumanWearPlaceVariables } from "./character_structs";
 import { CharacterStatVariables, CharacterWeaponBonus, CharacterWeaponBonusVariables, type CharacterStats } from "./common_defs";
 import type { directions } from "./map_structs";
+import type { TranslateTable } from "./translate";
 
 export const MAX_IDENTIFIERS = 100;
 
@@ -403,6 +404,7 @@ export class DialogManager {
     _dlg: Record<number, DialogStory> = {};
     _consts: Record<string, DialogConstant> = {};
     _identifiers: DialogIdentifierList = {};
+    _compat: boolean = false; //compatibility mode
 
     static new_node() : DialogNode{
         return {
@@ -449,8 +451,19 @@ export class DialogManager {
         return i;
     }
 
+    story_to_node(story_id: number) {
+        if (this._compat) return story_id * 128;
+        else return story_id;
+        
+    }
+
     save() : string {
-        return JSON.stringify({"dialogs":this._dlg,"constants":this._consts, "identifiers": this._identifiers});
+        return JSON.stringify({
+            "dialogs":this._dlg,
+            "constants":this._consts, 
+            "identifiers": this._identifiers,
+            "compat":this._compat
+        });
     }
 
     load(txt:string) {
@@ -458,6 +471,7 @@ export class DialogManager {
         this._dlg = s["dialogs"];
         this._consts = s["constants"] || {};
         this._identifiers = s["identifiers"] || {};
+        this._compat = s["compat"];
     }
 
     compile(consts: Record<string, DialogConstant> ) {
@@ -484,6 +498,35 @@ export class DialogManager {
         return mwr.getBuffer();    
     }
 
+    generate_translation(tbl: TranslateTable) {
+        const t = tbl.openFile("dialog")
+        for (const stk in this._dlg) {
+            const st = this._dlg[stk];
+            if (st.description) t.store(`${stk}`, st.description);
+            for (const ndk in st.nodes) {
+                const nd = st.nodes[ndk];
+                if (nd.description) t.store(`${stk}:${ndk}`, nd.description);
+                nd.branches.forEach((b,idx)=>{
+                    if (b.text) t.store(`${stk}:${ndk}:${idx}`, b.text);
+                });
+            }
+        }
+    }
+
+    translate(tbl: TranslateTable) {
+        const t = tbl.openFile("dialog")
+        for (const stk in this._dlg) {
+            const st = this._dlg[stk];
+            t.translate(`${stk}`, "description", st);
+            for (const ndk in st.nodes) {
+                const nd = st.nodes[ndk];
+                t.translate(`${stk}:${ndk}`, "description", nd);
+                nd.branches.forEach((b,idx)=>{
+                    t.translate(`${stk}:${ndk}:${idx}`, "text", b);
+                });
+            }
+        }
+    }
 }
 
 
@@ -518,7 +561,7 @@ const functionList: FunctionList =
     "set_rune":[['n'],178],
     "remove_rune":[['n'],202],
     "sleep":[['n'],183],
-    "timepass":[['n','n'],182],
+    "time_skip":[['n','n'],182],
     "eat":[['n'],184],
     "change_music":[['s'],36],
     "play_sound":[['s'],190],
@@ -528,6 +571,10 @@ const functionList: FunctionList =
     "cast_spell":[['n'],188],
     "cast_to_enemy":[['n'],40],
     "enable_global_map":[['n'],186],
+    "teleport_enemies":[['n','n','n'], 205],
+    "teleport_current_enemy":[['n','n'],206],
+    "send_enemy":[['n','n'],203],
+    "send_current_enemy":[['n'],204]
     
 };
 
@@ -558,10 +605,11 @@ class DialogCompiler {
     map : Map<DialogStory|DialogNode, number> = new Map;
     local_map : Map<DialogStory|DialogNode, number> = new Map;
     stories : Map<DialogNode, DialogStory> = new Map;
+    compat: boolean;
     
 
     node_id_from_target(node: DialogNode, target: number|null) {
-        if (target === null) return 0;
+        if (target === null) return 0;        
         const st = this.stories.get(node);
         if (!st) {
             this.compile_error("Internal error: node_id_from_target - no story from node");
@@ -581,7 +629,7 @@ class DialogCompiler {
         for (const id in d._dlg) {
             const st = d._dlg[id];
             const iid = parseInt(id);
-            const vid = iid *128;
+            const vid = iid * (this.compat?128:1);
             this.nodes[vid] = st;
             this.map.set(st, vid);
             this.local_map.set(st, iid);
@@ -609,6 +657,7 @@ class DialogCompiler {
 
     constructor(dlgm: DialogManager, external_consts: Record<string, DialogConstant> ) {
         this.create_node_map(dlgm);
+        this.compat = dlgm._compat;
         this.identifiers = dlgm._identifiers;
         this.consts = Object.assign(Object.assign({},external_consts), dlgm._consts);
         for (const s in this.identifiers) {
@@ -1074,6 +1123,7 @@ class DialogCompiler {
             case "position.sector": out.push({value:47});return true;
             case "position.direction": out.push({value:48});return true;
             case "random": out.push({value: 49});return true;
+            case "held_item": out.push({value: 50});return true;
             default :
                 if (s in this.consts) {
                     out.push({value:1}) //push;
