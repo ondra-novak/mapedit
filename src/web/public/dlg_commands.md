@@ -128,6 +128,6 @@ cond && {
  - **cast_spell(n)** - cast given spell, it is casted current character.
  - **cast_to_enemy(n)** - cast given spell to current enemy 
  - **enable_global_map(b)** - enable or disable global map
- 
+ - **visited(n)** - returns true, when node n has already been visited. N is local node ID  
 
 

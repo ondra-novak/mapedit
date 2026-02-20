@@ -2,7 +2,7 @@
 import { server, type ModifiedFileNotify } from '@/core/api';
 import { DialogManager,  type DialogNode, type DialogStory, DialogBranchTypeStr, type DialogAction, DialogBranchType, DialogSpeakerType, type DialogSpeaker, type DialogConstant, DlgNodeType, DialogCompileError, MAX_IDENTIFIERS} from '@/core/dialog_structs';
 import { SVGPath } from '@/utils/svg';
-import { computed, h, reactive, ref,watch } from 'vue';
+import { computed, h, reactive, ref,toRaw,watch } from 'vue';
 import noimage from '@/assets/noimage.svg'
 import HIFormat from '@/core/hiformat';
 import { create_datalist, type DataListHandle } from '@/utils/datalist';
@@ -21,6 +21,7 @@ import { shopsFromArrayBuffer } from '@/core/shop_structs';
 import DelayLoadedList from '@/components/DelayLoadedList.vue';
 import getGlobalShops from '@/utils/global_shop_list';
 import HexView from '@/components/HexView.vue';
+import ToggleButton from '@/components/tools/ToggleButton.vue';
 
 const dialogs = reactive(new DialogManager);
 let inited = false;
@@ -618,24 +619,38 @@ function update_optional_field(ev: Event, object: any, field: string) {
 }
 function add_branch() {
     const f = edit_focus.value;
-    if (f.node === undefined || f.dlg === undefined) return;
+    if (f.node === undefined || f.dlg === undefined) return null;
     const d = dialogs._dlg[f.dlg];
     const n = d.nodes[f.node];
     const b = DialogManager.new_branch();
     b.target = null;
+    if (n.branches.length) {
+        b.type = n.branches[n.branches.length-1].type;
+    }
     n.branches.push(b);
     edit_focus.value.branch =  n.branches.length-1;
+    return b;
 }
 function add_node_branch() {
     const f = edit_focus.value;
-    if (f.node === undefined || f.dlg === undefined || f.branch === undefined) return;
+    if (f.node === undefined || f.dlg === undefined || f.branch === undefined) return null;
     const d = dialogs._dlg[f.dlg];
     const n = d.nodes[f.node];
     const nn = DialogManager.create_node(d);
     const b = n.branches[f.branch];
     b.target = nn[0];
     f.node = b.target;
-    delete edit_focus.value.branch;
+    delete edit_focus.value.branch;    
+    return b;
+}
+
+function add_reaction_node() {
+    const pb = add_node_branch();
+    if (!pb) return;
+    const nb = add_branch();
+    if (!nb) return;
+    if (pb.type == DialogBranchType.choice||pb.type == DialogBranchType.selchar||pb.type == DialogBranchType.seldead) nb.type = DialogBranchType.npctalk;
+    else if (pb.type == DialogBranchType.npctalk) nb.type = DialogBranchType.choice;
 }
 
 const selected_dlg = computed(()=>{
@@ -720,20 +735,17 @@ function edit_condition(s:string) {
     }
 }
 
-async function save_condition() {
-    if (selected_condition.value && cur_story.value) {
-        if (selected_condition.value.content.source) {
-            cur_story.value.conditions[selected_condition.value.name] = selected_condition.value.content;
-            if (selected_branch.value) {
-                selected_branch.value.condition = selected_condition.value.name;
-            }
-        } else if (await messageBoxConfirm(`Confirm you want to remove the condition ${selected_condition.value.name}`)) {
-            delete cur_story.value.conditions[selected_condition.value.name];
-        } else {
-            return;
-        }
-        selected_condition.value = null;
+function save_condition() {
+    const sc = selected_condition.value;
+    const st = cur_story.value;
+    const sb = selected_branch.value;
+    if (!sc || !st) return;
+    if (!sc.name) sc.name = sc.content.source;
+    st.conditions[sc.name] = sc.content;
+    if (sb) {
+        sb.condition = sc.name;
     }
+    selected_condition.value = null;
 }
 
 function edit_speakers() {
@@ -792,6 +804,32 @@ function focus_loc(story?: number, node?: number) {
     }, 10);
 }
 
+const can_delete_condition = computed(()=>{
+    const st = cur_story.value;
+    const sc = selected_condition.value;    
+    if (!st || !sc || !st.conditions[sc.name]) return false;
+    for (const a in st.nodes) {
+        const n = st.nodes[a];
+        for (const b in n.branches) {
+            const bv = n.branches[b];           
+            if (toRaw(bv) != toRaw(selected_branch.value) && bv.condition == sc.name) return false;
+        }
+    }    
+    return true;
+})
+
+async function delete_condition() {
+    const sc = selected_condition.value;    
+    const st = cur_story.value;
+    if (!st || !sc || !st.conditions[sc.name]) return;
+    if (await messageBoxConfirm(`Confirm you want to remove the condition ${sc.name}`)) {
+        delete st.conditions[sc.name];
+        if (selected_branch.value) {
+            selected_branch.value.condition = "";
+        }
+        selected_condition.value = null;
+    }
+}
 
 </script>
 <template>
@@ -847,7 +885,7 @@ function focus_loc(story?: number, node?: number) {
                         <rect x="0" y="0" :width="x_width()" :height="y_coord(1)"  />
                         <text v-if="b.type==DialogBranchType.jump_to_node" :x="grid_width/2" :y="grid_y/2">(jump)</text>
                         <text v-else class="text" v-svg-ellipsis="grid_width-5" x="5" :y="grid_y/2" :title="b.text" :key="b.text">{{ b.text }}</text>
-                        <text class="cond" v-if="b.condition" :key="b.condition" :x="grid_width-2" :y="grid_y-2">{{ b.condition }}</text>
+                        <text class="cond" v-if="b.condition" :key="b.condition" :x="grid_width-2" :y="grid_y-2">{{ b.invert_condition?"NOT":"" }} {{ b.condition }}</text>
                     </g>
                 </g>
             </template>            
@@ -897,11 +935,13 @@ function focus_loc(story?: number, node?: number) {
                     <x-section-title>Edit condition: {{ selected_condition.name }}</x-section-title>
                     <x-form>                        
                         <label><span>Name</span><input type="text" v-model="selected_condition.name"></label>
+                        <div class="note">Change name doesn't rename, it creates copy</div>
                         <label><span>Code</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_condition.content" @focus="isEditingCode=true" @blur="isEditingCode=false"/></label>
                         <div class="label"><span>NOTE: A change is applied everywhere the modified condition is used in the current story</span>
                             <div class="more">
-                                <button @click="save_condition" :disabled="!selected_condition.name">Save & Apply</button>
+                                <button @click="save_condition">Save & Apply</button>
                                 <button @click="selected_condition = null">Cancel</button>
+                                <button @click="delete_condition" :disabled="!can_delete_condition">Delete</button>
                             </div>
                         </div>
                     </x-form>
@@ -949,15 +989,24 @@ function focus_loc(story?: number, node?: number) {
                                 </select>
                             <button :disabled="selected_branch.target === null" @click="selected_branch.target = null">Exit dialog</button>
                             <button :disabled="selected_branch.target !== null" @click="add_node_branch">Add node</button>
+                            <button :disabled="selected_branch.target !== null" 
+                                v-if="selected_branch.type != DialogBranchType.addstory && selected_branch.type != DialogBranchType.jump_to_node"
+                                @click="add_reaction_node">Add reaction</button>
                             </div>
                         </div>
                         <div class="label"><span>Condition</span>
                             <div class="more">
                                 <select v-model="selected_branch.condition">
                                     <option value="">(none)</option>
+                                    <option value="first visited">First visited (this node)</option>
+                                    <option value="whole group">Whole group</option>
+                                    <option value="is present">Speaker is present</option>
+                                    <option value="target not visited yet">Target not visited yet</option>
+                                    <option value="no choices">No active choices</option>
                                     <option v-for="(v,k) of cur_story.conditions" :key="k" :value="k">{{ k }}</option>
                                 </select>
-                                <button :disabled="!selected_branch.condition" @click="edit_condition(selected_branch.condition || '')">Edit</button>
+                                <ToggleButton v-model="selected_branch.invert_condition">Invert</ToggleButton>
+                                <button :disabled="!selected_branch.condition || !cur_story.conditions[selected_branch.condition]" @click="edit_condition(selected_branch.condition || '')">Edit</button>
                                 <button @click="edit_condition('')">Add</button>                                
                             </div>
                         </div>

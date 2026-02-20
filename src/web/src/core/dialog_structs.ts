@@ -30,7 +30,7 @@ class DialogParagraphDef {
 }
 
   
-interface Instruction {
+export interface Instruction {
     value?: number;
     text?: string;
     variable? :number;
@@ -83,14 +83,25 @@ export class DialogDef {
         const count:number = iter.parse("uint32");
         iter.parse("int32");    //dummy
         const pgf_map = new Map<number, number>()  //[id, [offset, alt]]
+        
         for (let i = 0; i < count; ++i) {
             const pgfdef  = new DialogParagraphDef();
             Object.assign(pgfdef, iter.parse(pgfdef.getSchema()));
             pgf_map.set(pgfdef.header.id, pgfdef.position);
         }
+
+        const offset_set : number[] = [];
+        pgf_map.forEach((v)=>offset_set.push(v));
+        offset_set.sort((a,b)=>a - b);
+
         const state = {local_pgf: 0};
+        const initial = 8*count+8;
         for (const itm of pgf_map) {
-            const part = buffer.slice(8+8*count+itm[1]);
+            const beg = itm[1];
+            const idx = offset_set.findIndex(x=>x == beg);
+            if (idx < 0) throw Error("Internal error");
+            const end = idx+1 == offset_set.length?buffer.byteLength:offset_set[idx+1];
+            const part = buffer.slice(initial+beg, initial+end);
             this.pgfs[itm[0]] = DialogDef.parse_code(part,state);
         }
         const m = this.pgfs.reduce((a, v,idx)=>{a.push([idx,v]);return a},[] as [number,any][] );
@@ -100,6 +111,12 @@ export class DialogDef {
         console.log(mm);
         return pgf_map;
     }
+
+    toObject() {
+        const m = this.pgfs.reduce((a, v,idx)=>{a.push([idx,v]);return a},[] as [number,any][] );
+        return Object.fromEntries(m);
+    }
+
 
     static instruction_table : Record<number, [string, number]>= {
         1: ["stk_push",1],
@@ -150,6 +167,8 @@ export class DialogDef {
         47: ["stk_push viewsector",0],
         48: ["stk_push viewdir",0],
         49: ["stk_push random",0],
+        50: ["stk_push held_item",0],
+        51: ["iff = no choices",0],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -161,12 +180,12 @@ export class DialogDef {
         136: ["nahodne_obrat",2],   //*
         137: ["set_name",2],
         138: ["set_iff",1],
-        139: ["goto_paragraph",1],
-        140: ["goto_iff",1],
-        141: ["goto_not_iff",1],
+        139: ["goto_node",1],
+        140: ["goto_node_iff",1],
+        141: ["goto_node_not_iff",1],
         142: ["add_choice",2],
         143: ["add_choice_iff", 3],
-        144: ["dialog_select(1)", 0],
+        144: ["select_choice", 0],
         145: ["visited",1],
         146: ["add_choice_not_visited", 2],
         147: ["picture",1],
@@ -174,7 +193,7 @@ export class DialogDef {
         149: ["add_to_book",1],
         150: ["set_nvisited",1],
         151: ["random_roll",1],
-        152: ["has_item",1],
+        152: ["have_item",1],
         153: ["create_item",1],
         154: ["destroy_item",1],
         155: ["add_money",1],
@@ -185,7 +204,7 @@ export class DialogDef {
         161: ["play_animation",3],
         162: ["add_to_story",1],
         163: ["test_flag",1],
-        164: ["dialog_select(0)",0],
+        164: ["pause",0],
         165: ["dialog_select_jump",0],
         166: ["first_visited",1],
         167: ["local_pgf",1],
@@ -200,8 +219,8 @@ export class DialogDef {
         176: ["pract_to",2],
         177: ["test_vls",3],
         178: ["add_rune",1],
-        179: ["has_rune",1],
-        180: ["has_money",1],
+        179: ["have_rune",1],
+        180: ["have_money",1],
         181: ["pract",3],
         182: ["dark_screen",2],
         183: ["sleep",1],
@@ -223,6 +242,10 @@ export class DialogDef {
         200: ["drop_character",0],
         201: ["pc_xicht",1],
         202: ["is_rune",1],
+        203: ["send_enemies",2],
+        204: ["send_current_enemy",1],
+        205: ["teleport_enemies", 3],
+        206: ["teleport_current_enemy", 3],
         518: ["set_flag",1],
         519: ["reset_flag",1],
         255: ["exit_dialog",0]
@@ -230,7 +253,7 @@ export class DialogDef {
 
 
     static is_exit_code(c: number) {
-        return (c == 164 || c== 165|| c == 255 || c == 139);
+        return (c== 165|| c == 255 || c == 139 || c == 144);
     }
 
 
@@ -241,7 +264,7 @@ export class DialogDef {
         let fill_jump : [number,number][] = [];
         try {
             while (true) {
-                while(true) {                
+                while(!iter.eof()) {                
                     label_map.set(iter.tell(), out.length);
                     const instr_code = read_instruction(iter);
                     if (instr_code.value === undefined) throw Error(`Parse error, instruction ${JSON.stringify(instr_code)}`);
@@ -267,7 +290,6 @@ export class DialogDef {
                         }
                         
                         out.push([instr[0], args]);
-                        if (DialogDef.is_exit_code(c)) break;
                     }                
                 }            
 
@@ -308,7 +330,7 @@ export const DialogBranchType = {
     choice:2,     //add choice into choices list
     selchar:3,    //ask for character and continue to target (for example cast spell on target)
     seldead:4,    //ask for dead character and continue to target (for example ressurection)
-    addstory:5,   //jump but add text to story log
+    addstory:5,   //jump but add text to story log    
 } as const;
 
 export const DialogSpeakerType = {
@@ -348,6 +370,8 @@ export interface DialogBranch {
     condition: string;
     ///target node, if not defined, dialog ends 
     target: number|null;
+    ///if true, condition is inverted
+    invert_condition?: boolean;
 };
 
 export interface DialogAction {
@@ -530,8 +554,8 @@ export class DialogManager {
 }
 
 
-// name, param type - n=number,s=string, code
-type FunctionList = Record<string,[ ('n'|'s')[], number]>;
+// name, param type - n=number,s=string,r=node ref, code
+type FunctionList = Record<string,[ ('n'|'s'|'r')[], number]>;
 
 const functionList: FunctionList = 
 {
@@ -540,7 +564,7 @@ const functionList: FunctionList =
     "pay":[['n'],156],
     "add_money":[['n'],155],
     "set_flag":[['n'],518],
-    "is_flag":[['n'],152],
+    "is_flag":[['n'],163],
     "reset_flag":[['n'],519],
     "set_fact":[['n'],31],
     "reset_fact":[['n'],32],
@@ -574,8 +598,8 @@ const functionList: FunctionList =
     "teleport_enemies":[['n','n','n'], 205],
     "teleport_current_enemy":[['n','n'],206],
     "send_enemy":[['n','n'],203],
-    "send_current_enemy":[['n'],204]
-    
+    "send_current_enemy":[['n'],204],
+    "visited":[['r'],145]
 };
 
 export class DialogCompileError extends Error {
@@ -656,8 +680,8 @@ class DialogCompiler {
 
 
     constructor(dlgm: DialogManager, external_consts: Record<string, DialogConstant> ) {
-        this.create_node_map(dlgm);
         this.compat = dlgm._compat;
+        this.create_node_map(dlgm);
         this.identifiers = dlgm._identifiers;
         this.consts = Object.assign(Object.assign({},external_consts), dlgm._consts);
         for (const s in this.identifiers) {
@@ -804,25 +828,45 @@ class DialogCompiler {
         if (nd.action && nd.action.ast) {
             this.pop_item(this.compile_ast(nd.action.ast, out), out);
         }
+        let choices = 0;
+        let uncond_jump = false;
 
-        nd.branches.forEach(b=>{
+        nd.branches.forEach((b,idx)=>{
             const brnch : Instruction[] = [];
             const condinstr : Instruction[] = [];
-            if (b.condition) {
+            let inverted = !!b.invert_condition;
+            //todo špatný target
+            const target =this.node_id_from_target(nd, b.target);
+
+            if (uncond_jump) {
+                this.compile_error (`Branch ${idx+1} is never taken`);
+            }
+
+            if (b.condition) {                
                 const st = this.stories.get(nd);
                 if (st) {
                     const cond = st.conditions[b.condition];
                     if (cond && cond.ast) {
                         this.pop_item(this.compile_ast(cond.ast, condinstr), condinstr);
+                    } else {
+                        switch (b.condition) {
+                            case "first visited":  condinstr.push({value:166},{value:this.cur_node_id});break;
+                            case "is present": if (b.speaker) condinstr.push({value:132},{value: b.speaker});
+                                               condinstr.push({value:41});
+                                               break;
+                            case "whole group": condinstr.push({value:185}); break;
+                            case "target not visited yet": condinstr.push({value:145},{value:target}); inverted = !inverted;break;
+                            case "no choices": condinstr.push({value:51});break;
+                            default: this.compile_error(`Undefined condition "${b.condition}"`);break;
+                        }
                     }
+                    
                 }
             }            
             let text = b.text ?? "";
             if (b.speaker) {
                 text = `%${b.speaker}l` + text;
             }
-            //todo špatný target
-            const target =this.node_id_from_target(nd, b.target);
             switch (b.type) {
                 case DialogBranchType.addstory:
                     brnch.push({value:162}); //add to story                                        
@@ -838,15 +882,26 @@ class DialogCompiler {
                     brnch.push({value:142}); //add choice
                     brnch.push({value:target})
                     brnch.push({text:text});
+                    ++choices;
                     break;
                 case DialogBranchType.jump_to_node:
                     if (target ) {
-                        brnch.push({value:139}); //goto paragraph;
+                        if (condinstr.length) {
+                            brnch.push(...condinstr);
+                            condinstr.splice(0);
+                            if (inverted)  brnch.push({value:141}); //not iff  jump
+                            else brnch.push({value:140}); //iff jump
+                        } else {
+                            uncond_jump = true;
+                            brnch.push({value:139}); //goto paragraph;
+                        }
                         brnch.push({value:target});         
+                        out.push(...brnch);
+                        return;
                     } else {
                         brnch.push({value:255}); ///exit
-                    }
-                    break;
+                        break;
+                    }                    
                 case DialogBranchType.npctalk:
                     brnch.push({value:148});
                     brnch.push({text:text});
@@ -876,8 +931,10 @@ class DialogCompiler {
             }
             if (condinstr.length) {
                 out.push(...condinstr);
-                out.push({value: 169}); //if !iff jump
+                out.push({value: inverted?170:169}); //if !iff jump
                 out.push({value: brnch.reduce((a,b)=>a+instruction_size(b),0)});
+            } else {
+                if (b.type == DialogBranchType.npctalk || b.type == DialogBranchType.addstory) uncond_jump = true;
             }
             out.push(...brnch);
         })
@@ -892,14 +949,16 @@ class DialogCompiler {
                 out.push({value:157});  //start_battle
                 break;
             default:
-                if (nd.branches.length) {
+                if (choices) {
                     out.push({value:144});  //dialog select
                     return;
                 }
                     
 
         }
-        out.push({value:255});  //exit dialog
+        if (!uncond_jump) {
+            out.push({value:255});  //exit dialog
+        }
     }
 
     compile_error(s: string) {
@@ -945,7 +1004,7 @@ class DialogCompiler {
                         const pos = args.length-idx-1;
                         const d = def[0][pos];
                         switch (d) {
-                            case "s": if (a[0] != "str") this.compile_error(`Function ${n} expected string as argument ${pos+1}`);
+                            case "s": if (a[0] != "str") this.compile_error(`Function "${n}()" expected string as argument ${pos+1}`);
                                     arginstr.unshift({text: a[1]});
                                     break;
                             case 'n': {
@@ -957,6 +1016,22 @@ class DialogCompiler {
                                     arginstr.unshift({pop:true});
                                 }
                             }
+                            break;
+                            case 'r': {
+                                const dirconst = this.compile_likely_constant(a, out);
+                                if (dirconst) {
+                                    const nd = dirconst.value!;    
+                                    try {
+                                        const ndid = this.node_id_from_target(this.cur_node!, nd);
+                                        arginstr.unshift({value:ndid});
+                                    } catch (e) {
+                                        this.compile_error(`Function "${n}()" - node not found`);
+                                    }
+                                } else {
+                                    this.compile_error(`Argument of "${n}()" must be number: id of node. Expression is not allowed`)
+                                }
+                            }
+                            break;
                         }
                     })
                     out.push({value:def[1]},...arginstr);
@@ -1063,7 +1138,7 @@ class DialogCompiler {
                 const id = CharacterStatVariables[s];
                 if (id !== undefined) {
                     const dirval = this.compile_likely_constant(right, out);
-                    out.push({value:176}); //attributes
+                    out.push({value:176}); //pract to
                     out.push({value:id});
                     if (dirval) out.push(dirval);else out.push({pop:true}); //pop as argument
                 } else {
@@ -1073,8 +1148,7 @@ class DialogCompiler {
                 const id = CharacterWeaponBonusVariables[s];
                 if (id !== undefined) {
                     const dirval = this.compile_likely_constant(right, out);
-                    out.push({value:25}); //equipment
-                    out.push({value:176}); //attributes
+                    out.push({value:176}); //pract to
                     out.push({value:id+100});
                     if (dirval) out.push(dirval);else out.push({pop:true}); //pop as argument
                 } else {
