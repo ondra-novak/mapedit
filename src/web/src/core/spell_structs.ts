@@ -101,6 +101,7 @@ const SpellSpecialAction = {
     SP_VZPLANUTI3: 25,
     SP_PHASEDOOR: 26,
     SP_TELEPORT_SECT: 27,
+    SP_RADIATION: 29
 } as const;
 
 export const SpellArgument = {
@@ -203,6 +204,7 @@ const SpellCommands : Record<string, SpellCommandDesc> = {
     spec_summonDemon1: {instr:[], action:SpellSpecialAction.SP_DEMON1},
     spec_summonDemon2: {instr:[], action:SpellSpecialAction.SP_DEMON2},
     spec_summonDemon3: {instr:[], action:SpellSpecialAction.SP_DEMON3},
+    spec_radiation: {instr:[], action:SpellSpecialAction.SP_RADIATION},
     spec_incineration1:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI1},
     spec_incineration2:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI2},
     spec_incineration3:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI3},

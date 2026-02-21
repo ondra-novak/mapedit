@@ -12,6 +12,13 @@ const start_dir = ref(0);
 const environment = ref(0);
 const autofog_floor_ceil = ref(false);
 
+const backdrop_n = ref("");
+const backdrop_e = ref("");
+const backdrop_s = ref("");
+const backdrop_w = ref("");
+
+const fade_mult = ref(0);
+const fade_end = ref(0);
 
 const dlg = ref<HTMLDialogElement>();
 
@@ -24,6 +31,12 @@ function update_from_model() {
         start_dir.value =  m.start_direction;
         environment.value = m.map_effector;
         autofog_floor_ceil.value = m.map_autofadefc != 0;
+        backdrop_n.value = m.back_fnames[0];
+        backdrop_e.value = m.back_fnames[1];
+        backdrop_s.value = m.back_fnames[2];
+        backdrop_w.value = m.back_fnames[3];
+        fade_mult.value = m.fade_mult;
+        fade_end.value = m.fade_end;
 
         dlg.value?.showModal();
     } else {
@@ -43,6 +56,12 @@ function save() {
     m.mapname = mapname.value;
     m.start_direction = start_dir.value;
     m.start_sector = start_sector.value;        
+    m.back_fnames[0] = backdrop_n.value
+    m.back_fnames[1] = backdrop_e.value
+    m.back_fnames[2] = backdrop_s.value
+    m.back_fnames[3] = backdrop_n.value
+    m.fade_end = fade_end.value;
+    m.fade_mult = fade_mult.value;
     model.value = m;
 }
 
@@ -61,6 +80,7 @@ watch(model, update_from_model);
 <dialog ref="dlg">
     <header>Map settings<button class="close" @click="model = undefined"></button></header>
     <div>
+        <x-section><x-section-title>Basic</x-section-title>
         <x-form>
             <label><span>Map name</span><input type="text" v-model="mapname" maxlength="29"></label>
             <label><span>Fog color</span><div class="col">
@@ -76,6 +96,17 @@ watch(model, update_from_model);
             </select></label>
             <label><input type="checkbox" v-model="autofog_floor_ceil">Generate fog for floor and ceil images (recommended)</label>
         </x-form>        
+        </x-section>
+        <x-section><x-section-title>Advanced</x-section-title>
+            <x-form>
+            <label><span>Backdrop north</span><input type="text" v-model="backdrop_n"></label>
+            <label><span>Backdrop east</span><input type="text" v-model="backdrop_e"></label>
+            <label><span>Backdrop south</span><input type="text" v-model="backdrop_s"></label>
+            <label><span>Backdrop west</span><input type="text" v-model="backdrop_w"></label>
+            <label><span>Brightness</span><input type="number" v-model="fade_mult"  v-watch-range min="0" max="2" step="0.1"></label>
+            <label><span>Fog strength</span><input type="number" v-model="fade_end" v-watch-range min="0" max="1" step="0.1"></label>
+            </x-form>
+        </x-section>
     </div>
     <footer>
         <button @click="save">OK</button>

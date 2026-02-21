@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import {  ActionType, create_action_instance, directions, SimpleActionTypeName, TMA_CANCELACTION, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFJMP, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TELEPORT, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
+import {  ActionType, create_action_instance, directions, SimpleActionTypeName, TMA_CANCELACTION, TMA_CHANGELIGHT, TMA_CODELOCK, TMA_DROPITM, TMA_FIREBALL, TMA_GEN, TMA_GLOBE, TMA_IFJMP, TMA_IFSEC, TMA_LOADLEV, TMA_LOCK, TMA_SEND_ACTION, TMA_SOUND, TMA_SWAPS, TMA_TELEPORT, TMA_TEXT, TMA_TWOP, TMA_UNIQUE, TMA_WOUND } from '@/core/map_structs';
 import { readWavInfoFromBuffer } from '@/core/sound_info';
 import { create_datalist, type DataListHandle } from '@/utils/datalist';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -78,7 +78,8 @@ const ActionName = [
 [34,"Control enemy",true,"Send an enemy from a sector to different sectorSend the monster to another sector. The monster will get there on its own. The monster must be mobile"],               //    GOMOB: 34,
 [35,"Call sub",true,"Call a script on another wall as a subroutine (for same event). Doesn't change context of execution."],                //    SHRMA: 35,
 [36,"Change music",true,"Change music"],                //    MUSIC: 36,
-[37,"Define global event",true,"Defines global events. Global events are not saved in the saved game, they must be set during the \"On level start\" event"]             //    GLOBE: 37,
+[37,"Define global event",true,"Defines global events. Global events are not saved in the saved game, they must be set during the \"On level start\" event"],             //    GLOBE: 37,
+[38,"Change fog color",true,"Temporarily changes the color of the fog. The choice is not saved in the saved game, you must invoke the action again after reloading the saved game"]             
 ].sort((x,y)=>(x[1] as string).localeCompare(y[1] as string));
 
 const ActionNameMap = ActionName.reduce((a,b)=>{
@@ -845,6 +846,11 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
         <template v-else-if="(focused_item instanceof TMA_SWAPS)">       
             <label><span>Sector1</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector1"></input></label>
             <label><span>Sector2</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector2"></input></label>
+        </template>
+        <template v-else-if="(focused_item instanceof TMA_CHANGELIGHT)">       
+            <label><span>Red</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.r"></input></label>
+            <label><span>Green</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.g"></input></label>
+            <label><span>Blue</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.b"></input></label>
         </template>
         <template v-else-if="(focused_item instanceof TMA_UNIQUE)">       
             {{ focused_item }}
