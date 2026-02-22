@@ -36,6 +36,7 @@ export interface IStatusBar {
     stop_game:()=>void;
     invoke_teleport:()=>void;
     invoke_reload:()=>void;
+    get_project_name:()=>string|null;
 };
 
 function create_promise() {
@@ -109,6 +110,9 @@ class StatusBar {
     }
     static set_current_dialog(id: number|null) {
         return conn.promise.then(st=>st.set_current_dialog(id));
+    }
+    static get_project_name() {
+        return conn.promise.then(st=>st.get_project_name());
     }
 
 };

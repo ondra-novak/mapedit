@@ -154,7 +154,7 @@ function onSelectIcon() {
 const key_mode = ref<number>(0);
 
 
-const form = computed<ItemDef>(()=>selected_item.value?item_list.value.get(selected_item.value):new ItemDef);
+const form = computed<ItemDef>(()=>typeof selected_item.value == "number"?item_list.value.get(selected_item.value):new ItemDef);
 
 
 

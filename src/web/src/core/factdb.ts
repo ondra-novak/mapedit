@@ -1,3 +1,5 @@
+import type { DialogConstant } from "./dialog_structs";
+
 type Fact = {
     id: number; // 1-255
     key: string; // short, human-readable identifier
@@ -52,6 +54,12 @@ export class FactDB {
 
     getAllFacts(): Fact[] {
         return Array.from(this.factsById.values());
+    }
+    asDlgConsts()  {
+        return this.getAllFacts().reduce((a,b)=>{
+            a[b.key] = {value:b.id, desc:b.description};
+            return a;
+        },{} as Record<string, DialogConstant>)
     }
     toJSON(): string {
         return JSON.stringify(this.getAllFacts());

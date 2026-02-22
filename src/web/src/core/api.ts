@@ -211,6 +211,21 @@ export class ApiClient extends WsRpcClient{
                  change_desc:string) : Promise<boolean> {
         return (await this.call("publish.publish", [title,desc,lang,tags,visbility,change_desc],[])).data;
     }
+    async lang_list() : Promise<string[]>{
+        return (await this.call("lang.list",[],[])).data;
+    }
+    async lang_get(lang:string) : Promise<ArrayBuffer>{
+        return (await this.call("lang.get",[lang],[])).attachments[0];
+    }
+    async lang_put(lang:string, content: ArrayBuffer) : Promise<boolean>{
+        return (await this.call("lang.put",[lang],[content])).data;
+    }
+    async lang_delete(lang:string) : Promise<void>{
+        await this.call("lang.delete",[lang],[]);
+    }
+    async lang_copyddl(target:string): Promise<void>{
+        await this.call("lang.copyddl", [target],[]);
+    }
 
 }
 

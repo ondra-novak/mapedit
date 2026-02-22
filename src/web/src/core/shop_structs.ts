@@ -1,5 +1,6 @@
 import { BinaryIterator, BinaryWriter, type Schema } from "./binary"
 import Hive from "@/utils/hive"
+import type { TranslateTable } from "./translate";
 
 const TProductSchema  : Schema = {
   "item":"int16",  
@@ -42,7 +43,7 @@ export class TShop {
 
 export class ShopHive extends Hive<TShop> {};
 
-export function shopsFromArrayBuffer(buff: ArrayBuffer): ShopHive  {
+export function shopsFromArrayBuffer(buff: ArrayBuffer, remove_populated: boolean): ShopHive  {
     const result :TShop[] = [];
     const rd  = new BinaryIterator(buff);
     const count = rd.parse("uint32");
@@ -52,7 +53,11 @@ export function shopsFromArrayBuffer(buff: ArrayBuffer): ShopHive  {
         for (let j = 0; j < shp.products; ++j) {
             p.push(Object.assign(new TProduct(), rd.parse(TProductSchema)));
         }
-        shp.product_list = p.filter(x=>(x.trade_flags & ProductFlags.SHP_POPULATED) == 0);
+        if (remove_populated) {
+            shp.product_list = p.filter(x=>(x.trade_flags & ProductFlags.SHP_POPULATED) == 0);
+        } else {
+            shp.product_list = p;
+        }
         result.push(shp);
     }
     const result2 = new ShopHive;
@@ -67,6 +72,7 @@ export function shopsToArrayBuffer(shops: ShopHive) {
     wr.write("uint32", count);
     shops.forEach((x,idx)=>{
         x.shop_id = idx;
+        x.products = x.product_list.length;
         wr.write(TShopSchema, x);
         x.product_list.forEach(y=>{
             wr.write(TProductSchema, y);
@@ -85,3 +91,15 @@ export const ProductFlags = {
     SHP_TYPE: 0x80,      //not item, but information about population
 };
 
+export function shops_generate_translation(e: ShopHive, tbl: TranslateTable) {
+    const target = tbl.openFile("shop")
+    e.forEach((x, idx)=>{
+        target.store(`${idx}`, x.keeper);
+    });
+}
+export function shops_translate(e: ShopHive, tbl: TranslateTable) {
+    const target = tbl.openFile("shop")
+    e.forEach((x, idx)=>{
+        x.keeper = target.translate(`${idx}`, x.keeper);
+    });
+}

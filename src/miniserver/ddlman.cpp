@@ -1,5 +1,6 @@
 #include "ddlman.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <fstream>
 #include <optional>
@@ -310,7 +311,7 @@ std::optional<std::pair<DDLManager::DirItem, unsigned int> > DDLManager::find_fi
     unsigned int index = 0;
     parse_ddl(f, [&](const DirItem &item) {
         auto n2 = item.get_name();
-        if (n2 != n1) {
+        if (!equal_icase(n2 ,n1)) {
             ++index;
             return true;
         }
@@ -486,3 +487,18 @@ std::vector<std::pair<std::uint32_t, std::chrono::system_clock::time_point> > DD
     return out;   
 }
 
+
+bool DDLManager::equal_icase(std::string_view a, std::string_view b) {
+    if (a.length() != b.length()) return false;
+    auto cnt = a.length();
+    for (std::size_t i = 0; i < cnt; ++i) {
+        char ac = a[i];
+        char bc = b[i];
+        if (ac != bc) {
+            if (ac >= 'a' && ac <= 'z') ac = ac - 'a' + 'A';
+            if (bc >= 'a' && bc <= 'z') bc = bc - 'a' + 'A';
+            if (ac != bc) return false;
+        }
+    }
+    return true;
+}

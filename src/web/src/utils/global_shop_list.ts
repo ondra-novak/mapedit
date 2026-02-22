@@ -20,7 +20,7 @@ async function getGlobalShops() {
             try {
                 const data = await server.getDDLFile("SHOPS.DAT");
                 server.on("modified",reload);
-                const hive = shopsFromArrayBuffer(data);
+                const hive = shopsFromArrayBuffer(data,true);
                 hive.forEach((v,idx)=>out.push([idx,v.keeper]));
             } catch (e) {
             }        

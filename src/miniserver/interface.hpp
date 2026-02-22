@@ -111,6 +111,11 @@ protected:
     void ws_publish_status(const WsRpc::Request &req);   
     void ws_publish_set_image(const WsRpc::Request &req);   
     void ws_publish_publish(const WsRpc::Request &req);   
+    void ws_lang_list(const WsRpc::Request &req);
+    void ws_lang_get(const WsRpc::Request &req);
+    void ws_lang_put(const WsRpc::Request &req);
+    void ws_lang_delete(const WsRpc::Request &req);
+    void ws_lang_copyddl(const WsRpc::Request &req);
 
     void send_state_update(WsRpc &rpc);
 
@@ -144,6 +149,11 @@ protected:
         {"publish.status", &WebInterface::ws_publish_status},
         {"publish.set_image", &WebInterface::ws_publish_set_image},
         {"publish.publish", &WebInterface::ws_publish_publish},
+        {"lang.list", &WebInterface::ws_lang_list},
+        {"lang.get", &WebInterface::ws_lang_get},
+        {"lang.put", &WebInterface::ws_lang_put},
+        {"lang.delete", &WebInterface::ws_lang_delete},
+        {"lang.copyddl", &WebInterface::ws_lang_copyddl}
     };
 
 

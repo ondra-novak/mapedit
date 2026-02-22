@@ -70,7 +70,7 @@ function init() {
     function reload() {
         getDDLFileWithImport(server,"SHOPS.DAT",AssetGroup.MAPS).then(buff=>{
             if (buff) {
-                shop_list.value = shopsFromArrayBuffer(buff);
+                shop_list.value = shopsFromArrayBuffer(buff,true);
             } else {
                 shop_list.value = new ShopHive;   
             }

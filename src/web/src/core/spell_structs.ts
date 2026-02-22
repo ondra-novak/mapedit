@@ -1,4 +1,5 @@
 import { BinaryIterator, BinaryWriter,type Schema } from "./binary";
+import type { TranslateTable } from "./translate";
 
 
 const TKouzloSchema : Schema= {
@@ -393,4 +394,20 @@ export function spellsToArrayBuffer(spells: TKouzlo[]) : ArrayBuffer {
 
     return fin.getBuffer();
 
+}
+
+export function spells_generate_translation(e: TKouzlo[], tbl: TranslateTable) {
+    const target = tbl.openFile("spell")
+    const max = 5*7*3;    
+    e.forEach((x, idx)=>{
+        if (idx < max && (idx % 3) == 0) {
+            target.store(`${idx}`, x.spellname);
+        }
+    });
+}
+export function spells_translate(e: TKouzlo[], tbl: TranslateTable) {
+    const target = tbl.openFile("spell")
+    e.forEach((x, idx)=>{
+        x.spellname = target.translate(`${idx}`, x.spellname);
+    });
 }

@@ -1,6 +1,7 @@
 import { make_identifiers } from "./common_defs";
 import { keybcs2string, string2keybcs } from "./keybcs2";
 import Hive from "@/utils/hive"
+import type { TranslateTable } from "./translate";
 
 export interface THuman {
   jmeno: string;
@@ -268,4 +269,17 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
     }).join("\r\n")+"\r\n";
 
     return Uint8Array.from(string2keybcs(whole_str)).buffer;
+}
+
+export function characters_generate_translation(e: HumanHive, tbl: TranslateTable) {
+    const target = tbl.openFile("char")
+    e.forEach((x, idx)=>{
+        target.store(`${idx}`, x.jmeno);
+    });
+}
+export function characters_translate(e: HumanHive, tbl: TranslateTable) {
+    const target = tbl.openFile("char")
+    e.forEach((x, idx)=>{
+        x.jmeno = target.translate(`${idx}`, x.jmeno);
+    });
 }

@@ -44,10 +44,10 @@ export class TranslateTable {
             translate(ref: ItemRef, name_or_string: string, object?: any) {
                 const s = this.owner.load(this.file, ref);
                 if (typeof object == "object" && object) {
-                    if (typeof s == "string") object[name_or_string] = s;
+                    if (s) object[name_or_string] = s;
                     return object[name_or_string];
                 } else {
-                    if (typeof s == "string") return s;
+                    if (s) return s;
                     else return name_or_string;
                 }
             }
@@ -81,7 +81,7 @@ export class TranslateTable {
             }
         }
         const enc = new TextEncoder();
-        enc.encode(lines.join("\r\n")).buffer;
+        return enc.encode(lines.join("\r\n")).buffer;
     }
 
     import_csv(x: ArrayBuffer) {

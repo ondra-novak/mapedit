@@ -85,9 +85,7 @@ public:
 
     std::vector<std::pair<std::uint32_t, std::chrono::system_clock::time_point> > get_history(std::string_view name);
 
-protected:
-    /// Path to the archive file.
-    std::filesystem::path _pathname;
+    static bool equal_icase(std::string_view a, std::string_view b);
 
     struct DirItem {
         char name[12];
@@ -98,6 +96,11 @@ protected:
         }
         void set_name(std::string_view new_name);
     };
+
+protected:
+    /// Path to the archive file.
+    std::filesystem::path _pathname;
+
 
     struct DirItemGroup : DirItem{
         uint32_t group;

@@ -1,10 +1,12 @@
 #include "interface.hpp"
 #include "ddlman.hpp"
 #include "handler_map.hpp"
+#include "langfiles.hpp"
 #include "mgifdecomp.hpp"
 #include "skeldal_exe.hpp"
 #include "utils/json.hpp"
 #include "publish_helper.hpp"
+#include <cctype>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -12,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <mutex>
 #include "utils/json.hpp"
@@ -25,6 +28,7 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <unordered_map>
 
 namespace server {
 
@@ -597,17 +601,22 @@ void WebInterface::ws_ddl_mpg_close(const WsRpc::Request &req) {
     }
     
 }
-void WebInterface::ws_ddl_active(const WsRpc::Request &req) {
-    auto name = req.params[0].as<std::u8string>();
+static bool validate_ddl_name(const std::u8string &name, const WsRpc::Request &req) {
     for (char c: name) {
         if (!((c >= '0' && c <= '9')
             || (c >= 'A' && c <='Z')
             || (c >= 'a' && c <='z')
             || (c == '_' || c == '-' || c =='.'))) {
                 req.send_error(400, "DDL Archive name validation failed (unsupported characters)");
-                return;
+                return false;
             }                           
     }
+    return true;
+}
+
+void WebInterface::ws_ddl_active(const WsRpc::Request &req) {
+    auto name = req.params[0].as<std::u8string>();
+    if (!validate_ddl_name(name, req)) return;
     _current_ddl = name;
     _config.set("project", _current_ddl);
      save_config();        
@@ -807,6 +816,101 @@ void WebInterface::ws_publish_publish(const WsRpc::Request &req){
     req.send_response(true);
     
 }
+
+void WebInterface::ws_lang_list(const WsRpc::Request &req){
+    Json::Array out;
+    auto langs = LangFiles::get_available_languages(_user_dir/_current_ddl);
+    out.resize(langs.size());
+    std::copy(langs.begin(), langs.end(), out.begin());
+    req.send_response(out);
+}
+
+static bool validate_lang(const std::string_view &lang) {
+    for (char c: lang) {
+        if (!((c>='0' && c <='9') || (c>='a' && c<='z'))) return false;
+    }
+    return true;
+}
+
+void WebInterface::ws_lang_get(const WsRpc::Request &req){
+    auto lang = req.params[0].as<std::string>();
+    if (!validate_lang(lang)) return req.send_error(400, "invalid lang");
+    auto content = LangFiles::get_language_file(_user_dir/_current_ddl, std::move(lang));
+    if (!content.has_value()) return req.send_error(404, "file not found");    
+    return req.send_response({},std::span(&(*content),1));
+}
+void WebInterface::ws_lang_put(const WsRpc::Request &req){
+    auto lang = req.params[0].as<std::string>();
+    if (!validate_lang(lang)) return req.send_error(400, "invalid lang");
+    if (req.attachments.empty()) return req.send_error(400,"expect attachment");
+    return req.send_response(
+        LangFiles::update_lang_file(_user_dir/_current_ddl, lang, req.attachments[0]));
+}
+
+void WebInterface::ws_lang_delete(const WsRpc::Request &req) {
+    auto lang = req.params[0].as<std::string>();
+    if (!validate_lang(lang)) return req.send_error(400, "invalid lang");
+    LangFiles::delete_lang_file(_user_dir/_current_ddl, lang);
+    return req.send_response(true);
+}
+
+constexpr auto copy_files = std::array<std::string_view, 10>({
+    "ITEMS.DAT","KOUZLA.DAT","DIALOGY.JSON",
+    "ENEMY.DAT","SHOPS.DAT","POSTAVY.DAT"
+});
+
+
+void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
+    auto new_ddl = req.params[0].as<std::u8string>();
+    if (!validate_ddl_name(new_ddl, req)) return;
+    auto src = _user_dir/_current_ddl;
+    auto trg = _user_dir/new_ddl;
+    if (src == trg) return req.send_error(409, "Can't copy to itself");
+
+    DDLManager srcddl(src);
+    DDLManager trgddl(trg);
+    auto srclist = srcddl.list();
+    std::unordered_map<std::string, std::uint32_t> manifest;
+    auto mftsrc = trgddl.get(".MANIFEST");
+    if (mftsrc.has_value()) {
+        std::span<const DDLManager::DirItem> mft(reinterpret_cast<const DDLManager::DirItem *>(mftsrc->data()), mftsrc->size()/sizeof(DDLManager::DirItem));
+        for (const auto &x: mft) manifest.emplace(x.get_name(), x.offset);
+    }
+
+    bool mchg = false;
+    std::hash<std::string_view> hasher;
+    for (const auto &s: srclist) {
+        auto iter = manifest.find(s.name);
+        auto data = srcddl.get(s.name);
+        if (data.has_value()) {
+            std::uint32_t h = static_cast<std::uint32_t>(hasher({data->data(), data->size()}));
+            if (iter == manifest.end() || (iter->second != h && iter->first != "ADV.INI")) {
+                manifest[s.name] = h;
+                mchg = true;
+                trgddl.put(s.name, {data->data(), data->size()}, s.group);
+            }
+        }
+    }
+
+    if (mchg) {
+        std::vector<DDLManager::DirItem> mftout;
+        for (const auto &[name, sz]: manifest) {
+            DDLManager::DirItem itm;
+            itm.offset = sz;
+            itm.set_name(name);
+            mftout.push_back(itm);
+        }
+        trgddl.put(".MANIFEST", {reinterpret_cast<const char *>(mftout.data()), mftout.size()*sizeof(DDLManager::DirItem)}, 0);
+    }
+
+    _current_ddl = new_ddl;
+    req.send_response(true);
+    publish_state();
+
+}
+
+
+
 
 }
 

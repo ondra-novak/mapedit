@@ -303,14 +303,14 @@ export const WeaponTypeName = [
 ]
 
 
-export function enemy_generate_translation(e: ItemHive, tbl: TranslateTable) {
+export function items_generate_translation(e: ItemHive, tbl: TranslateTable) {
     const target = tbl.openFile("item")
     e.forEach((x, idx)=>{
         target.store(`${idx}:n`, x.jmeno);
         target.store(`${idx}:d`, x.popis)
     });
 }
-export function enemy_translate(e: ItemHive, tbl: TranslateTable) {
+export function items_translate(e: ItemHive, tbl: TranslateTable) {
     const target = tbl.openFile("item")
     e.forEach((x, idx)=>{
         x.jmeno = target.translate(`${idx}:n`, x.jmeno);

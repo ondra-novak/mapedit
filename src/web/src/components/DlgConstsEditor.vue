@@ -32,7 +32,7 @@ async function load_enemies() {
 
 async function load_shops() {
     const data = await server.getDDLFile("SHOPS.DAT");
-    const lst = shopsFromArrayBuffer(data);
+    const lst = shopsFromArrayBuffer(data,true);
     return lst.map((x, idx)=>[idx,x.keeper] as [number,string])
             .sort((a,b)=>a[1].localeCompare(b[1]));
 }

@@ -214,6 +214,10 @@ function set_current_dialog(id : number|null ){
     current_dialog.value = id;
 }
 
+function get_project_name() {
+    return current_project.value ?? null
+}
+
 onMounted(()=>{
     StatusBar.attach_component({
         register_save_control,
@@ -227,7 +231,8 @@ onMounted(()=>{
         stop_game: stop_client,
         invoke_teleport,
         invoke_reload,
-        set_current_dialog
+        set_current_dialog,
+        get_project_name
     })
 })
 
