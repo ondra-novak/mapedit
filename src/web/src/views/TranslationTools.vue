@@ -23,6 +23,26 @@ const lang_list = computed(()=>{
     return Object.entries(ascii_languages).sort((a,b)=>a[1].localeCompare(b[1]));
 })
 
+
+interface TranslateConfig {
+    lang: string;
+    ddlname: string;
+    ignore_list: string;
+}
+
+const trans_config = reactive<TranslateConfig>({lang:"",ddlname:"", ignore_list:"ADV.INI\nKNIHA.TXT\nENDTEXT.TXT"});
+
+
+async function load_config() {
+    const dec = new TextDecoder();
+    Object.assign(trans_config, JSON.parse(dec.decode(await server.getDDLFile("TRANS.JSON"))));
+}
+
+async function save_config() {
+    const enc = new TextEncoder();
+    server.putDDLFile("TRANS.JSON",enc.encode(JSON.stringify(trans_config)).buffer, AssetGroup.UNKNOWN);
+}
+
 let project_name: string|null;
 
 function compute_target_project(lang: string) {
@@ -31,6 +51,12 @@ function compute_target_project(lang: string) {
     return project_name.substring(0,sep)+"-"+lang+project_name.substring(sep);
 }
 
+function update_target_ddl() {
+    const lang = trans_config.lang;
+    if (project_name == null) return "";
+    const sep = project_name.lastIndexOf(".");
+    trans_config.ddlname =  project_name.substring(0,sep)+"-"+lang+project_name.substring(sep);
+}
 const gen_config = reactive<{
     char?:boolean,
     enemies?:boolean,
@@ -124,6 +150,7 @@ async function browse_for_epilog() {
 
 function init() {
     load_languages();
+    load_config();
 }
 
 async function delete_lang() {
@@ -266,7 +293,7 @@ async function update_target() {
         return;
     dlg.showModal();
     try {
-        await server.lang_copyddl(langpkg.target_project_name);
+        await server.lang_copyddl(langpkg.target_project_name,[]);
 
         if (langpkg.book) await server.putDDLFile("KNIHA.TXT",langpkg.book, AssetGroup.MAPS);
         if (langpkg.epilog) await server.putDDLFile("ENDTEXT.TXT",langpkg.epilog, AssetGroup.MAPS);
@@ -282,6 +309,32 @@ async function update_target() {
     }
 
     location.reload();
+}
+
+async function update_target_csv() {
+    
+    const selected = await browse_file("text/csv");
+    const dlg = translate_status.value;
+    if (!dlg) return;
+    if (!await messageBoxConfirm(`After processing, the workspace will be switched to the target project.\n\nConfirm that you want to edit the target project\n\n${langpkg.target_project_name}`))
+        return;
+    dlg.showModal();
+
+    try {
+        await server.lang_copyddl(trans_config.ddlname, trans_config.ignore_list.split("\n").map(x=>x.trim()));
+
+        await save_config();
+        await do_apply_stringtable(selected.data);
+        dlg.close();
+    } catch (e) {
+        dlg.close();
+        const err = e as Error;
+        await messageBoxAlert(`An error reported during processing. Result can be incomplete: ${err.message}`);
+    }
+
+    location.reload();
+
+
 }
 
 async function do_apply_stringtable(csv: ArrayBuffer) {
@@ -395,17 +448,15 @@ next step to generate the localized language version.
             You need extract them manually, translate them and attach separatedly</p>
     </x-section>
     <x-section>
-        <x-section-title>Preparation of a language mutation</x-section-title>
+        <x-section-title>Create or update language mutation</x-section-title>
         <x-form>
-            <label><span>Target language</span><div><select v-model="selected_language" :class="{defined: !!defined_languages[selected_language]}"><option value="">-- Select language --</option>
-                <option v-for="v of lang_list" :key="v[0]" :value="v[0]" :class="{defined: !!defined_languages[v[0]]}"> {{  v[1] }}</option>
-            </select><button @click="delete_lang" :disabled="invalid_lang && !defined_languages[selected_language]">Delete</button></div></label>
-            <label><span>Target project name</span><div><input :disabled="invalid_lang" type="text" @change="save_selected_lang" v-model="langpkg.target_project_name" placeholder="TRANSLATED.DDL"><div>Will be created if not exists</div></div></label>
-            <div class="label"><span>String table</span><div class="present-state" :class="{present: !!langpkg.string_table}"><button :disabled="invalid_lang" @click="browse_for_stringtable"></button></div></div>
-            <div class="label"><span>KNIHA.TXT</span><div class="present-state" :class="{present: !!langpkg.book}"><button  :disabled="invalid_lang"  @click="browse_for_booktxt"></button></div></div>
-            <div class="label"><span>ENDTEXT.TXT</span><div class="present-state" :class="{present: !!langpkg.epilog}"><button :class="{present: !!langpkg.epilog}" :disabled="invalid_lang" @click="browse_for_epilog"></button></div></div>
+            <label><span>Target language</span><div><select v-model="trans_config.lang" @change="update_target_ddl()"><option value="">-- Select language --</option>
+            <option v-for="v of lang_list" :key="v[0]" :value="v[0]"> {{  v[1] }}</option>
+            </select></div></label>
+            <label><span>Target project name</span><div><input spellcheck="false" :disabled="!trans_config.lang" type="text" v-model="trans_config.ddlname" placeholder="TRANSLATED.DDL"><div>Will be created if not exists</div></div></label>
+            <label><span>Protect files (one per line)</span><textarea spellcheck="false" rows="10" v-model="trans_config.ignore_list"></textarea></label>
         </x-form>
-        <div class="deploy"><button :disabled="invalid_lang || (!langpkg.string_table && !langpkg.book && !langpkg.epilog)" @click="update_target">Create or update target project</button></div>
+        <div class="deploy"><button :disabled="!trans_config.lang || !trans_config.ddlname" @click="update_target_csv">Open CSV and update project</button></div>
     </x-section>
     </div>
     <dialog ref="string_table_gen_status">
@@ -438,27 +489,6 @@ x-section {
 
 .deploy {
     text-align: center;
-}
-option.defined, select.defined {
-    font-weight: bold;
-}
-.present-state::before {
-    content: "\2717";
-    margin: 0 0.5rem;
-    color: darkred;
-    font-size: 1.5rem;
-    vertical-align: middle;
-    display: inline-block;
-}
-.present-state.present::before {
-    content: "\2713";
-    color: green;
-}
-.present-state button::before {
-    content: "Attach"
-}
-.present-state.present button::before {
-    content: "Update"
 }
 
 </style>

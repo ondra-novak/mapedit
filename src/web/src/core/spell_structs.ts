@@ -387,7 +387,7 @@ export function spellsToArrayBuffer(spells: SpellHive) : ArrayBuffer {
 
 }
 
-export function spells_generate_translation(e: TKouzlo[], tbl: TranslateTable) {
+export function spells_generate_translation(e: SpellHive, tbl: TranslateTable) {
     const target = tbl.openFile("spell")
     const max = 5*7*3;    
     e.forEach((x, idx)=>{
@@ -396,7 +396,7 @@ export function spells_generate_translation(e: TKouzlo[], tbl: TranslateTable) {
         }
     });
 }
-export function spells_translate(e: TKouzlo[], tbl: TranslateTable) {
+export function spells_translate(e: SpellHive, tbl: TranslateTable) {
     const target = tbl.openFile("spell")
     e.forEach((x, idx)=>{
         x.spellname = target.translate(`${idx}`, x.spellname);

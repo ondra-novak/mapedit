@@ -29,6 +29,7 @@
 #include <system_error>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace server {
 
@@ -862,6 +863,14 @@ constexpr auto copy_files = std::array<std::string_view, 10>({
 
 void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
     auto new_ddl = req.params[0].as<std::u8string>();
+    auto ignore_list_json = req.params[1];
+    std::unordered_set<std::string> ignore_list;
+
+    for (const auto &v : ignore_list_json.as_array()) {
+        ignore_list.insert(v.as<std::string>());
+    }
+
+
     if (!validate_ddl_name(new_ddl, req)) return;
     auto src = _user_dir/_current_ddl;
     auto trg = _user_dir/new_ddl;
@@ -884,7 +893,7 @@ void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
         auto data = srcddl.get(s.name);
         if (data.has_value()) {
             std::uint32_t h = static_cast<std::uint32_t>(hasher({data->data(), data->size()}));
-            if (iter == manifest.end() || (iter->second != h && iter->first != "ADV.INI")) {
+            if (iter == manifest.end() || (iter->second != h && ignore_list.find(iter->first)  == ignore_list.end())) {
                 manifest[s.name] = h;
                 mchg = true;
                 trgddl.put(s.name, {data->data(), data->size()}, s.group);

@@ -223,8 +223,8 @@ export class ApiClient extends WsRpcClient{
     async lang_delete(lang:string) : Promise<void>{
         await this.call("lang.delete",[lang],[]);
     }
-    async lang_copyddl(target:string): Promise<void>{
-        await this.call("lang.copyddl", [target],[]);
+    async lang_copyddl(target:string, ignore_files:string[]): Promise<void>{
+        await this.call("lang.copyddl", [target, ignore_files],[]);
     }
 
 }
