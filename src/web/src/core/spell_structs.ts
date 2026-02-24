@@ -6,7 +6,8 @@ const TKouzloSchema : Schema= {
     num:"uint16", //spell number
     um:"uint16",  //min require magic stat
     mge:"uint16", //mana cost
-    pc:"uint16",      //zero 
+    zivel:"uint8",      //zero 
+    cast_time:"uint8",  //zero - or count of AP paid for this spell
     owner:"int16",    //zero
     accnum:"int16",   //spell category id, replaces spell with same id
     start:"uint32",   //script start address
@@ -290,7 +291,8 @@ export interface TKouzlo {
     num:number, //spell number
     um:number,  //min require magic stat
     mge:number, //mana cost
-    pc:number,      //zero 
+    zivel:number,      //zero 
+    cast_time: number,  //cast time (or zero)
     owner:number,    //zero
     accnum:number,   //spell category id, replaces spell with same id
     start:number,   //script start address

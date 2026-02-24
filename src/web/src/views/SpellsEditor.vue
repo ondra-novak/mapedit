@@ -80,7 +80,8 @@ function onCreateNew() {
             backfire:0,
             povaha:0,
             spellname:"Undefined spell",
-            pc:0,
+            zivel:0,
+            cast_time:0,
             owner:0,
             teleport_target:0,
             mge:0,
@@ -242,7 +243,7 @@ watch(item_list, (nv)=>ds_spellItems.update(()=>nv.map((v,id)=>({value:v.jmeno, 
         <h1>Rune spells</h1>
         <table class="spell-list">
             <thead>
-                <tr><th>Element</th><th>Rune</th><th>Strength</th><th>Name</th><th>Level (Magic)</th><th>Mana cost</th><th>Target type</th><th>Protection</th><th>Group</th><th>Flags</th></tr>
+                <tr><th>Element</th><th>Rune</th><th>Strength</th><th>Name</th><th>Level (Magic)</th><th>Mana cost</th><th>Target type</th><th>Harmful</th><th>Group</th><th>Flags</th></tr>
             </thead>
             <tbody>
                 <tr v-for="row of (spell_list || []).filter(x=>x.num < 105)" :key="row.num" :class="`element-${Math.floor(row.num/21)}` " @click="current_spell=row">
@@ -291,14 +292,17 @@ watch(item_list, (nv)=>ds_spellItems.update(()=>nv.map((v,id)=>({value:v.jmeno, 
                         <span v-if="current_spell.num > 105 || current_spell.num % 3 != 0">Name (not shown)</span>
                         <input type="text" v-model="current_spell.spellname">
                     </label>
-                    <label v-if="current_spell.num < 105"><span>Magic level</span><input type="number" v-model="current_spell.um"></label>
-                    <label v-if="current_spell.num < 105"><span>Mana cost</span><input type="number" v-model="current_spell.mge"></label>
+                    <template v-if="current_spell.num < 105">
+                    <label ><span>Magic level</span><input type="number" v-model="current_spell.um"></label>
+                    <label><span>Mana cost</span><input type="number" v-model="current_spell.mge"></label>
+                    <label><span>Action points cost (0=disabled)</span><input type="number" v-model="current_spell.cast_time"></label>
+                    </template>
                     <label><span>Target / Victim</span><div><select v-model="current_spell.cil">
                             <option v-for="(v,id) of TargetType" :key="id" :value="id">{{  v  }}</option>
                         </select></div>
                     </label>
                     <label><span>Spell group</span><input type="number" v-model="current_spell.accnum"></label>
-                    <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1" :false-value="0"><span>Victim defense roll</span></label>
+                    <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1" :false-value="0"><span>Harmful</span></label>
                     <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TRACKON"><span>Need enemy in front</span></label>
                     <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TELEPORT"><span>Open map for teleport</span></label>
                 </x-form>
