@@ -34,7 +34,7 @@ class Hive<T> {
   }
 
   is_valid(index: number) : boolean {
-    return this.data[index] !== null;
+    return index < this.data.length && this.data[index] !== null;
   }
 
   get(index: number): T {

@@ -161,36 +161,36 @@ export class BinaryIterator {
         } else {
             switch (schema) {
                 case 'int8':
-                    result = this.dataView.getInt8(this.position);
                     this.position += 1;
+                    result = this.dataView.getInt8(this.position-1);
                     break;
                 case 'uint8':
-                    result = this.dataView.getUint8(this.position);
                     this.position += 1;
+                    result = this.dataView.getUint8(this.position-1);
                     break;
                 case 'int16':
-                    result = this.dataView.getInt16(this.position, true);
                     this.position += 2;
+                    result = this.dataView.getInt16(this.position-2, true);
                     break;
                 case 'uint16':
-                    result = this.dataView.getUint16(this.position, true);
                     this.position += 2;
+                    result = this.dataView.getUint16(this.position-2, true);
                     break;
                 case 'int32':
-                    result = this.dataView.getInt32(this.position, true);
                     this.position += 4;
+                    result = this.dataView.getInt32(this.position-4, true);
                     break;
                 case 'uint32':
-                    result = this.dataView.getUint32(this.position, true);
                     this.position += 4;
+                    result = this.dataView.getUint32(this.position-4, true);
                     break;
                 case 'float32':
-                    result = this.dataView.getFloat32(this.position, true);
                     this.position += 4;
+                    result = this.dataView.getFloat32(this.position-4, true);
                     break;
                 case 'float64':
-                    result = this.dataView.getFloat64(this.position, true);
                     this.position += 8;
+                    result = this.dataView.getFloat64(this.position-8, true);
                     break;
                 default:
                     throw new Error(`Unsupported type: ${schema}`);

@@ -10,7 +10,7 @@ export const ElementType = {
 
 export const ElementTypeName = [
     "Fire","Water","Earth","Air","Mind"
-] as const;
+] ;
 
 
 export const SpellEffects = {

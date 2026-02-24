@@ -4,15 +4,25 @@ import { AssetGroup } from '@/core/asset_groups';
 import { CharacterStatsNames, ElementTypeName, SpellEffectName } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import {ItemHive, itemsFromArrayBuffer } from '@/core/items_struct';
-import { spellsFromArrayBuffer, SpellCommandsArgs ,type TKouzlo, SpellArgument, spellsToArrayBuffer } from '@/core/spell_structs';
+import { spellsFromArrayBuffer, SpellCommandsArgs ,TKouzlo, SpellArgument, spellsToArrayBuffer, SpellHive } from '@/core/spell_structs';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
 import { create_datalist } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
+import { messageBoxAlert } from '@/utils/messageBox';
+import DelayLoadedList from '@/components/DelayLoadedList.vue';
+import { SectorFlags } from '@/core/map_structs';
 
 
-const spell_list = ref<TKouzlo[]>([]);
-const current_spell = ref<TKouzlo>();
+const spell_list = ref<SpellHive>(new SpellHive());
+const cur_spell_index = ref<number>(-1)
+const current_spell = computed(()=>{
+    const v = cur_spell_index.value;
+    const tbl = spell_list.value;
+    if (v < 0 || !tbl.is_valid(v)) return null;
+    else return tbl.get(v);
+});
+
 
 const item_list = ref(new ItemHive);
 const all_sounds = ref<string[]>([]);
@@ -21,27 +31,36 @@ let save_state: SaveRevertControl;
 
 const TargetType = [
     "self",
-    "character",
-    "this square",
-    "next square",
-    "dead character",
-    "far character",
-    "random character",
-    "other target",
+    "char",
+    "this sq.",
+    "next sq.",
+    "dead char",
+    "far char",
+    "rnd char",
+    "other",
 ];
 
-const ProtectionFlag = ["No","Yes"];
+const ProtectionFlag = ["Harm","Safe"];
 
-const FlagsNames = ["---","enemy in front","teleport","enemy in front | teleport"]
+const FlagsNames = ["","EF","T","EF | T"]
 
 function init() {
     function reload() {
-        current_spell.value = undefined;
-        getDDLFileWithImport(server, "KOUZLA.DAT", AssetGroup.MAPS).then(x=>{
+        cur_spell_index.value = -1;
+        getDDLFileWithImport(server, "KOUZLA.DAT", AssetGroup.MAPS).then(x=>{            
+            spell_list.value = new SpellHive;
             if (x) {
-                spell_list.value = spellsFromArrayBuffer(x);
-            } else {
-                spell_list.value = [];
+                try {
+                    spell_list.value = spellsFromArrayBuffer(x);
+                } catch (e) {
+                    const err = e as Error;
+                    messageBoxAlert(`Error loading spell list: ${err.message}`);
+                }
+            }
+            for (let i = 0; i < 105; ++i) {
+                const t = new TKouzlo;
+                t.script = [];
+                if (!spell_list.value.is_valid(i)) spell_list.value.set(i, t);
             }
             nextTick(()=>{
                 save_state.set_changed(false);
@@ -61,44 +80,12 @@ function init() {
     })
     StatusBar.register_save_control().then(st=>{
         st.on_save(async ()=>{
-            if (spell_list.value) {
-                const b = spellsToArrayBuffer(spell_list.value);
-                await server.putDDLFile("KOUZLA.DAT", b, AssetGroup.MAPS);
-            }
+            const b = spellsToArrayBuffer(spell_list.value as SpellHive);
+            await server.putDDLFile("KOUZLA.DAT", b, AssetGroup.MAPS);
         });
         st.on_revert(reload);
         save_state = st;
     });
-}
-
-function onCreateNew() {
-    spell_list.value = new Array(105).fill(0).map((_,idx)=>{
-        const def : TKouzlo = {
-            accnum :0,
-            cil:0,
-            flags:0,
-            backfire:0,
-            povaha:0,
-            spellname:"Undefined spell",
-            zivel:0,
-            cast_time:0,
-            owner:0,
-            teleport_target:0,
-            mge:0,
-            um:0,
-            start: 0,
-            script: [],
-            num: idx,
-            wait: 0,
-            delay: 0,
-
-        };
-        return def;
-    });
-}
-
-function onImported() {
-    init();
 }
 
 const shadow_drag_table = ref<HTMLTableElement|null>(null);
@@ -200,7 +187,8 @@ function validateCommand(event: Event) {
     const t = event.target as HTMLInputElement;
     const cmd = SpellCommandsArgs[t.value];
     if (cmd) {
-        current_spell.value.script!.push({
+        if (!current_spell.value.script) current_spell.value.script = [];
+        current_spell.value.script.push({
             command: t.value,
             args: new Array(cmd.length).fill(null).map((_,idx:number)=>cmd[idx] < 16?0:""),
         });
@@ -234,121 +222,206 @@ watch(all_animations, (nv)=>ds_spellAnim.update(()=>nv.map(v=>({value:v}))));
 watch(all_sounds, (nv)=>ds_spellSounds.update(()=>nv.map(v=>({value:v}))));
 watch(item_list, (nv)=>ds_spellItems.update(()=>nv.map((v,id)=>({value:v.jmeno, label:`${v.jmeno} #${id}`}))));
 
+function calc_row_csss_class(idx: number) {
+    const s = idx == cur_spell_index.value?"selected":""
+    return `element-${Math.floor(idx/21)} ${s}`;
+}
 
+const rune_list = computed(()=>{
+    return spell_list.value.filter((x,idx)=>idx<105);
+})
+const other_spell_list = computed(()=>{
+    return (spell_list.value.map((x,idx)=>[x,idx]) as [TKouzlo, number][])
+    .filter(x=>x[1]>=105);
+})
+
+function load_spell_list() {
+    return spell_list.value.map((x,idx)=>({value:idx,label:x.spellname}));
+}
+
+const categories = [0,1,2,3,4];
+const runes = [0,1,2,3,4,5,6]
+function power_list(c: number, r: number) : [TKouzlo, number][] {
+    const start = c * 21 +r *3;
+    return spell_list.value.get_raw().slice(start, start+3).map((x,idx)=>[x,idx+start]) as [TKouzlo, number][];
+}
+const section_len = 25;
+const page_list = computed(()=>{
+    const other = spell_list.value.map((x,idx)=>[x,idx] as [TKouzlo, number]).filter(x=>x[1]>=105);
+    const n = other.length;
+    let count = Math.floor((n + section_len-1)/section_len);
+    const out = [];
+    for (let i = 0; i < count; ++i) {
+        out.push(i * section_len);
+    }
+    return out;
+})
+function spell_page(start: number) {
+    const other = spell_list.value.map((x,idx)=>[x,idx] as [TKouzlo, number]).filter(x=>x[1]>=105);
+    return other.slice(start, start+section_len);
+}
+
+function add_spell() {
+    const k = new TKouzlo;
+    k.script = [];
+    cur_spell_index.value = spell_list.value.add(k);
+}
 
 </script>
 
 <template>
     <x-workspace>
-        <h1>Rune spells</h1>
-        <table class="spell-list">
-            <thead>
-                <tr><th>Element</th><th>Rune</th><th>Strength</th><th>Name</th><th>Level (Magic)</th><th>Mana cost</th><th>Target type</th><th>Harmful</th><th>Group</th><th>Flags</th></tr>
-            </thead>
-            <tbody>
-                <tr v-for="row of (spell_list || []).filter(x=>x.num < 105)" :key="row.num" :class="`element-${Math.floor(row.num/21)}` " @click="current_spell=row">
-                    <td v-if="(row.num % 21) == 0" rowspan="21"> {{ ElementTypeName[Math.floor(row.num/21)] }} </td>
-                    <td v-if="(row.num % 3) == 0" rowspan="3"> {{ spell_list?spell_list[Math.floor(row.num/3)*3].spellname:"" }} </td>
-                    <td class="number"> {{ (row.num % 3)+1 }}</td>
-                    <td> {{  row.spellname }}</td>
-                    <td class="number"> {{  row.um }}</td>
-                    <td class="number"> {{  row.mge }}</td>
-                    <td> {{  TargetType[row.cil] }}</td>
-                    <td class="number"> {{  ProtectionFlag[row.povaha] }}</td>
-                    <td class="number"> {{  row.accnum }} </td>
-                    <td> {{  FlagsNames[row.flags] }}</td>
-                </tr>                
-            </tbody>
-        </table>
-        <h1>Other spells</h1>
-        <table class="spell-list second">
-            <thead>
-                <tr><th>ID</th><th>Name</th><th>Target type</th><th>Protection</th><th>Group</th><th>Flags</th></tr>
-            </thead>
-            <tbody>
-                <tr v-for="row of (spell_list || []).filter(x=>x.num >= 105)" :key="row.num" @click="current_spell=row">
-                    <td class="number">{{ row.num }}</td>
-                    <td> {{  row.spellname }}</td>
-                    <td> {{  TargetType[row.cil] }}</td>
-                    <td class="number"> {{  ProtectionFlag[row.povaha] }}</td>
-                    <td class="number"> {{  row.accnum }} </td>
-                    <td> {{  FlagsNames[row.flags] }}</td>
-                    <td><button @click="spell_list!.splice(spell_list!.findIndex(x=>x.num == row.num),1);$event.stopPropagation()">🞬</button></td>
-                </tr>
-            </tbody>
-        </table>
-
-    </x-workspace>
-
-    <div class="editor" v-if="current_spell">
-        <div>
-            <x-section>
-                <x-section-title>Basic settings</x-section-title>
-                <x-form>
-                    <label v-if="current_spell.num < 105"><span>Rune</span><div><input type="text" readonly="true" size="4" :value="ElementTypeName[Math.floor(current_spell.num/21)]">
-                                <input size="4" type="text" readonly="true" :value="Math.floor((current_spell.num%21)/3)+1">
-                                <input size="4"  type="text" readonly="true" :value="(current_spell.num%3)+1"></div></label>
-                    <label><span v-if="current_spell.num < 105 && current_spell.num % 3 == 0">Display name</span>
-                        <span v-if="current_spell.num > 105 || current_spell.num % 3 != 0">Name (not shown)</span>
-                        <input type="text" v-model="current_spell.spellname">
-                    </label>
-                    <template v-if="current_spell.num < 105">
-                    <label ><span>Magic level</span><input type="number" v-model="current_spell.um"></label>
-                    <label><span>Mana cost</span><input type="number" v-model="current_spell.mge"></label>
-                    <label><span>Action points cost (0=disabled)</span><input type="number" v-model="current_spell.cast_time"></label>
-                    </template>
-                    <label><span>Target / Victim</span><div><select v-model="current_spell.cil">
-                            <option v-for="(v,id) of TargetType" :key="id" :value="id">{{  v  }}</option>
-                        </select></div>
-                    </label>
-                    <label><span>Spell group</span><input type="number" v-model="current_spell.accnum"></label>
-                    <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1" :false-value="0"><span>Harmful</span></label>
-                    <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TRACKON"><span>Need enemy in front</span></label>
-                    <label v-if="current_spell.num < 105"><input type="checkbox" v-model="chk_trackon.TELEPORT"><span>Open map for teleport</span></label>
-                </x-form>
-            </x-section>
-            <x-section>
-                <table ref="shadow_drag_table" class="drag-preview" hidden="true">
-                    <tbody ref="shadow_drag_content">
-                        <tr><td>Drag</td></tr>
-                    </tbody>
-                </table>
-                <x-section-title>Script</x-section-title>            
-                <table>
-                    <tbody>
-                        <tr v-for="(v,id) of (current_spell.script || [])" :key="id" :data-index="id">
-                            <td>{{  id }} </td>
-                            <td class="grab-handle" @mousedown="$event=>begin_drag($event, id)">≡ {{ v.command }}</td>
-                            <td><template v-for="(a, id) of v.args" :key="id">                                                        
-                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Number" v-model="v.args[id]" type="number">
-                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Percent" v-model="v.args[id]" type="number">
-                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.AnimationFile" v-model="v.args[id]" type="text" :list="ds_spellAnim.id">
-                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.SoundFile" v-model="v.args[id]" type="text" :list="ds_spellSounds.id">
-                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Item" 
-                                    type="text" :value="`${item_list.get(a as number).jmeno||'???'} #${a}`" @change="$event=>findItem($event, v.args, id)" :list="ds_spellItems.id">
-                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Element" v-model="v.args[id]" >
-                                    <option v-for="(v,id) of ElementTypeName" :key="id" :value="id"> {{ v }}</option>
-                                </select>
-                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Stat" v-model="v.args[id]" >
-                                    <option v-for="(v,id) of CharacterStatsNames" :key="id" :value="id"> {{ v }}</option>
-                                </select>
-                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.EffectBit" v-model="v.args[id]" >
-                                    <option v-for="(v,id) of SpellEffectName" :key="id" :value="1<<id"> {{ v }}</option>
-                                </select>
-                            </template></td>
-                            <td>
-                                <button @click="current_spell!.script!.splice(id,1)">🞬</button></td>
-                        </tr>
-                        <tr><td> {{ current_spell.script!.length }}</td><td colspan="2"><input type="text" :list="ds_spellCommands.id"
-                            @change="$event=>validateCommand($event)" @keydown="$event=>validateCommandEnter($event)"></td></tr>
-                    </tbody>
-                </table>
-            </x-section>
+        <div class="panels">
+            <div class="runes">
+                <div v-for="c in categories" :class="`category element-${c}`" :key="c">
+                    <div class="element-name"> {{ ElementTypeName[c] }}</div>
+                    <div v-for="r in runes">
+                        <div class="rune-name"> {{ spell_list.get(c * 21 + r * 3)?.spellname }}</div>
+                        <div class="powers">
+                            <div v-for="[spl, idx] in power_list(c, r)" :key="idx" @click="cur_spell_index = idx"
+                                :class="{ spell: true, selected: idx == cur_spell_index }">
+                                <div class="name">{{ spl.spellname }}</div>
+                                <div class="un">{{ spl.um }}</div>
+                                <div class="mge">{{ spl.mge }}</div>
+                                <div class="ap">{{ spl.cast_time }}</div>
+                                <div class="tt">{{ TargetType[spl.cil] }}</div>
+                                <div class="pv">{{ ProtectionFlag[spl.povaha] }}</div>
+                                <div class="gr">{{ spl.accnum }}</div>
+                                <div class="flg">{{ FlagsNames[spl.flags] }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="other" v-for="p of page_list" :key="p">
+                    <div>
+                        <div v-for="[spl, idx] of spell_page(p)" :key="idx" @click="cur_spell_index = idx"
+                            :class="{ spell: true, selected: idx == cur_spell_index }">
+                            <div class="id">{{ idx }}</div>
+                            <div class="name">{{ spl.spellname }}</div>
+                            <div class="tt">{{ TargetType[spl.cil] }}</div>
+                            <div class="pv">{{ ProtectionFlag[spl.povaha] }}</div>
+                            <div class="gr">{{ spl.accnum }}</div>
+                            <div class="flg">{{ FlagsNames[spl.flags] }}</div>
+                            <div class="btn"><button
+                                    @click="spell_list.remove(idx); $event.stopPropagation()">🞬</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="editor">
+                <div v-if="current_spell">
+                    <div>
+                        <x-section>
+                            <x-section-title>Basic settings</x-section-title>
+                            <x-form>
+                                <label v-if="cur_spell_index < 105"><span>Rune</span>
+                                    <div><input type="text" readonly="true" size="4"
+                                            :value="ElementTypeName[Math.floor(cur_spell_index / 21)]">
+                                        <input size="4" type="text" readonly="true"
+                                            :value="Math.floor((cur_spell_index % 21) / 3) + 1">
+                                        <input size="4" type="text" readonly="true" :value="(cur_spell_index % 3) + 1">
+                                    </div>
+                                </label>
+                                <label><span v-if="cur_spell_index < 105 && cur_spell_index % 3 == 0">Display
+                                        name</span>
+                                    <span v-if="cur_spell_index > 105 || cur_spell_index % 3 != 0">Name (not
+                                        shown)</span>
+                                    <input type="text" v-model="current_spell.spellname">
+                                </label>
+                                <template v-if="cur_spell_index < 105">
+                                    <label><span>Magic level</span><input type="number"
+                                            v-model="current_spell.um"></label>
+                                    <label><span>Mana cost</span><input type="number"
+                                            v-model="current_spell.mge"></label>
+                                    <label><span>Action points cost (0=disabled)</span><input type="number"
+                                            v-model="current_spell.cast_time"></label>
+                                    <label><span>Backfire spell id</span>
+                                        <DelayLoadedList v-model="current_spell.backfire" :list="load_spell_list()"
+                                            :key="cur_spell_index"></DelayLoadedList>
+                                    </label>
+                                </template>
+                                <label><span>Target / Victim</span>
+                                    <div><select v-model="current_spell.cil">
+                                            <option v-for="(v, id) of TargetType" :key="id" :value="id">{{ v }}</option>
+                                        </select></div>
+                                </label>
+                                <label><span>Spell group</span><input type="number"
+                                        v-model="current_spell.accnum"></label>
+                                <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1"
+                                        :false-value="0"><span>Harmful</span></label>
+                                <label v-if="cur_spell_index < 105"><input type="checkbox"
+                                        v-model="chk_trackon.TRACKON"><span>Need enemy in front</span></label>
+                                <label v-if="cur_spell_index < 105"><input type="checkbox"
+                                        v-model="chk_trackon.TELEPORT"><span>Open map for teleport</span></label>
+                            </x-form>
+                        </x-section>
+                        <x-section>
+                            <table ref="shadow_drag_table" class="drag-preview" hidden="true">
+                                <tbody ref="shadow_drag_content">
+                                    <tr>
+                                        <td>Drag</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <x-section-title>Script</x-section-title>
+                            <table>
+                                <tbody>
+                                    <tr v-for="(v, id) of (current_spell.script || [])" :key="id" :data-index="id">
+                                        <td>{{ id }} </td>
+                                        <td class="grab-handle" @mousedown="$event => begin_drag($event, id)">≡ {{
+                                            v.command }}</td>
+                                        <td><template v-for="(a, id) of v.args" :key="id">
+                                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Number"
+                                                    v-model="v.args[id]" type="number">
+                                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Percent"
+                                                    v-model="v.args[id]" type="number">
+                                                <input
+                                                    v-if="SpellCommandsArgs[v.command][id] == SpellArgument.AnimationFile"
+                                                    v-model="v.args[id]" type="text" :list="ds_spellAnim.id">
+                                                <input
+                                                    v-if="SpellCommandsArgs[v.command][id] == SpellArgument.SoundFile"
+                                                    v-model="v.args[id]" type="text" :list="ds_spellSounds.id">
+                                                <input v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Item"
+                                                    type="text"
+                                                    :value="`${item_list.get(a as number).jmeno || '???'} #${a}`"
+                                                    @change="$event => findItem($event, v.args, id)"
+                                                    :list="ds_spellItems.id">
+                                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Element"
+                                                    v-model="v.args[id]">
+                                                    <option v-for="(v, id) of ElementTypeName" :key="id" :value="id"> {{
+                                                        v }}</option>
+                                                </select>
+                                                <select v-if="SpellCommandsArgs[v.command][id] == SpellArgument.Stat"
+                                                    v-model="v.args[id]">
+                                                    <option v-for="(v, id) of CharacterStatsNames" :key="id" :value="id">
+                                                        {{ v }}</option>
+                                                </select>
+                                                <select
+                                                    v-if="SpellCommandsArgs[v.command][id] == SpellArgument.EffectBit"
+                                                    v-model="v.args[id]">
+                                                    <option v-for="(v, id) of SpellEffectName" :key="id" :value="1 << id">
+                                                        {{ v }}</option>
+                                                </select>
+                                            </template></td>
+                                        <td>
+                                            <button @click="current_spell!.script!.splice(id, 1)">🞬</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td> {{ current_spell.script?.length }}</td>
+                                        <td colspan="2"><input type="text" :list="ds_spellCommands.id"
+                                                @change="$event => validateCommand($event)"
+                                                @keydown="$event => validateCommandEnter($event)"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </x-section>
+                    </div>
+                </div>
+                    <div class="add-spell"><button @click="add_spell">Add</button></div>
+            </div>
         </div>
-        <button class="close" @click="current_spell = undefined"></button>
-    </div>
-
-
+    </x-workspace>
 
 </template>
 
@@ -360,37 +433,22 @@ watch(item_list, (nv)=>ds_spellItems.update(()=>nv.map((v,id)=>({value:v.jmeno, 
 .element-3{background-color: #aff}
 .element-4{background-color: #faf}
 
-table.spell-list tr:hover td {
-    background-color: #fff8;
+
+.panels {
+    display:flex;
+    height: 100%;
+    justify-content: space-evenly;
 }
 
-table.spell-list tr td {
-    cursor: pointer;
-}
-
-
-table.spell-list tr td.number {text-align: center;}
-
-table.spell-list {
-    margin-left: 15rem;
-}
-table.spell-list.second {
-    margin-left: 32rem;
+.panels > div {
+    height: 100%;
+    overflow: auto;    
 }
 
 .editor {
-    position: fixed;
-    left: 0;
-    right: 0;
-    top: 10vh;
-    bottom: 0;
-    width: 30em;
-    margin: 0 auto auto 1rem;
-    border: 1px solid;
-    box-shadow: 3px 3px 5px black;
-    padding: 1.5em 0 0.5em 0;
-    background-color: #ccc;
-    height: fit-content;
+    position:relative;
+    width: 35rem;
+    flex-shrink: 0;
 }
 
 .editor > div {
@@ -447,5 +505,68 @@ input[type=number] {
     width: 4rem;
     text-align: center;
 }
+
+.runes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: space-evenly;
+}
+.element-name, .rune-name{
+    font-weight: bold;
+    padding: 0.2rem;
+}
+.rune-name {
+    padding-left: 0.4rem;
+}
+.powers {
+    padding-left: 0.6rem;
+}
+
+.spell {
+    cursor: pointer;
+    position: relative;    
+    display: flex;
+}
+
+.spell > * {
+    border: 1px dotted;
+    margin: -1px -1px 0 0;
+    padding: 0.1rem;
+}
+.spell.selected {
+    background-color: black;;
+    color: yellow;
+}
+.spell:hover::after {
+    position:absolute;
+    inset: 0;
+    content: "";
+    background-color: #FFF8;
+    pointer-events: none;
+    
+}
+.spell > .name {width:10rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.spell > .um {width:2rem;text-align: right;}
+.spell > .mge {width:2rem;text-align: right; color:blue}
+.spell > .ap {width:1rem;text-align: right; color:brown}
+.spell > .tt {width:5rem;text-align: center;}
+.spell > .pv {width:3rem;text-align: left;}
+.spell > .gr {width:3rem;text-align: right; color:green}
+.spell > .flg {width:3rem;text-align: center;}
+.spell > .id {width:2.5rem;text-align: right;}
+
+.add-spell {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    font-size: 1.5rem;
+    text-align: right;
+    padding: 1rem;
+}
+.add-spell button {
+    font-size: 1.5rem;
+}
+
 
 </style>

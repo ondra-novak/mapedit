@@ -1,3 +1,4 @@
+import Hive from "@/utils/hive";
 import { BinaryIterator, BinaryWriter,type Schema } from "./binary";
 import type { TranslateTable } from "./translate";
 
@@ -20,12 +21,6 @@ const TKouzloSchema : Schema= {
     spellname:"char[28]", //name of spell
     teleport_target:"uint16", //zero
 };
-
-const TKouzloFlags = {
-    NeedTargetBehind: 0x1,
-    NeedTeleportTarget: 0x2
-} as const;
-
 
 const SpellInstruction = {
     zivel: 131,
@@ -287,48 +282,50 @@ function createScriptFromCmdList(lst: SpellSimpleCmd[]) {
 }
 
 
-export interface TKouzlo {
-    num:number, //spell number
-    um:number,  //min require magic stat
-    mge:number, //mana cost
-    zivel:number,      //zero 
-    cast_time: number,  //cast time (or zero)
-    owner:number,    //zero
-    accnum:number,   //spell category id, replaces spell with same id
-    start:number,   //script start address
-    cil:number,      //type of target
-    povaha:number,   //attack spell or benefical spell
-    flags:number,  //1 - any enemy in front player
-    backfire:number, //spell for backfire
-    wait:number,     //zero
-    delay:number,    //zero
-    spellname:string
-    teleport_target:number, //zero
+export class TKouzlo {
+    num:number = 0; //spell number
+    um:number = 0;  //min require magic stat
+    mge:number = 0; //mana cost
+    zivel:number = 0;      //zero 
+    cast_time: number = 0;  //cast time (or zero)
+    owner:number = 0;    //zero
+    accnum:number = 0;   //spell category id, replaces spell with same id
+    start:number = 0;   //script start address
+    cil:number = 0;      //type of target
+    povaha:number = 0;   //attack spell or benefical spell
+    flags:number = 0;  //1 - any enemy in front player
+    backfire:number = 0; //spell for backfire
+    wait:number = 0;     //zero
+    delay:number = 0;    //zero
+    spellname:string = "";
+    teleport_target:number = 0; //zero
     script?: SpellScriptCommand[];
 }
 
-export function spellsFromArrayBuffer(buff: ArrayBuffer) : TKouzlo[] {
+export class SpellHive extends Hive<TKouzlo> {};
+
+export function spellsFromArrayBuffer(buff: ArrayBuffer) : SpellHive {
     const iter = new BinaryIterator(buff);
     const first = iter.parse(TKouzloSchema) as TKouzlo;
     const ofs = first.start;
     const defblock = buff.slice(0, ofs);
     const iter_lst = new BinaryIterator(defblock);
 
-    const lst : TKouzlo[]= [];
+    const lst = new SpellHive;
 
     let n :number = 0;
     while (!iter_lst.eof()) {
         const r =  iter_lst.parse(TKouzloSchema);
-        r.num = n;
-        ++n;
-        if (!("spellname" in r) ) break;
-        if (r.start == 0) continue;
-        lst.push(r as TKouzlo) ;        
+        lst.add(r);
     }
-    lst.forEach(itm=>{
-        itm.script = createScriptFromCmdList(parseSpellCmdList(buff.slice(itm.start)));
+    lst.forEach((x,idx)=>{
+        if (!x.start) {
+            lst.remove(idx);
+        } else {
+            x.script = createScriptFromCmdList(parseSpellCmdList(buff.slice(x.start)));
+        }
     });
-    return lst.sort((a,b)=>a.num-b.num);    
+    return lst;
 }
 
 function buildScript(script: SpellScriptCommand[]) {
@@ -361,40 +358,32 @@ function buildScript(script: SpellScriptCommand[]) {
     return wr.getBuffer();
 }
 
-export function spellsToArrayBuffer(spells: TKouzlo[]) : ArrayBuffer {
-    let len = 104;
-    for (const k of spells) {if (k.num > len) len = k.num;}
-    ++len;
-    const fakeBuff = new ArrayBuffer(1000);
-    const spell_table  = new Array(len).fill(0).map(_=>new BinaryIterator(fakeBuff).parse(TKouzloSchema) as TKouzlo);
-    const all_scripts = new Array(len).fill(null);
-    for (const k of spells) {
-        if (k.script) all_scripts[k.num] = buildScript(k.script);        
-        spell_table[k.num] = {...k, start: 1};
-    }
+export function spellsToArrayBuffer(spells: SpellHive) : ArrayBuffer {
+    const raw = spells.get_raw();
+    const len = raw.length;
+    const out = raw.map(x=>x?x:new TKouzlo);
 
-    const tmp=new BinaryWriter();
-    tmp.write(TKouzloSchema, spell_table[0]);
-    const blen = tmp.getBuffer().byteLength;
+    const dtc_part = new BinaryWriter();
+    dtc_part.write(TKouzloSchema, new TKouzlo())
+    const sz = dtc_part.length();
 
-    let offset = blen * len;
+    const script_part = new BinaryWriter();
+    const table_part = new BinaryWriter();
 
-    for (let i = 0; i < len; ++i) {
-        if (spell_table[i].start) {
-            spell_table[i].start = offset;
+    const start = len * sz;
+
+    out.forEach(spl=>{
+        if (spl.script) {
+            spl.start = start + script_part.length();
+            script_part.write_buffer(buildScript(spl.script));
+        } else {
+            spl.start = 0;
         }
-        if (all_scripts[i]) offset+=all_scripts[i].byteLength;
-    }
+        table_part.write(TKouzloSchema, spl);
+    })
 
-    const fin = new BinaryWriter();
-    for (let i = 0; i < len; ++i) {
-        fin.write(TKouzloSchema, spell_table[i]);        
-    }
-    for (let i = 0; i < len; ++i) {
-        if (all_scripts[i]) fin.write_buffer(all_scripts[i]);
-    }
-
-    return fin.getBuffer();
+    table_part.write_buffer(script_part.getBuffer());
+    return table_part.getBuffer();
 
 }
 
