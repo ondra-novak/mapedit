@@ -310,6 +310,11 @@ const Abilities=[
 
 ]
 
+async function laod_dialogs() : Promise<{value:number, label:string}[]> {
+    const lst = await getGlobalDialogs();
+    return  [{value:-1,label:'(none)'}].concat(lst.map(y=>({value:y[0], label:y[1]})));
+}
+
 </script>
 
 <template>      
@@ -398,8 +403,9 @@ const Abilities=[
                         <option value="9">Held on place</option>
                     </select></label>
                     <label><span>Dialog</span>
-                        <DelayLoadedList v-model="form.dialog" :list="getGlobalDialogs().then(x=>[{value:-1,label:'(none)'}].concat(x.map(y=>({value:y[0], label:y[1]}))))" size="1"/>
+                        <DelayLoadedList v-model="form.dialog" :list="laod_dialogs()" size="1"/>
                         </label>
+                    <label><span>Kill dialog (played on defeat)</span><DelayLoadedList v-model="form.kill_dialog" :list="laod_dialogs()" size="1"/></label>
                 </x-form>
             </x-section>
             <x-section>

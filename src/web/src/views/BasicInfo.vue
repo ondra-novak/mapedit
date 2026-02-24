@@ -24,6 +24,7 @@ class BasicInfoData {
     characters_min:number = 3;
     characters_max:number = 3;
     start_map: string = "START.MAP";
+    dlc:number = 0;
     language: string = "en";
 };
 
@@ -190,6 +191,20 @@ async function publish_publish() {
     }
 
 }
+
+async function warning_msg() {
+    setTimeout(()=>{
+        if (basic_info.value.dlc) {
+            messageBoxAlert("This feature can only be enabled if your adventure is an expansion of the original game. This requires that all original definitions be retained, such as all items, monsters, shops, dialogue, or spells. Any modification to these definitions may cause saved games from the original game to be unplayable, or cause undefined behavior.")
+        }
+    },100);
+}
+
+const dlc = computed({
+    get:()=>!!parseInt(`${basic_info.value.dlc}`),
+    set:(b:boolean)=>basic_info.value.dlc = b?1:0
+})
+
 </script>
 <template>
 
@@ -216,6 +231,7 @@ async function publish_publish() {
             </tbody>
         </table>
         </div>
+            <label><input type="checkbox" v-model="dlc" @click="warning_msg"><span>DLC / Game plus</span></label>
         </x-form>
     </x-section>    
     </div>

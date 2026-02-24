@@ -3,7 +3,7 @@ import Hive from '@/utils/hive'
 import type { TranslateTable } from "./translate";
 
 
-const MOBS_INV = 16;
+const MOBS_INV = 15;
 const MOB_SOUNDS = 4;
 
 
@@ -71,6 +71,7 @@ export class EnemyDef{
   money: number = 0; // peníze (word)
   specproc: number = 0; // speciální akce (word)
   reserved: number[] = []; // rezervovaná data (char[3])
+  kill_dialog:number = 0;
 };
 
 const EnemySchema : Schema = {
@@ -86,6 +87,7 @@ const EnemySchema : Schema = {
   anim_counter: "uint16",
   vlastnosti: ["uint16", 24],
   inv: ["int16", MOBS_INV],
+  kill_dialog: "int16",
   lives: "int16",
   cislo_vzoru: "int16",
   speed: "int16",
@@ -117,48 +119,49 @@ const EnemySchema : Schema = {
 
 
 const EnemySchemaNew : Schema = {
-  name: "char[30]",                 //30
-  casting: "int16",                 //32
-  adjusting: ["int16", 6, 16],      //224
-  sector: "uint16",                 //226
-  dir: "uint16",                    //228
+  name: "char[30]",                 
+  casting: "int16",                 
+  adjusting: ["int16", 6, 16],      
+  sector: "uint16",                 
+  dir: "uint16",                    
   locx: "int8",
   locy: "int8",
   headx: "int8",
-  heady: "int8",                    //232
-  anim_counter: "uint16",           //234
-  vlastnosti: ["uint16", 24],       //282
-  inv: ["int16", MOBS_INV],         //314
-  lives: "int16",                   //316
-  cislo_vzoru: "int16",             //318
-  speed: "int16",                   //320
-  dohled: "int16",                  //322
-  dosah: "int16",                   //324
-  stay_strategy: "uint8",           //325
-  walk_data: "int8",                //326
-  bonus: "uint16",                  //328
-  flee_num: "int8",                 //329
-  anim_counts: ["int8", 6],         //335
-  mobs_name: "char[7]",             //342
-  flags2:  "uint8",                 //343
-  reserved: "uint8",                //344
-  experience: "int32",              //348
-  vlajky: "uint8",                  //349
-  anim_phase: "uint8",              //350
-  csektor: "int16",                 //352
-  home_pos: "int16",                //354
-  next: "int16",                    //356
-  actions: "uint8",                 //357
-  hit_pos: "uint8",                 //358
-  sounds: ["uint16", MOB_SOUNDS],   //366
-  paletts_count: "int8",            //367
-  mode: "int8",                     //368
-  dialog: "int16",                  //370
-  dialog_flags: "int16",            //372
-  money: "uint16",                  //374
-  specproc: "uint16",               //376
-  reserved2: "uint16",              //378
-  reserved3: "uint16",              //380
+  heady: "int8",                    
+  anim_counter: "uint16",           
+  vlastnosti: ["uint16", 24],       
+  inv: ["int16", MOBS_INV],         
+  kill_dialog: "int16",             
+  lives: "int16",                   
+  cislo_vzoru: "int16",             
+  speed: "int16",                   
+  dohled: "int16",                  
+  dosah: "int16",                   
+  stay_strategy: "uint8",           
+  walk_data: "int8",                
+  bonus: "uint16",                  
+  flee_num: "int8",                 
+  anim_counts: ["int8", 6],         
+  mobs_name: "char[7]",             
+  flags2:  "uint8",                 
+  reserved: "uint8",                
+  experience: "int32",              
+  vlajky: "uint8",                  
+  anim_phase: "uint8",              
+  csektor: "int16",                 
+  home_pos: "int16",                
+  next: "int16",                    
+  actions: "uint8",                 
+  hit_pos: "uint8",                 
+  sounds: ["uint16", MOB_SOUNDS],   
+  paletts_count: "int8",            
+  mode: "int8",                     
+  dialog: "int16",                  
+  dialog_flags: "int16",            
+  money: "uint16",                  
+  specproc: "uint16",               
+  reserved2: "uint16",              
+  reserved3: "uint16",              
 } as const;
 
 export class Enemies extends Hive<EnemyDef> {}
