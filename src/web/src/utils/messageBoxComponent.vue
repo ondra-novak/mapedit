@@ -49,8 +49,6 @@ watch(dlg, (new_val, old_val)=>{
     }
 })
 
-dlc
-
 const dlg_ref = ref<HTMLDialogElement>();
 
 watch(dlg_ref, ()=>{

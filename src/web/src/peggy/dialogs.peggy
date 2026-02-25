@@ -66,7 +66,7 @@ Primary
 
 Call
   = name:Identifier _ "(" _ args:Arguments? _ ")" {
-      return node("call", name[1], ...args);
+      return node("call", name[1], ...(args ?? []));
     }
 
 ExpressionOrString = Expression / String

@@ -8,6 +8,7 @@ import globalGetItems from '@/utils/global_item_list';
 import { ref, watch } from 'vue';
 import MaskedInput from './MaskedInput.vue';
 import DelayLoadedList from './DelayLoadedList.vue';
+import { spellsFromArrayBuffer } from '@/core/spell_structs';
 
 
 const model = defineModel< Record<string, DialogConstant> >();
@@ -42,6 +43,13 @@ async function load_charactes() {
     return chrs.map((x, idx)=>[idx,x.jmeno]  as [number,string]);
 }
 
+async function load_spells() {
+    const data = await server.getDDLFile("KOUZLA.DAT");
+    const spls = spellsFromArrayBuffer(data);
+    return spls.map((x, idx)=>[idx, x.spellname] as [number, string])
+        .sort((a,b)=>a[1].localeCompare(b[1]));
+}
+
 
 async function get_list() : Promise<[number,string][]> {
     const t = sel_type.value;
@@ -51,12 +59,13 @@ async function get_list() : Promise<[number,string][]> {
         case 2:return await load_enemies();
         case 3:return await load_shops();
         case 4:return await load_charactes();        
+        case 5:return await load_spells();        
         default: return Promise.resolve([]);
     }
 }
 
 const typenames = [
-    "Number","Item","Enemy","Shop","Character"
+    "Number","Item","Enemy","Shop","Character","Spell"
 ];
 
 

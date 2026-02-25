@@ -17,7 +17,11 @@ const TKouzloSchema : Schema= {
     backfire:"uint16", //spell for backfire
     wait:"uint16",     //zero
     delay:"uint16",    //zero
-    flags:"uint8",  
+    flags:["bitmap","uint8",{
+        trace: 0x1,
+        teleport: 0x2,
+        hidden: 0x4
+    }],
     spellname:"char[28]", //name of spell
     teleport_target:"uint16", //zero
 };
@@ -186,7 +190,7 @@ const SpellCommands : Record<string, SpellCommandDesc> = {
     spec_gather3: {instr:[],action: SpellSpecialAction.SP_PRIPOJENI3},
     spec_gatherAll: {instr:[],action: SpellSpecialAction.SP_PRIPOJENIA},
     spec_earthquake: {instr:[],action: SpellSpecialAction.SP_CHVENI},
-    spec_iconSpellEffect: {instr:[],action: SpellSpecialAction.SP_DEFAULT_EFFEKT},
+    spec_portraitSpellEffect: {instr:[],action: SpellSpecialAction.SP_DEFAULT_EFFEKT},
     spec_TrueSeeing: {instr:[],action: SpellSpecialAction.SP_TRUE_SEEING},
     spec_ShowHP: {instr:[],action: SpellSpecialAction.SP_SCORE},
     spec_Halucinacion: {instr:[],action: SpellSpecialAction.SP_HALUCINACE},
@@ -281,6 +285,11 @@ function createScriptFromCmdList(lst: SpellSimpleCmd[]) {
     return ret;
 }
 
+interface SpellFlags {
+    trace: boolean,
+    teleport: boolean,
+    hidden: boolean
+}
 
 export class TKouzlo {
     num:number = 0; //spell number
@@ -293,7 +302,7 @@ export class TKouzlo {
     start:number = 0;   //script start address
     cil:number = 0;      //type of target
     povaha:number = 0;   //attack spell or benefical spell
-    flags:number = 0;  //1 - any enemy in front player
+    flags : SpellFlags= {trace:false, teleport: false, hidden: false};
     backfire:number = 0; //spell for backfire
     wait:number = 0;     //zero
     delay:number = 0;    //zero

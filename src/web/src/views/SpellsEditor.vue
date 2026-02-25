@@ -40,9 +40,8 @@ const TargetType = [
     "other",
 ];
 
-const ProtectionFlag = ["Harm","Safe"];
+const ProtectionFlag = ["Safe","Harm"];
 
-const FlagsNames = ["","EF","T","EF | T"]
 
 function init() {
     function reload() {
@@ -97,7 +96,8 @@ onUnmounted(()=>save_state.unmount());
 
 const [ cur_spell_trackon, chk_trackon ] = useBitmaskCheckbox2({
     TRACKON: 0x1,
-    TELEPORT: 0x2
+    TELEPORT: 0x2,
+    HIDDEN: 0x4
 });
 
 function findItem(event: Event, params: any[], index: number) {
@@ -204,12 +204,6 @@ function validateCommandEnter(event: Event) {
     }
 }
 
-watch(current_spell, ()=>{    
-    if (current_spell.value) cur_spell_trackon.value = current_spell.value.flags;    
-});
-watch(cur_spell_trackon, ()=>{
-    if (current_spell.value && cur_spell_trackon) current_spell.value.flags = cur_spell_trackon.value;
-});
 
 watch(spell_list, ()=>save_state.set_changed(true),{deep:true});
 
@@ -267,6 +261,14 @@ function add_spell() {
     cur_spell_index.value = spell_list.value.add(k);
 }
 
+function flags_to_string(spl: TKouzlo) {
+    var out : string[] = [];
+    if (spl.flags.trace) out.push("E");
+    if (spl.flags.teleport) out.push("T");
+    if (spl.flags.hidden) out.push("H");
+    return out.join(",");
+}
+
 </script>
 
 <template>
@@ -287,7 +289,7 @@ function add_spell() {
                                 <div class="tt">{{ TargetType[spl.cil] }}</div>
                                 <div class="pv">{{ ProtectionFlag[spl.povaha] }}</div>
                                 <div class="gr">{{ spl.accnum }}</div>
-                                <div class="flg">{{ FlagsNames[spl.flags] }}</div>
+                                <div class="flg">{{ flags_to_string(spl)}}</div>
                             </div>
                         </div>
                     </div>
@@ -301,7 +303,7 @@ function add_spell() {
                             <div class="tt">{{ TargetType[spl.cil] }}</div>
                             <div class="pv">{{ ProtectionFlag[spl.povaha] }}</div>
                             <div class="gr">{{ spl.accnum }}</div>
-                            <div class="flg">{{ FlagsNames[spl.flags] }}</div>
+                            <div class="flg">{{ flags_to_string(spl)}}</div>
                             <div class="btn"><button
                                     @click="spell_list.remove(idx); $event.stopPropagation()">🞬</button></div>
                         </div>
@@ -350,9 +352,10 @@ function add_spell() {
                                 <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1"
                                         :false-value="0"><span>Harmful</span></label>
                                 <label v-if="cur_spell_index < 105"><input type="checkbox"
-                                        v-model="chk_trackon.TRACKON"><span>Need enemy in front</span></label>
+                                        v-model="current_spell.flags.trace"><span>Need enemy in front</span></label>
                                 <label v-if="cur_spell_index < 105"><input type="checkbox"
-                                        v-model="chk_trackon.TELEPORT"><span>Open map for teleport</span></label>
+                                        v-model="current_spell.flags.teleport"><span>Open map for teleport</span></label>
+                                <label><input type="checkbox" v-model="current_spell.flags.hidden"><span>Hide icon</span></label>
                             </x-form>
                         </x-section>
                         <x-section>

@@ -169,6 +169,7 @@ export class DialogDef {
         49: ["stk_push random",0],
         50: ["stk_push held_item",0],
         51: ["iff = no choices",0],
+        52: ["kill_current_enemy",0],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -599,7 +600,8 @@ const functionList: FunctionList =
     "teleport_current_enemy":[['n','n'],206],
     "send_enemy":[['n','n'],203],
     "send_current_enemy":[['n'],204],
-    "visited":[['r'],145]
+    "visited":[['r'],145],
+    "kill_current_enemy":[[],52]
 };
 
 export class DialogCompileError extends Error {
