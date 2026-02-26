@@ -62,7 +62,7 @@ function get_instruction_text(v: [string, Instruction[]]) {
     out.push(code);
     args.forEach(x=>{
         if ("value" in x) out.push(`${x.value}`);
-        else if ("variable" in x) out.push(`[${x.value}]`);
+        else if ("variable" in x) out.push(`[${x.variable}]`);
         else if (x.pop) out.push("POP");
         else if ("text" in x) out.push(`'${x.text}'`);
     })

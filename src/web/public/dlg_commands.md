@@ -131,5 +131,7 @@ cond && {
  - **visited(n)** - returns true, when node n has already been visited. N is local node ID  
  - **kill_current_enemy()** - kills current enemy (disables kill dialog, displays effects, drops loot)
  - **set_speaker_by_face(slot, face_id)** - set speaker's slot by face (variable can be used) 
+ - **printf(s,...)** - output text to window, where s is pattern and arguments are variable count depend on pattern: printf("chance is {} of {}", a, b)
+ - **str(n)** - function can be used instead of string, where n is refers to global string table. n must be constant. Invalid use causes crash
 
 

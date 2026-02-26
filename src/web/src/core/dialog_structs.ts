@@ -170,6 +170,8 @@ export class DialogDef {
         50: ["stk_push held_item",0],
         51: ["iff = no choices",0],
         52: ["kill_current_enemy",0],
+        53: ["speaker_by_slot",2],
+        54: ["printf",2],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -556,7 +558,7 @@ export class DialogManager {
 
 
 // name, param type - n=number,s=string,r=node ref, code
-type FunctionList = Record<string,[ ('n'|'s'|'r')[], number]>;
+type FunctionList = Record<string,[ ('n'|'s'|'r'|'va')[], number]>;
 
 const functionList: FunctionList = 
 {
@@ -602,7 +604,8 @@ const functionList: FunctionList =
     "send_current_enemy":[['n'],204],
     "visited":[['r'],145],
     "kill_current_enemy":[[],52],
-    "set_speaker_by_face(slot, face_id":[['n','n'],29]
+    "set_speaker_by_face(slot, face_id":[['n','n'],29],
+    "exit":[[],255],
 };
 
 export class DialogCompileError extends Error {
@@ -661,11 +664,11 @@ class DialogCompiler {
             this.map.set(st, vid);
             this.local_map.set(st, iid);
         }
-        let idx = 1;
+        let idx = 32767;
         for (const id in d._dlg) {
             const st = d._dlg[id];
             for (const subid in st.nodes) {                
-                while (this.nodes[idx]) ++idx;
+                while (this.nodes[idx]) --idx;
                 this.nodes[idx] = st.nodes[subid];
                 this.map.set(st.nodes[subid], idx);
                 this.stories.set(st.nodes[subid], st);
@@ -994,6 +997,14 @@ class DialogCompiler {
                         }
                     }
                     this.compile_error(`Condition ${cond_name} is not defined`);
+                } else if (n == "printf") {
+                    if (args.length<1) this.compile_error("Function printf needs at least one argument");
+                    const s = this.compile_string(args.pop(),1,n);
+                    args.forEach(a=>this.push_iff(this.compile_ast(a, out),out));
+                    out.push({value: 54});
+                    out.push(s);
+                    out.push({value: args.length});                
+                    return false;
                 } else {
                     const def = functionList[n];
                     if (!def) this.compile_error(`Unknown function ${n}`);
@@ -1003,8 +1014,7 @@ class DialogCompiler {
                         const pos = args.length-idx-1;
                         const d = def[0][pos];
                         switch (d) {
-                            case "s": if (a[0] != "str") this.compile_error(`Function "${n}()" expected string as argument ${pos+1}`);
-                                    arginstr.unshift({text: a[1]});
+                            case "s":  arginstr.unshift(this.compile_string(a[0],pos+1,n));
                                     break;
                             case 'n': {
                                 const dummy : Instruction[] = [];
@@ -1029,6 +1039,9 @@ class DialogCompiler {
                                 } else {
                                     this.compile_error(`Argument of "${n}()" must be number: id of node. Expression is not allowed`)
                                 }
+                            }
+                            case 'va': {
+                                
                             }
                             break;
                         }
@@ -1116,6 +1129,20 @@ class DialogCompiler {
 
             }
         }
+    }
+
+    compile_string(ast: any[], pos: number, fn: string):Instruction {
+        if (ast[0] == "call" && ast[1] == "str" && ast.length==3) {
+            const dummy: Instruction[] = [];
+            const v = this.compile_likely_constant(ast[2], dummy);
+            if (!v) {this.compile_error("Argument of the function str() must be constant");return {};}
+            return v;
+        } else if (ast[0] == "str" && typeof ast[1] == "string") {
+            return {text: ast[1]};
+        }
+        this.compile_error(`Function "${fn}()" expected string as argument ${pos}`);
+        return {};
+
     }
 
     compile_likely_constant(ast: any[], out: Instruction[]) {
