@@ -130,5 +130,6 @@ cond && {
  - **enable_global_map(b)** - enable or disable global map
  - **visited(n)** - returns true, when node n has already been visited. N is local node ID  
  - **kill_current_enemy()** - kills current enemy (disables kill dialog, displays effects, drops loot)
+ - **set_speaker_by_face(slot, face_id)** - set speaker's slot by face (variable can be used) 
 
 

@@ -140,14 +140,14 @@ export class DialogDef {
         19: ["un!",0],
         20: ["push iff",0],
         21: ["pop iff",0],
-        22: ["speaker",2],
+        22: ["speaker",3],
         23: ["stk_push stat.",1],
         24: ["stk_push equip.",1],
         25: ["stk_push weapon_bonus.",1],
         26: ["stk_push gender",0],
         27: ["stk_push count_slots",0],
         28: ["stk_push count_present",0],
-        29: ["speaker_xicht",1],
+        29: ["speaker_xicht",2],
         30: ["q_fact",1],
         31: ["set_fact",1],
         32: ["reset_fact",1],
@@ -601,7 +601,8 @@ const functionList: FunctionList =
     "send_enemy":[['n','n'],203],
     "send_current_enemy":[['n'],204],
     "visited":[['r'],145],
-    "kill_current_enemy":[[],52]
+    "kill_current_enemy":[[],52],
+    "set_speaker_by_face(slot, face_id":[['n','n'],29]
 };
 
 export class DialogCompileError extends Error {
@@ -773,29 +774,25 @@ class DialogCompiler {
         st.speakers.forEach((sp,idx)=>{
             switch (sp.type) {
                 case DialogSpeakerType.attribute:
-                    out.push({value:22},       //nahodne
-                             {value:sp.attribute || 0},
-                             {value:sp.param || 99},
-                             {value:130}, //save_name
-                             {value:idx+1});
+                    out.push({value:22},       //select speaker
+                             {value:sp.attribute || 0}, //attribue
+                             {value:sp.param || 99},   //limit
+                             {value:idx+1});  //slot
                     break;
                 case DialogSpeakerType.random:
-                    out.push({value:22},       //nahodne
+                    out.push({value:22},       //select speaker
                              {value:0},
                              {value:0},
-                             {value:130}, //save_name
                              {value:idx+1});
                     break;
                 case DialogSpeakerType.xicht:
-                    out.push({value:201});       //pc_xicht
+                    out.push({value:29});       //select speaker by face
                     out.push({value:sp.param}); 
-                    out.push({value:130}); //save_name
                     out.push({value:idx+1});
                     break;
                 case DialogSpeakerType.character:
-                    out.push({value:29});       //character slot
+                    out.push({value:53});       //select speaker by slot
                     out.push({value:sp.param}); 
-                    out.push({value:130}); //save_name
                     out.push({value:idx+1});
                     break;
                 default:
