@@ -4,12 +4,13 @@ import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { BinaryIterator, BinaryWriter, parseSection, writeSection } from '@/core/binary';
 import { characters_generate_translation, characters_translate, humanDataFromArrayBuffer, humanDataToArrayBuffer } from '@/core/character_structs';
-import { DialogManager, type DialogConstant } from '@/core/dialog_structs';
+import { DialogManager, translate_original_dialogy_dat, type DialogConstant } from '@/core/dialog_structs';
 import { enemy_generate_translation, enemy_translate, enemyAndSoundFromArrayBuffer, enemyAndSoundToArrayBuffer, enemyFromArrayBuffer } from '@/core/enemy_struct';
 import { FactDB } from '@/core/factdb';
 import { items_generate_translation, items_translate, itemsFromArrayBuffer, itemsToArrayBuffers } from '@/core/items_struct';
 import { keybcs2string, string2keybcs } from '@/core/keybcs2';
 import { ascii_languages } from '@/core/languages';
+import { mapExtractName, mapTranslateName } from '@/core/map_structs';
 import { shops_generate_translation, shops_translate, shopsFromArrayBuffer, shopsToArrayBuffer } from '@/core/shop_structs';
 import { spells_generate_translation, spells_translate, spellsFromArrayBuffer, spellsToArrayBuffer } from '@/core/spell_structs';
 import { map_load_stringtable, map_save_stringtable, parse_stringtable, serialize_stringtable, stringtable_generate_translation, stringtable_translation } from '@/core/string_table';
@@ -254,6 +255,9 @@ async function do_generate_stringtable() : Promise<string> {
         if (!gen_config.index0) delete str[0];
         if (!gen_config.playlist) delete_playlists(str);
         stringtable_generate_translation(v, str, trn);
+        const map = (await server.getDDLFile(v));
+        const n = mapExtractName(map);
+        if (n) trn.store("mapname", v, n);
     }
 
     for (const v of other_files) {
@@ -372,7 +376,7 @@ async function do_apply_stringtable(csv: ArrayBuffer) {
             db = FactDB.fromJSON(dec.decode(factsdata));;
         } catch (e) {}
 
-        const dat = dlg.generate_dat(dlg.compile(db.asDlgConsts()));
+        const dat = DialogManager.generate_dat(dlg.compile(db.asDlgConsts()));
         await server.putDDLFile("DIALOGY.DAT", dat, AssetGroup.MAPS);
     } catch (e) {}
 
@@ -406,6 +410,13 @@ async function do_apply_stringtable(csv: ArrayBuffer) {
             stringtable_translation(v, str, trn);
             await map_save_stringtable(v, str);
         }
+        const n = trn.load("mapname",v);
+        if (n) {
+            const b = mapTranslateName( await server.getDDLFile(v),n);
+            if (b) {
+                await server.putDDLFile(v, b, AssetGroup.MAPS);
+            }
+        }
     }
 
     for (const v of other_files) {
@@ -420,9 +431,18 @@ async function do_apply_stringtable(csv: ArrayBuffer) {
 
         }
     }
+}
 
+async function translate_dialogy_dat() {
+    const f = await browse_file("text/csv");
+    const trn = new TranslateTable;
+    trn.import_csv(f.data);
 
-    
+    const dlg = await server.getDDLFile("DIALOGY.DAT");    
+    const ret = translate_original_dialogy_dat(trn, dlg);
+    if (ret) {
+        await server.putDDLFile("DIALOGY.DAT", ret, AssetGroup.MAPS);
+    }
 }
 
 </script>
@@ -458,6 +478,9 @@ next step to generate the localized language version.
         </x-form>
         <div class="deploy"><button :disabled="!trans_config.lang || !trans_config.ddlname" @click="update_target_csv">Open CSV and update project</button></div>
     </x-section>
+    <!--<x-section>
+        <div class="deploy"><button @click="translate_dialogy_dat">Translate dialogy.dat</button></div>
+    </x-section>-->
     </div>
     <dialog ref="string_table_gen_status">
         <header>Generate stringtable</header>

@@ -1513,6 +1513,44 @@ export class GlobalMapPalettes {
     
 }
 
+export function mapExtractName(mapBin: ArrayBuffer) : string | null{
+    const it = new BinaryIterator(mapBin);
+    while (true) {
+        const sect = parseSection(it);
+        if (sect.type == MapSections.MAPEND) break;
+        if (sect.type == MapSections.MAPGLOB) {
+            
+            const nfo = new MAPGLOBAL;
+            Object.assign(nfo, (new BinaryIterator(sect.data)).parse(nfo.getSchema()));
+            return nfo.mapname;            
+        }
+    }
+    return null;
+}
+
+export function mapTranslateName(mapBin: ArrayBuffer, name: string): ArrayBuffer | null {
+    const it = new BinaryIterator(mapBin);
+    const wr = new BinaryWriter();
+    let changed = false;
+    while (true) {
+        const sect = parseSection(it);
+        if (sect.type == MapSections.MAPEND) break;
+        if (sect.type == MapSections.MAPGLOB) {
+            const nfo = new MAPGLOBAL;
+            Object.assign(nfo, (new BinaryIterator(sect.data)).parse(nfo.getSchema()));
+            nfo.mapname = name;
+            const wr2 = new BinaryWriter();
+            wr2.write(nfo.getSchema(), nfo);
+            writeSection(wr, sect.type, wr2.getBuffer());
+            changed = true;
+        } else {
+            writeSection(wr, sect.type, sect.data);
+        }
+    }
+    writeSection(wr,MapSections.MAPEND, new ArrayBuffer());
+    return changed?wr.getBuffer():null;
+}
+
 
 export const directions = ["North ↑","East →","South ↓","West ←"];
 

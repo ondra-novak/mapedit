@@ -34,7 +34,8 @@ export function stringtable_translation(name: string, stbl: string[], ttbl: Tran
 
 export function serialize_stringtable(ss:string[]) :string{
     const out = ss.reduce((a,txt,idx)=>{
-        a.push(`${idx} ${txt}`);
+        const txts = txt.replace("\n","|").replace("\r","");        
+        a.push(`${idx} ${txts}`);
         return a;
     },[] as string[]);
     out.push("-1");

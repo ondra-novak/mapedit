@@ -92,7 +92,7 @@ export class TranslateTable {
             split_ignore_in_quotes(row,",").map(x=>{
                 const y = x.trim();
                 if (y.startsWith('"') && y.endsWith('"')) {
-                    return y.substring(1, y.length-1).replace('""','"');                                        
+                    return y.substring(1, y.length-1).replaceAll('""','"');                                        
                 } else {
                     return y;
                 }

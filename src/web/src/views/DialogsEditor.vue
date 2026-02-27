@@ -75,7 +75,7 @@ async function save_all() {
     await server.putDDLFile("DIALOGY.JSON", bin.buffer, AssetGroup.MAPS);    
     const code = compile_code(true);
     if (code !== null) {
-        const bin = dialogs.generate_dat(code);
+        const bin = DialogManager.generate_dat(code);
         await server.putDDLFile("DIALOGY.DAT", bin, AssetGroup.MAPS);
         StatusBar.invoke_reload();
     }

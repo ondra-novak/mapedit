@@ -30,46 +30,48 @@ function y_coord(v:number) {
     return v*20;
 }
 
-function get_target_node(v: [string, Instruction[]]) {
+function get_target_node(v: [number, Instruction[]]) {
     const code = v[0];
-    if (code == "add_choice" 
-       || code == "goto_node" 
-       || code  == "goto_node_iff" 
-       || code == "goto_node_not_iff") {
+    if (code == 142 
+       || code == 139 
+       || code  == 140 
+       || code == 141) {
             return v[1][0].value || null;
        }
-    if (code == "add_choice_iff") {
+    if (code == 143) {
             return v[1][1].value || null;
     }
     return null;
 }
 
-function get_jump_offset(v: [string, Instruction[]]) {
+function get_jump_offset(v: [number, Instruction[]]) {
     const code = v[0];
-    if (code == "jump_not_iff" || code == "jump_iff" || code == "jump") {
+    if (code == 169 || code == 170 || code == 171) {
         return v[1][0]?.value || null;
     } else {
         return null;
     }
 }
 
-function get_instruction_text(v: [string, Instruction[]]) {
+function get_instruction_text(v: [number, Instruction[]]) {
     if (!v || !v.length) return "<empty>";
     const code = v[0];
     const args = v[1];
 
     const out :string[] = []
-    out.push(code);
+    const c = DialogDef.instruction_table[code];
+    if (!c) out.push(`#${code}`);
+    else out.push(c[0]);
     args.forEach(x=>{
-        if ("value" in x) out.push(`${x.value}`);
+        if ("text" in x) out.push(`'${x.text}' (offset: ${x.value})`);
+        else if ("value" in x) out.push(`${x.value}`);
         else if ("variable" in x) out.push(`[${x.variable}]`);
         else if (x.pop) out.push("POP");
-        else if ("text" in x) out.push(`'${x.text}'`);
     })
     return out.join(" ");
 }
 
-function goto_node(n: [string, Instruction[]]) {
+function goto_node(n: [number, Instruction[]]) {
     const tn = get_target_node(n);
     if (tn !== null) {
         cur_node_idx.value = tn;
@@ -101,11 +103,11 @@ function calc_arrow(from:number, to:number) : string {
     
 }
 
-function contains_text(n:[string, Instruction[]]) {
+function contains_text(n:[number, Instruction[]]) {
     const s = n[1].find(x=>!!x.text);
     return !!s;
 }
-async function copy_to_clip(n:[string, Instruction[]], idx: number) {
+async function copy_to_clip(n:[number, Instruction[]], idx: number) {
     const txt = n[1].filter(x=>"text" in x).map(x=>x.text).join(",")
     await navigator.clipboard.writeText(txt);
     is_copied.value = idx;

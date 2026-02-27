@@ -1,7 +1,6 @@
 import { BinaryIterator, BinaryWriter, make1DArray, type Schema } from "./binary";
 import { HumanWearPlaceVariables } from "./character_structs";
 import { CharacterStatVariables, CharacterWeaponBonus, CharacterWeaponBonusVariables, type CharacterStats } from "./common_defs";
-import type { directions } from "./map_structs";
 import type { TranslateTable } from "./translate";
 
 export const MAX_IDENTIFIERS = 100;
@@ -58,15 +57,15 @@ function read_instruction(iter: BinaryIterator) : Instruction {
 }
 
 function write_instruction(iter: BinaryWriter, instr: Instruction) {
-    if ("value" in instr) {
-        iter.write("uint8",2);
-        iter.write("int16",instr.value);
-    } else if ("text" in instr) {
+    if ("text" in instr) {
         const txt = instr.text ?? "";        
         const cz = 
         iter.write("uint8",1);
         iter.write_stringz(txt.substring(0,4000));
-    } else  if ("variable" in instr) {
+    } else if ("value" in instr) {
+        iter.write("uint8",2);
+        iter.write("int16",instr.value);
+    } else if ("variable" in instr) {
         iter.write("uint8",3);
         iter.write("int16",instr.variable);
     } else if (instr.pop) {
@@ -76,8 +75,8 @@ function write_instruction(iter: BinaryWriter, instr: Instruction) {
 
 export class DialogDef {
 
-    pgfs: [string, any][][] = [];
-
+    pgfs: [number, Instruction[]][][] = [];
+    
     load_from_buffer(buffer: ArrayBuffer) {
         const iter = new BinaryIterator(buffer);
         const count:number = iter.parse("uint32");
@@ -94,13 +93,14 @@ export class DialogDef {
         pgf_map.forEach((v)=>offset_set.push(v));
         offset_set.sort((a,b)=>a - b);
 
-        const state = {local_pgf: 0};
+        const state = {local_pgf: 0, seek: 0};
         const initial = 8*count+8;
         for (const itm of pgf_map) {
             const beg = itm[1];
             const idx = offset_set.findIndex(x=>x == beg);
             if (idx < 0) throw Error("Internal error");
             const end = idx+1 == offset_set.length?buffer.byteLength:offset_set[idx+1];
+            state.seek = initial+beg;
             const part = buffer.slice(initial+beg, initial+end);
             this.pgfs[itm[0]] = DialogDef.parse_code(part,state);
         }
@@ -260,12 +260,13 @@ export class DialogDef {
     }
 
 
-    static parse_code(buffer: ArrayBuffer, state: {local_pgf: number}) : [string, Instruction[] ][] {
+    static parse_code(buffer: ArrayBuffer, state: {local_pgf: number, seek: number}) : [number, Instruction[] ][] {
         const iter = new BinaryIterator(buffer);
-        const out : [string,Instruction[]][] = [];
+        const out : [number,Instruction[]][] = [];
         const label_map = new Map<number, number>()
         let fill_jump : [number,number][] = [];
         try {
+            let cycles : number  = 0;
             while (true) {
                 while(!iter.eof()) {                
                     label_map.set(iter.tell(), out.length);
@@ -273,12 +274,17 @@ export class DialogDef {
                     if (instr_code.value === undefined) throw Error(`Parse error, instruction ${JSON.stringify(instr_code)}`);
                     const c = instr_code.value;
                     const instr = DialogDef.instruction_table[c];
-                    if (!instr) out.push(["?unknown",[instr_code]]);
+                    if (!instr) out.push([instr,[]]);
                     else {
                         const arg_cnt = instr[1];
                         const args : Instruction[]= [];
-                        for (let i = 0; i < arg_cnt; ++i) {
-                            args.push(read_instruction(iter));                        
+                        for (let i = 0; i < arg_cnt; ++i) {                            
+                            const ofs = state.seek + iter.tell();
+                            const instr = read_instruction(iter);
+                            if ("text" in instr) {
+                                instr.value = ofs+1;
+                            }
+                            args.push(instr);
                         }
                         if (c >= 169 && c<=171 && args[0].value !== undefined) {
                             fill_jump.push([iter.tell()+args[0].value,out.length]);
@@ -292,7 +298,7 @@ export class DialogDef {
                             args[1].value = args[1].value+state.local_pgf;
                         }
                         
-                        out.push([instr[0], args]);
+                        out.push([instr_code.value, args]);
                     }                
                 }            
 
@@ -312,6 +318,11 @@ export class DialogDef {
                     return true;
                 });
                 
+                cycles++;
+                if (cycles == 1000) {
+                    throw new Error("Too many cycles, corrupted file");
+                }
+
                 if (fill_jump.length == 0) break;
                 const f = fill_jump[0];
 
@@ -506,7 +517,7 @@ export class DialogManager {
         return compiler.compile();
     }
 
-    generate_dat(instructions: Instruction[][]) {
+    static generate_dat(instructions: Instruction[][]) {
         const mwr = new BinaryWriter();
         const datawr = new BinaryWriter();
         const offsets : DialogParagraphDef[] = [];
@@ -1276,3 +1287,53 @@ class DialogCompiler {
 
 }
 
+
+export function translate_original_dialogy_dat(trn: TranslateTable, dlgdata: ArrayBuffer) : ArrayBuffer|null{
+    const d = new DialogDef;
+    const tb = trn.openFile("DIALOGY.DAT");
+    const ilist :Instruction[][] = [];    
+    d.load_from_buffer(dlgdata);
+    d.pgfs.forEach((x,idx)=>{
+        x.forEach((y,idx)=>{
+            y[1].forEach(z=>{
+                if ("text" in z) {
+                    const ofs = z.value;
+                    const res = tb.translate(`${ofs}`, z.text!);
+                    z.text = res;                        
+                    delete z.value;
+                }
+            });            
+        });
+    });
+
+    d.pgfs.forEach((x,idx)=>{
+        const y = x.filter(z=>z[0] != 167);
+        d.pgfs[idx] = y;
+    });
+    
+    d.pgfs.forEach((x,idx)=>{
+        const curlist : Instruction[] =[];
+        x.forEach((y,idx)=>{
+            const instr = y[0]
+            curlist.push({value:instr}); 
+            if (instr >= 169 && instr <= 171) {
+                const pos = y[1][0].value!
+                const slc = x.slice(idx+1, pos);
+                const len = slc.reduce((a,b)=>a+3+b[1].reduce((d,e)=>d+instruction_size(e),0),0);
+                curlist.push({value: len});
+            } else {
+                y[1].forEach(z=>{
+                    curlist.push(z);
+                });
+            }
+        })
+        ilist[idx] = curlist;
+    })
+    
+    return DialogManager.generate_dat(ilist);
+
+
+
+
+
+}
