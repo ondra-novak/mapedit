@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { directions, MAPGLOBAL } from '@/core/map_structs';
-import { ref, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
+import PlaylistEditor from './PlaylistEditor.vue';
 
     
-const model = defineModel<MAPGLOBAL>();
+const model = defineModel<{mapinfo:MAPGLOBAL, strings: string[]}>();
+
+const emit = defineEmits<{
+  (e: 'ok'): void;
+  (e: 'cancel'):void;
+}>()
+
 
 const mapname = ref("");
 const colorhex = ref("");
@@ -20,11 +27,14 @@ const backdrop_w = ref("");
 const fade_mult = ref(0);
 const fade_end = ref(0);
 
+const playlist = ref()
+
 const dlg = ref<HTMLDialogElement>();
 
 function update_from_model() {
-    const m = model.value;
-    if (m) {
+    const mdl = model.value;
+    if (mdl) {
+        const m = mdl.mapinfo;
         mapname.value = m.mapname;
         colorhex.value = `#${((m.fade_r << 16) | (m.fade_g << 8) | m.fade_b).toString(16).padStart(6, '0')}`;
         start_sector.value = m.start_sector;
@@ -37,6 +47,7 @@ function update_from_model() {
         backdrop_w.value = m.back_fnames[3];
         fade_mult.value = m.fade_mult;
         fade_end.value = m.fade_end;
+        playlist.value = mdl.strings[0] ?? "";
 
         dlg.value?.showModal();
     } else {
@@ -62,7 +73,11 @@ function save() {
     m.back_fnames[3] = backdrop_n.value
     m.fade_end = fade_end.value;
     m.fade_mult = fade_mult.value;
-    model.value = m;
+    if (model.value) {
+        model.value.mapinfo = m;
+        model.value.strings[0] = playlist.value;
+        emit("ok");
+    }    
 }
 
 const envornment_types = [
@@ -78,7 +93,7 @@ watch(model, update_from_model);
 </script>
 <template>
 <dialog ref="dlg">
-    <header>Map settings<button class="close" @click="model = undefined"></button></header>
+    <header>Map settings<button class="close" @click="emit('cancel')"></button></header>
     <div>
         <x-section><x-section-title>Basic</x-section-title>
         <x-form>
@@ -97,6 +112,9 @@ watch(model, update_from_model);
             <label><input type="checkbox" v-model="autofog_floor_ceil">Generate fog for floor and ceil images (recommended)</label>
         </x-form>        
         </x-section>
+        <x-section><x-section-title>Playlist</x-section-title>
+            <PlaylistEditor v-model="playlist" ></PlaylistEditor>
+        </x-section>        
         <x-section><x-section-title>Advanced</x-section-title>
             <x-form>
             <label><span>Backdrop north</span><input type="text" v-model="backdrop_n"></label>

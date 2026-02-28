@@ -13,6 +13,7 @@ import { condition_proxy } from '@/core/bitproxy';
 import DelayLoadedList from './DelayLoadedList.vue';
 import getGlobalDialogs from '@/utils/global_dialog_list';
 import getGlobalShops from '@/utils/global_shop_list';
+import PlaylistEditor from './PlaylistEditor.vue';
 
 
 
@@ -77,9 +78,10 @@ const ActionName = [
 [33,"End game",true,"Finish the game"],                //    ENDGM: 33,
 [34,"Control enemy",true,"Send an enemy from a sector to different sectorSend the monster to another sector. The monster will get there on its own. The monster must be mobile"],               //    GOMOB: 34,
 [35,"Call sub",true,"Call a script on another wall as a subroutine (for same event). Doesn't change context of execution."],                //    SHRMA: 35,
-[36,"Change music",true,"Change music"],                //    MUSIC: 36,
+[36,"Change playlist",true,"Define new music playlist"],                //    MUSIC: 36,
 [37,"Define global event",true,"Defines global events. Global events are not saved in the saved game, they must be set during the \"On level start\" event"],             //    GLOBE: 37,
-[38,"Change fog color",true,"Temporarily changes the color of the fog. The choice is not saved in the saved game, you must invoke the action again after reloading the saved game"]             
+[38,"Change fog color",true,"Temporarily changes the color of the fog. The choice is not saved in the saved game, you must invoke the action again after reloading the saved game"],
+[39,"Play music",true,"Play specified music. When music is finished, continues by current playlist"],
 ].sort((x,y)=>(x[1] as string).localeCompare(y[1] as string));
 
 const ActionNameMap = ActionName.reduce((a,b)=>{
@@ -274,9 +276,6 @@ function stringtable_load_text() {
     const f = focused_item.value as TMA_TEXT;
     if (!f || !script.value) return;
     let s = script.value.stringTable[f.textindex] || "";
-    if (f.header.action == ActionType.MUSIC) {
-        s = s.replaceAll(' ','\n');
-    }
     stringtable_cur_text.value = s;
 }
 
@@ -284,9 +283,6 @@ function stringtable_save_text() {
     const f = focused_item.value as TMA_TEXT;
     if (!f || !script.value) return;
     let s = stringtable_cur_text.value;
-    if (f.header.action == ActionType.MUSIC) {
-        s = s.split('\n').map(x=>x.trim()).join(' ');
-    }
     script.value.stringTable[f.textindex] = s;
 }
 
@@ -572,6 +568,17 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
     });
 }
 
+const suitable_texts = computed(()=>{
+    const f = focused_item.value;
+    const scr = script.value;
+    if (!scr || !f || !(f instanceof TMA_TEXT)) return [] as string[];
+    const txt = f as TMA_TEXT;
+    const is_pls = txt.header.action == ActionType.MUSIC;
+    const lst =  scr.stringTable.map((x,idx)=>[x.replaceAll('\n','|'),idx] as [string, number])
+        .filter(x=>(!!x[0].match(/^\s*(FORWARD\s+|RANDOM\s+|FIRST\s+)?\s*([^.]+\.(MP3|MUS)\s+)*([^.]+\.(MP3|MUS))\s*$/i)) == is_pls)
+    return lst;
+})
+
 </script>
 
 <template>
@@ -688,27 +695,15 @@ function draw_arrow(p: any, list: TMA_GEN[], from: TMA_IFJMP) {
                 <label><span>Shop</span>
                     <DelayLoadedList v-model="focused_item.textindex" :list="getGlobalShops().then(x=>x.map(y=>({value:y[0],label:y[1]})))" /></label>
             </template>
-            <template v-else>
-                <template v-if="focused_item.header.action == ActionType.MUSIC">
-                    <p class="note">Select or create a playlist by listing all the song file names, each on a separate line</p>
-                    <p class="note">One of the following keywords may be listed instead of the first song:</p>
-                    <dl class="note">
-                        <dt>RANDOM</dt>
-                        <dd>Play songs in random order (default)</dd>
-                        <dt>FORWARD</dt>
-                        <dd>Play songs in the order listed</dd>
-                        <dt>FIRST</dt>
-                        <dd>The song in first place is always played first, then it is played in random order</dd>
-                    </dl>
-                </template>
-                <label><span v-if="focused_item.header.action == ActionType.MUSIC">Selected playlist</span>
-                        <span v-else>Selected text:</span><select v-model="focused_item.textindex" @change="stringtable_load_text">
-                    <option v-for="(t,idx) of script.stringTable" :key="idx" :value="idx"> {{ t.replaceAll('\n','|') }}</option>
+            <template v-else>            
+                <label><span>Selected {{ focused_item.header.action == ActionType.MUSIC ?"playlist":"text" }} </span><select v-model="focused_item.textindex" @change="stringtable_load_text">
+                    <option v-for="[t,idx] of suitable_texts" :key="idx" :value="idx"> {{ t }}</option>
                 </select></label>
                 <div>
-                    <textarea rows="5" cols="49" v-model="stringtable_cur_text" @change="stringtable_save_text"></textarea>
+                    <textarea v-if="focused_item.header.action != ActionType.MUSIC" rows="5" cols="49" v-model="stringtable_cur_text" @change="stringtable_save_text"></textarea>
+                    <PlaylistEditor v-else v-model="stringtable_cur_text" @change="stringtable_save_text"></PlaylistEditor>
                 </div>
-                <div style="text-align: right;"><button @click="stringtable_add_text">Add new text</button></div>
+                <div style="text-align: right;"><button @click="stringtable_add_text">Add new {{ focused_item.header.action == ActionType.MUSIC ?"playlist":"text" }}</button></div>
             </template>
         </template>
         <template v-else-if="(focused_item instanceof TMA_IFJMP)">       

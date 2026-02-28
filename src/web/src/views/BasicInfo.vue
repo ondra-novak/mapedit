@@ -26,6 +26,7 @@ class BasicInfoData {
     start_map: string = "START.MAP";
     dlc:number = 0;
     language: string = "en";
+    langddl: string = "en";
 };
 
 class PublishData {
@@ -212,12 +213,16 @@ const dlc = computed({
     <div class="panels">
     <div class="advinfo">
     <x-section>
-        <x-section-title>Adventure info</x-section-title>
+        <x-section-title>Adventure Definition</x-section-title>
         <x-form>
             <label><span>Name</span><input type="text" v-model="basic_info.name"></label>
             <label><span>Description [BBCodes allowed]<br>(ctrl+b bold, ctrl+i italic) </span><w-y-s-i-w-y-gedit class="descedit" v-model="basic_info.desc" format="BBCode"></w-y-s-i-w-y-gedit></label>
             <label><span>Language</span><select v-model="basic_info.language">
                 <option v-for="v of lang_list" :key="v[0]" :value="v[2]"> {{ v[0] }} </option>
+            </select></label>
+            <label><span>Game UI language</span><select v-model="basic_info.langddl">
+                <option value="CZ">Brány Skeldalu (česká verze) - default</option>
+                <option value="EN">Gates of Skeldal (english version)</option>
             </select></label>
             <label><span>Start map</span><input type="text" maxlength="12" v-model="basic_info.start_map" @input="basic_info.start_map=dosname_sanitize(basic_info.start_map)"></label>
             <label><span>Initial number of adventurers</span><div><input type="number" v-watch-range min="1" max="6" v-model="basic_info.characters_min">-
@@ -237,7 +242,7 @@ const dlc = computed({
     </div>
     <div class="publish">
         <x-section>
-            <x-section-title>Steam Workshop</x-section-title>
+            <x-section-title>Steam Workshop publishing</x-section-title>
             <header>{{ basic_info.name }}</header>
             <div class="imagepreview" >
                 <img :src="curImgUrl" v-if="publish_data.image">

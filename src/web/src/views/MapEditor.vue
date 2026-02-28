@@ -130,7 +130,7 @@ const curNiche = ref<NicheDef|null>(null);
 const goto_sector_n = ref(1);
 const goto_sector_dlg = ref(false);
 const goto_sector_input = ref<HTMLInputElement>();
-const map_settings = ref<MAPGLOBAL>();
+const map_settings = ref<{mapinfo:MAPGLOBAL, strings: string[]}>();
 const action_ui = ref(false);
 const wall_props = ref(false);
 const active_enemy = ref(-1);
@@ -937,20 +937,22 @@ function goto_sector_find() {
 }
 
 function open_map_settings() {
-    map_settings.value = curmap.value.info;
-    queueMicrotask(()=>{
-        const w = watch(map_settings,()=>{
-            if (map_settings.value) {
-                const map = begin_edit();
-                map.info = map_settings.value;
-                end_edit(map);
-                queueMicrotask(()=>{
-                    map_settings.value = undefined;
-                });
-            }
-            w.stop();
+    map_settings.value = {
+        mapinfo: curmap.value.info,
+        strings: curmap.value.strtable.slice()
+    };
+}
+function map_settings_ok() {
+    const ms = map_settings.value;
+    if (ms) {
+        const map = begin_edit();
+        map.info = ms.mapinfo;
+        map.strtable = ms.strings;
+        end_edit(map);
+        queueMicrotask(()=>{
+            map_settings.value = undefined;
         });
-    });
+    }
 }
 
 watch(goto_sector_input,()=>{
@@ -1312,7 +1314,7 @@ watch(selection,()=>{
 </template>
 </x-workspace>
 <MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
-<MapSettingsDlg v-model="map_settings"></MapSettingsDlg>
+<MapSettingsDlg v-model="map_settings" @ok="map_settings_ok" @cancel="map_settings = undefined"></MapSettingsDlg>
 <NicheEditor v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus?.side_def || null"></NicheEditor>
 </template>
 
