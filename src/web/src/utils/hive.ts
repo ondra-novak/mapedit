@@ -78,6 +78,10 @@ class Hive<T> {
         this.data[index] = item;
     }
   }
+  clear() {
+    this.data = [];
+    this.first_free = Number.MAX_SAFE_INTEGER;
+  }
 }
 
 export default Hive;

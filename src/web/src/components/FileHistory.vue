@@ -6,6 +6,7 @@ import { onMounted, ref, triggerRef, watch } from 'vue';
 
 
 const filename = defineModel<string>();
+const props = defineProps<{group: AssetGroupType}>();
 
 const history = ref<DDLFileHistory[]>([]);
 const active = ref(0);
@@ -27,6 +28,7 @@ async function load_history() {
 onMounted(()=>load_history());
 
 watch(filename, ()=>load_history());
+watch(()=>props.group, ()=>new_group.value = props.group);
 
 watch(new_filename, ()=>{
     const f = new_filename.value;

@@ -10,7 +10,7 @@ export function parse_stringtable(txt:string) : string[] {
                 const p = b.indexOf(' ');
                 if (p == -1) return a;
                 const idx = b.substring(0,p);
-                const val = b.substring(p+1).trim();
+                const val = b.substring(p+1).trim().replace("|","\n")
                 const idxval = parseInt(idx);
                 if (isFinite(idxval) && idxval >= 0) {
                     a[idxval] = val;

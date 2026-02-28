@@ -454,6 +454,7 @@ export class TMA_LOADLEV extends TMA_GEN {
     };;
 };
 
+
 export class TMA_DROPITM extends TMA_GEN {
 
     item: number | null = null;
@@ -673,9 +674,9 @@ const action_to_schema = [
    TMA_IFJMP,TMA_TWOP,TMA_IFJMP,TMA_TEXT,TMA_IFJMP,
    TMA_TWOP,TMA_TELEPORT,TMA_LOADLEV,TMA_DROPITM,
    TMA_IFJMP,TMA_TWOP,TMA_UNIQUE,TMA_TWOP,TMA_UNIQUE,
-   TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_LOADLEV,
+   TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_GEN,
    TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_CHANGELIGHT,
-   TMA_TEXT
+   TMA_TEXT, TMA_TEXT, TMA_LOADLEV
 ]
 
 export const ActionType = {
@@ -718,7 +719,9 @@ export const ActionType = {
     MUSIC: 36,
     GLOBE: 37,
     CHGLG: 38,
-    PLMUS: 39
+    PLMUS: 39,
+    FAILG: 40,
+    ENDG2: 41
 }
 
 export function create_action_instance(type: typeof ActionType[keyof typeof ActionType], event: number) {

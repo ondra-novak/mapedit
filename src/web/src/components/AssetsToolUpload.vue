@@ -32,7 +32,7 @@ function set_new_file(event: Event) {
 }
 
 async function do_upload() {
-    if (!new_file.value || !new_filename.value || !new_group.value) return;
+    if (!new_file.value || !new_filename.value || new_group.value === undefined) return;
     try {
         const buffer = await readFileToArrayBuffer(new_file.value);
         await server.putDDLFile(new_filename.value, buffer, new_group.value);
@@ -47,6 +47,9 @@ async function do_upload() {
 async function updateModel() {
     if (filename.value) {
         download_link.value = server.get_download_link(filename.value);
+    }
+    if (group.value !== undefined) {
+        new_group.value = group.value;
     }
 }
 
