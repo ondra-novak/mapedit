@@ -40,6 +40,8 @@ async function save_current_file() {
         await server.putDDLFile(current_filename, Uint8Array.from(string2keybcs(out)).buffer, current_group);
     } else if (texteditor.value !== null) {
         await server.putDDLFile(current_filename, Uint8Array.from(string2keybcs(texteditor.value)).buffer, current_group);
+    } else if (bookeditor.value !== null) {
+        await server.putDDLFile(current_filename, Uint8Array.from(string2keybcs(bookeditor.value)).buffer, current_group);
     }
 }
 
@@ -139,7 +141,7 @@ async function create_file() {
 <x-workspace>
 <string-table-editor v-if="stringtable" v-model="stringtable" :global_table="filename?.toUpperCase() == 'POPISY.TXT'" @change="stringtable_changed"></string-table-editor>
 <textarea v-else-if="texteditor !== null" v-model="texteditor" ></textarea>
-<book-editor v-else-if="bookeditor !== null" v-model="bookeditor" ></book-editor>
+<book-editor v-else-if="bookeditor !== null" v-model="bookeditor" @change="stringtable_changed" ></book-editor>
 <div v-else class="creat">
     <x-section><x-section-title>Create new text file</x-section-title></x-section>
     <x-form>

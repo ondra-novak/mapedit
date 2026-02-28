@@ -24,6 +24,10 @@ class Hive<T> {
     }
   }
 
+  set_first_free(index: number) {
+        this.first_free = index;
+  }
+
   optimize() {
     let l = this.data.length;
     while (l) {

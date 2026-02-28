@@ -10,7 +10,7 @@ export function parse_stringtable(txt:string) : string[] {
                 const p = b.indexOf(' ');
                 if (p == -1) return a;
                 const idx = b.substring(0,p);
-                const val = b.substring(p+1).trim().replace("|","\n")
+                const val = b.substring(p+1).trim().replaceAll("|","\n")
                 const idxval = parseInt(idx);
                 if (isFinite(idxval) && idxval >= 0) {
                     a[idxval] = val;
@@ -34,7 +34,7 @@ export function stringtable_translation(name: string, stbl: string[], ttbl: Tran
 
 export function serialize_stringtable(ss:string[]) :string{
     const out = ss.reduce((a,txt,idx)=>{
-        const txts = txt.replace("\n","|").replace("\r","");        
+        const txts = txt.replaceAll("\n","|").replaceAll("\r","");        
         a.push(`${idx} ${txts}`);
         return a;
     },[] as string[]);
