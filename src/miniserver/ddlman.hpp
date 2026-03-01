@@ -67,6 +67,7 @@ public:
      * @brief Reclaims unused space in the archive by compacting it.
      */
     void compact() const;
+    bool compact_to(const std::filesystem::path &target) const;
 
     struct Stats {
         std::size_t entries_used = 0;

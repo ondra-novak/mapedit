@@ -242,6 +242,16 @@ public:
         }
     }
 
+    template<typename T>
+    auto as_vector() const {
+        std::vector<T> out;
+        const auto &a = as_array();
+        out.reserve(a.size());
+        for (const auto &x: a) out.push_back(x.as<T>());
+        return out;
+    }
+
+
     auto as_bool() const {return as<bool>();}
     auto as_int() const {return as<int>();}
     auto as_unsigned_int() const {return as<unsigned int>();}
@@ -521,14 +531,22 @@ protected:
     template<typename Fn>
     static std::string parse_string(Fn &&fn) {        
         std::basic_string<char16_t> data;
+        std::string outdata;
         char hexbuf[4];
         int m = 0;
-        auto cc = fn();
+        auto cc = fn();        
+                
         while (cc && (*cc!='"' || m)) {
-            char c = *cc;
+            unsigned char c = *cc;
             if (m == 0) {
                 if (c == '\\') m = -1;
-                else data.push_back(c);
+                else {
+                    if (!data.empty()) {
+                        Utf8<char16_t>::to_utf8(data.begin(), data.end(), std::back_inserter(outdata));                
+                        data.clear();
+                    }
+                    outdata.push_back(c);
+                }
             } else if (m == -1) {
                 m = 0;
                 switch (c) {
@@ -554,9 +572,10 @@ protected:
             }
              cc = fn();
         }
-        std::string out;
-        Utf8<char16_t>::to_utf8(data.begin(), data.end(), std::back_inserter(out));
-        return out;
+        if (!data.empty()) {
+            Utf8<char16_t>::to_utf8(data.begin(), data.end(), std::back_inserter(outdata));                
+        }
+        return outdata;
     }
 };
 

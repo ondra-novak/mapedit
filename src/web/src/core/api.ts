@@ -57,6 +57,39 @@ export class Config {
     project = "";    
 }
 
+export class PublishData {
+    tags:string[] = [];
+    visibility:number = 0;
+    title:string = "";
+    description:string = "";
+    content_lang:string = "";
+    update_lang:string = "";
+    base_lang:string = "";
+};
+
+export class PublishStatus extends PublishData {
+    item_id:number = 0;
+    last_publish:Date|null = null;
+    image: Blob|null = null;
+};
+
+export interface PublishProgres {
+    type: "ok",
+    running: boolean,
+    stage: number,
+    percentage: number,
+    error: number
+};
+
+export interface PublishException {
+    type: "exception",
+    message: string,
+};
+
+export type PublishRunStatus = PublishProgres| PublishException;
+export type PublishInitiateStatus = "ok"|"reject"|"legal"|"invalid"|"unknown"|"n/a";
+
+
 export class ApiClient extends WsRpcClient{
 
     
@@ -195,22 +228,36 @@ export class ApiClient extends WsRpcClient{
         return (await this.call("file_copy",[from, to, to_group, from_rev],[])).data;
     }
 
-    async get_publish_status() : Promise<WsRpcResult> {
-        return await this.call("publish.status",[],[]);
+    async get_publish_status() : Promise<PublishStatus> {
+        const r =  await this.call("publish.status",[],[]);
+        const data = r.data as Record<string, any>;
+        const out =  Object.assign(new PublishData(), {
+            update_lang:data.update_lang,
+            content_lang:data.content_lang,
+            base_lang: data.base_lang,
+            description: data.description,
+            image: data.image_content_type?new Blob(r.attachments, {type:data.image_content_type}):null,
+            item_id: data.item_id,
+            last_publish: data.last_publish?new Date(data.last_publish * 1000):null,
+            tags:data.tags,
+            title: data.title,
+            visibility: data.visibility
+        });            
+        return out;
     }
 
     async set_publish_image(image: ArrayBuffer, content_type: string): Promise<boolean> {
         return (await this.call("publish.set_image",[content_type],[image])).data;;
     }
 
-    async publish(title: string, 
-                 desc:string, 
-                 lang:string, 
-                 tags: string[],
-                 visbility: number,
-                 change_desc:string) : Promise<boolean> {
-        return (await this.call("publish.publish", [title,desc,lang,tags,visbility,change_desc],[])).data;
+    async set_publish_metadata(data: PublishData) : Promise<boolean> {
+        return (await this.call("publish.store_metadata",[data],[])).data;
     }
+
+    async publish(change_desc:string) : Promise<PublishInitiateStatus> {
+        return (await this.call("publish.publish", [change_desc],[])).data;
+    }
+
     async lang_list() : Promise<string[]>{
         return (await this.call("lang.list",[],[])).data;
     }

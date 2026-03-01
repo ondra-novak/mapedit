@@ -3,6 +3,7 @@
 #include "handler_map.hpp"
 #include "config.hpp"
 #include "interface.hpp"
+#include "steamservice.hpp"
 #include "utils/profile_path.hpp"
 #include "utils/getoptxx.h"
 #include <filesystem>

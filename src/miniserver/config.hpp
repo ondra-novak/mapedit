@@ -1,5 +1,6 @@
 #pragma once
 
+#include "steamservice.hpp"
 #include <filesystem>
 
 namespace server {

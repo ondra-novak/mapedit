@@ -2,15 +2,11 @@
 import { server } from '@/core/api';
 import { AssetGroup, AssetGroupLabel, type AssetGroupType } from '@/core/asset_groups';
 import { keybcs2string, string2keybcs } from '@/core/keybcs2';
-import { readFileToArrayBuffer } from '@/core/read_file';
 import { parse_stringtable, serialize_stringtable } from '@/core/string_table';
-import { MainStringtable } from '@/core/ui_strings';
 import Hive from '@/utils/hive';
-import { isImportTypeAssertionContainer } from 'typescript';
-import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import StringTableEditor from './StringTableEditor.vue';
 import StatusBar, { type SaveRevertControl } from './statusBar';
-import { create } from 'domain';
 import { dosname_sanitize } from '@/core/dosname';
 import BookEditor from './BookEditor.vue';
 

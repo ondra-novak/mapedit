@@ -3,11 +3,13 @@
 #include "config.hpp"
 #include "ddlman.hpp"
 #include "server.hpp"
+#include "steamservice.hpp"
 #include "wsrpc.hpp"
 #include "mgifcomp.hpp"
 #include "skeldal_exe.hpp"
 #include "wsrpc.hpp"
 #include "publisher.hpp"
+#include <atomic>
 #include <filesystem>
 #include <shared_mutex>
 #include <thread>
@@ -20,6 +22,8 @@ struct Request;
 
 class WebInterface {
 public:
+
+    static constexpr unsigned int app_id = 3533830;
 
     static constexpr auto keepalive_interval = std::chrono::seconds(5);
 
@@ -36,12 +40,18 @@ protected:
     std::u8string _current_ddl;
     std::stop_source _stop;
     Json _config;
+    std::unique_ptr<SteamService> _steam;
+    WsPublisher _publisher;
     bool _check_active = false;
 
     WsRpc::MethodMap _methods;
 
-    MGifComp _mgfcomp;
     std::mutex _mgfcomp_mx;
+    MGifComp _mgfcomp;
+
+    std::atomic<bool> _publish_running = {};
+    std::jthread _publish_process;
+
 
     bool webserver(Request &req);
     bool webserver_index(Request &req);
@@ -109,6 +119,7 @@ protected:
     void ws_file_history(const WsRpc::Request &req);    
     void ws_file_copy(const WsRpc::Request &req);   
     void ws_publish_status(const WsRpc::Request &req);   
+    void ws_publish_store_metadata(const WsRpc::Request &req);   
     void ws_publish_set_image(const WsRpc::Request &req);   
     void ws_publish_publish(const WsRpc::Request &req);   
     void ws_lang_list(const WsRpc::Request &req);
@@ -148,6 +159,7 @@ protected:
         {"preview_console_exec",&WebInterface::ws_preview_console_exec},
         {"publish.status", &WebInterface::ws_publish_status},
         {"publish.set_image", &WebInterface::ws_publish_set_image},
+        {"publish.store_metadata", &WebInterface::ws_publish_store_metadata},
         {"publish.publish", &WebInterface::ws_publish_publish},
         {"lang.list", &WebInterface::ws_lang_list},
         {"lang.get", &WebInterface::ws_lang_get},
@@ -157,12 +169,14 @@ protected:
     };
 
 
-    WsPublisher _publisher;
     void publish_state();
     Json create_state();
 
     std::optional<std::vector<char>  >file_get(std::string_view name, std::uint32_t rev);
     bool file_put(std::string_view name, std::uint32_t group, bool fail_if_exists, std::string_view data);
+
+    void ensure_steam_ready();
+
 };
 
 

@@ -24,12 +24,14 @@
 #include <numeric>
 #include <optional>
 #include <shared_mutex>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 
 namespace server {
 
@@ -323,8 +325,9 @@ void WebInterface::basic_timer_worker(std::stop_token stp)
 void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
-    broadcast("\r\n\r\n");    
-}
+    broadcast("\r\n\r\n");   
+ 
+}   
 
 
 
@@ -767,54 +770,116 @@ void WebInterface::ws_file_copy(const WsRpc::Request &req) {
 }
 
 void WebInterface::ws_publish_status(const WsRpc::Request &req){
-    PublishHelper hlp(_game_folder);;
-    auto p = getUserDDL().get_path();
-    auto st = hlp.get_state(p);
+    std::lock_guard _(_mx);
+    PublishHelper hlp( getUserDDL().get_path());
+    auto st = hlp.get_state();
     
     std::vector<WsRpc::Attachment> attchs;
 
-    auto [data,ctx] = hlp.get_image(p);
-    if (!ctx.empty()) {
-        attchs.push_back(std::move(data));
+    if (!st.image_content_type.empty()) {
+        attchs.push_back(std::move(st.image));
     }
 
 
-    req.send_response(Json{{
+    req.send_response(Json{
         {"item_id", st.steam_id},
         {"last_publish", st.publish_time == std::chrono::system_clock::time_point()?Json():Json(std::chrono::system_clock::to_time_t(st.publish_time))},
         {"tags",Json::Array(st.tags.begin(), st.tags.end())},
-        {"visibility", st.visibility},        
-    },ctx},{attchs});
+        {"title", st.title},
+        {"description", st.description},
+        {"visibility", st.visibility},
+        {"update_lang", st.update_lang},
+        {"content_lang", st.content_lang},
+        {"base_lang", st.base_lang},
+        {"image_content_type", st.image_content_type}
+    },{attchs});
 
 
 }
 void WebInterface::ws_publish_set_image(const WsRpc::Request &req){
+    std::lock_guard _(_mx);
     const auto ctx = req.params[0].as_text();
     const auto attch = req.attachments[0];
     auto p = getUserDDL().get_path();
-    PublishHelper hlp(_game_folder);;
-    hlp.set_image(p, attch, ctx);
+    PublishHelper hlp(p);;
+    hlp.set_image(attch, ctx);
     req.send_response(true);
 
 
 }
-void WebInterface::ws_publish_publish(const WsRpc::Request &req){
-    auto title = req.params[0].as<std::string>();
-    auto desc = req.params[1].as<std::string>();
-    auto lang= req.params[2].as<std::string>();
-    auto tags = req.params[3].as_array();
-    auto visibility = req.params[4].as<unsigned int>();
-    auto change_desc = req.params[5].as<std::string>();
-    std::vector<std::string> taglst;
-    std::transform(tags.begin(), tags.end(), std::back_inserter(taglst),
-            [](const Json &x){return x.as<std::string>();});
 
+void WebInterface::ws_publish_store_metadata(const WsRpc::Request &req){
+    std::lock_guard _(_mx);
     auto p = getUserDDL().get_path();
-    PublishHelper hlp(_game_folder);
-    hlp.publish(p, std::move(title), std::move(desc), 
-            std::move(lang), std::move(taglst), 
-            visibility, std::move(change_desc));
+    PublishHelper hlp(p);
+    const auto &param = req.params[0];
+    auto title = param["title"].as<std::string>();
+    auto desc = param["description"].as<std::string>();
+    auto update_lang= param["update_lang"].as<std::string>();
+    auto content_lang= param["content_lang"].as<std::string>();
+    auto base_lang= param["base_lang"].as<std::string>();
+    auto tags = param["tags"].as_vector<std::string>();
+    auto visibility = param["visibility"].as<unsigned int>();
+    hlp.set_metadata(title, desc, update_lang, content_lang,base_lang, tags, visibility) ;
     req.send_response(true);
+
+}
+void WebInterface::ws_publish_publish(const WsRpc::Request &req){
+    std::lock_guard _(_mx);
+    ensure_steam_ready();
+    if (!_steam || !_steam->is_available()) {
+        req.send_response("n/a");
+        _steam.reset();
+        return;
+    }
+    if (_publish_running.load()) throw std::runtime_error("Publish pending");
+    if (_publish_process.joinable()) _publish_process.join();
+    auto change_desc = req.params[0].as<std::string>();
+    auto p = getUserDDL().get_path();
+    PublishHelper hlp(p);;
+    _publish_running = true;
+
+    auto resp = hlp.publish(_steam.get(), change_desc, 
+        [this](bool running, int stage, float percentage, int error) {
+            _publish_running = running;
+            if (!running && stage == -1) {
+                auto exp = std::current_exception();
+                if (exp) {
+                    try {
+                        std::rethrow_exception(exp);
+                    } catch (const std::exception &e) {
+                        _publisher.publish("upload_progress", {
+                            {"type","exception"},
+                            {"message",e.what()}
+                        });
+                    }
+                    return;
+                }
+            }
+            _publisher.publish("upload_progress", {
+                {"type","ok"},
+                {"running",running},
+                {"stage",stage},
+                {"percentage", percentage},
+                {"error", error}
+            });
+        });
+        
+    if (std::holds_alternative<PublishHelper::PublishResult>(resp)) {
+        auto pr = std::get<PublishHelper::PublishResult>(resp);
+        std::string_view resp;
+        switch (pr) {    
+            case PublishHelper::PublishResult::create_rejected: resp="reject";break;
+            case PublishHelper::PublishResult::need_legal_agr: resp="legal";break;
+            case PublishHelper::PublishResult::invalid: resp="invalid";break;
+            default: resp = "unknown";break;
+        }
+        _publish_running = false;
+        req.send_response(resp);
+    } else {
+        _publish_process = std::move(std::get<std::jthread>(resp));        
+        req.send_response("ok");
+    }
     
 }
 
@@ -918,7 +983,14 @@ void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
 
 }
 
-
+void WebInterface::ensure_steam_ready() {
+    if (!_steam) {
+        auto curdur = std::filesystem::current_path();
+        std::filesystem::current_path(_user_dir);
+        _steam = std::make_unique<SteamService>(3533830);
+        std::filesystem::current_path(curdur);        
+    }
+}
 
 
 }

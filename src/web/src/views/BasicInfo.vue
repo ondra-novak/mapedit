@@ -1,21 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
-import { server, type FileItem } from '@/core/api';
+import {  PublishStatus, server, type PublishProgres, type PublishRunStatus } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { dosname_sanitize } from '@/core/dosname';
 import { humanDataFromArrayBuffer, humanDataToArrayBuffer, Runes, type THumanData } from '@/core/character_structs';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
-import { string2keybcs } from '@/core/keybcs2';
 import { IniConfig } from '@/core/ini';
 import WYSIWYGedit from '@/components/WYSIWYGedit.vue';
 import { supported_languages } from '@/core/languages';
 import { create_datalist } from '@/utils/datalist';
 import { publish_tags } from '@/core/publis_tags';
-import { bb2html } from '@/core/bb2html';
-import { messageBox, messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
+import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
 import { readFileToArrayBuffer } from '@/core/read_file';
-import { WsRpcException } from '@/core/wsrpc';
+import type { WsRpcResult } from '@/core/wsrpc';
 
 
 class BasicInfoData {
@@ -29,21 +27,16 @@ class BasicInfoData {
     langddl: string = "en";
 };
 
-class PublishData {
-    item_id: string = "";
-    last_publish: Date | null = null;
-    image:Blob|null = null;
-    tags: string[] = [];
-    visibility: number = 0;
-};
 
 const basic_info = ref<BasicInfoData>(new BasicInfoData);
-const publish_data = ref<PublishData>(new PublishData);
+const publish_data = ref<PublishStatus>(new PublishStatus);
 const postavy_dat = ref<THumanData>()
 const runes = ref<Runes>(new Runes());
 const next_tag = ref("");
 const new_changelog = ref("");
 let save_state: SaveRevertControl;
+const progress_state = ref<PublishProgres|null>(null);
+const progress_dlg = ref<HTMLDialogElement>();
 
 function reload() {
     server.getDDLFile("ADV.INI").then(buff=>{
@@ -61,16 +54,7 @@ function reload() {
             nextTick(()=>save_state.set_changed(false));
         }
     });
-    server.get_publish_status().then(data=>{
-        const n = new PublishData();
-        const [status,ctx] = data.data as [Record<string, any>, string];        
-        n.item_id = status.item_id;
-        n.last_publish = status.last_publish?new Date(status.last_publish*1000):null;
-        n.tags = status.tags;
-        n.visibility = status.visibility;
-        n.image = ctx?new Blob(data.attachments, {type:ctx}):null;
-        publish_data.value = n;
-    });
+    server.get_publish_status().then(data=>publish_data.value = data)
     new_changelog.value="";
 }
 
@@ -86,6 +70,13 @@ async function save() {
         const buff3 = humanDataToArrayBuffer(postavy_dat.value);
         await server.putDDLFile("POSTAVY.DAT", buff3, AssetGroup.MAPS);
     }
+    const cl = supported_languages.find(x=>x[2] == basic_info.value.language);
+    publish_data.value.base_lang = basic_info.value.langddl;
+    publish_data.value.update_lang = cl?cl[1]:"en";
+    publish_data.value.content_lang = cl?cl[3]:"en"
+    publish_data.value.title = basic_info.value.name;
+    publish_data.value.description = basic_info.value.desc;    
+    await server.set_publish_metadata(publish_data.value);
 }
 
 async function init() {
@@ -176,16 +167,51 @@ function upload_image() {
     input.click();
 }
 
+async function goto_licence_page() {
+    if (await messageBoxConfirm("You must agree to the Steam Community license agreement. Do you want to open the license agreement form?")) {
+        const st = await server.get_publish_status();
+        location.href = `steam://url/CommunityFilePage/${st.item_id}`;
+    }
+}
+
+function upload_progress(x:WsRpcResult ){
+    const p : PublishRunStatus = x.data;
+    if (p.type == "exception") {
+        progress_state.value = null;
+        messageBoxAlert(`FAILED: Publish failed because an exception: ${p.message}`);
+    } else if (p.running) {
+        progress_state.value = p;
+    } else {
+        progress_state.value = null;
+        if (p.error) {
+            messageBoxAlert(`FAILED: Publish fauled because Steam returned error state ${p.error}`);
+        } else {
+            messageBoxAlert(`SUCCESS: Publish completed successfully`);
+        }
+    }
+}
+
+async function continue_publish() {
+    progress_state.value={percentage:0,running:true,error:0,stage:1,type:"ok"};
+    server.on("upload_progress", upload_progress);
+}
+
+onUnmounted(()=>{
+    server.off("upload_progress", upload_progress);
+})
+
 async function publish_publish() {
-    await save();
+    await save_state.do_save();
     if (await messageBoxConfirm("Confirm you want to publish this content")) {
         try {
-            await server.publish(basic_info.value.name,
-                basic_info.value.desc,basic_info.value.language,
-                publish_data.value.tags, publish_data.value.visibility,
-                new_changelog.value);            
-            messageBoxAlert("Succesfully published");
-            reload();
+            const st = await server.publish(new_changelog.value);
+            switch (st) {
+                case "n/a": await messageBoxAlert("It seems that Steam is not running. Start the Steam client and try again");break;
+                default: await messageBoxAlert("Invalid publish state. Restart the application");break;
+                case "legal": await goto_licence_page();break;
+                case "reject": await messageBoxAlert("Steam rejected operation (permission denied)");break;
+                case "ok": await continue_publish();break;            
+            } 
         } catch (e) {
             await messageBoxAlert(`Publish failed: ${(e as Error).message}`);
         }
@@ -204,6 +230,26 @@ async function warning_msg() {
 const dlc = computed({
     get:()=>!!parseInt(`${basic_info.value.dlc}`),
     set:(b:boolean)=>basic_info.value.dlc = b?1:0
+})
+
+const publish_stage = computed(()=>{
+    const ps = progress_state.value;
+    if (!ps) return "";
+    const strings : Record<number, string> = {
+        "-1":"ERROR reported",
+        0:"Already done",
+        1:"processing configuration data",
+        2:"reading and processing content files",
+        3:"uploading content changes to Steam",
+        4:"uploading new preview file image",
+        5:"committing all changes"
+    };
+    return strings[ps.stage];
+})
+
+watch(progress_dlg, ()=>{
+    const dlg = progress_dlg.value;
+    if (dlg) dlg.showModal();
 })
 
 </script>
@@ -266,12 +312,21 @@ const dlc = computed({
         </x-section>
         <x-section>
             <x-section-title>Publish an update</x-section-title>
-            <label  v-if="publish_data.item_id"><span>Description of changes:</span><w-y-s-i-w-y-gedit v-model="new_changelog" format="BBCode" class="chgdesc"/></label>
-            <div class="pub"><button @click="publish_publish" :disabled="new_changelog.length == 0 && !!publish_data.item_id">Publish</button></div>
-            <p class="note">You can't publish! This feature is not implemented yet  (mock-up only)</p>
+            <label  v-if="publish_data.last_publish"><span>Changelog (optional, recommended!):</span><w-y-s-i-w-y-gedit v-model="new_changelog" format="BBCode" class="chgdesc"/></label>
+            <div class="pub"><button @click="publish_publish">Publish</button></div>        
         </x-section>
     </div>
 </div>
+<dialog ref="progress_dlg" class="progress-dlg" v-if="progress_state">
+    <header>Uploading your content!</header>
+    <div class="temp">
+        <div :style="{width: `${progress_state.percentage * 100}%`}"></div>
+    </div>
+    <div> {{ publish_stage }}</div>
+    <footer>
+        
+    </footer>
+</dialog>
 </x-workspace>
 
 
@@ -361,6 +416,21 @@ input[type=number] {
 p.note  {
     color: red;
     font-size: 1.2rem;
+}
+
+.progress-dlg {
+    width: 50%;
+}
+.temp {
+    border: 1px solid;
+    margin: 0.5rem 0;
+}
+
+.temp > * {
+    height: 1.5rem;
+    margin-left: 0;
+    margin-right: auto;
+    background-color: green;
 }
 
 </style>

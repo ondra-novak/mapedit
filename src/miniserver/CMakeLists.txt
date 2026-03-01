@@ -31,6 +31,8 @@ add_executable(mapedit_server
     publisher.cpp
     langfiles.cpp
     publish_helper.cpp
+    steamservice.cpp
+    steamservice_steam.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c
@@ -38,4 +40,4 @@ add_executable(mapedit_server
     utils/fast_copy_file.cpp
     )
 
-target_link_libraries(mapedit_server PRIVATE mapedit_server_webcontent)
+target_link_libraries(mapedit_server PRIVATE mapedit_server_webcontent ${STEAMLIB})
