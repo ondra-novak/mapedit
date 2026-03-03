@@ -1,12 +1,14 @@
 #include "publish_helper.hpp"
 #include "ddlman.hpp"
-#include "steamservice.hpp"
+#include "utils/http_utils.hpp"
 #include "utils/json.hpp"
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <iterator>
+#include <optional>
 #include <stdexcept>
 #include <stop_token>
 #include <thread>
@@ -14,14 +16,105 @@
 
 
 static std::filesystem::path state_file_name(std::filesystem::path src) {
-    src.replace_extension(".published");
+    src.replace_extension(".publish");
     return src;
 }
 
+static std::filesystem::path steam_state_file_name(std::filesystem::path src) {
+    src.replace_extension(".steam");
+    return src;
+}
+
+PublishHelper::PublishHelper(const DDLManager &ddl_file):PublishHelper(ddl_file.get_path()) {}
+
 PublishHelper::PublishHelper(std::filesystem::path ddl_file)
     :_ddl(ddl_file)
-    ,_state(state_file_name(ddl_file)) {}
+    ,_steam_state(steam_state_file_name(ddl_file)) 
+    ,_state(state_file_name(ddl_file)){}
 
+PublishHelper::State PublishHelper::get_state() const {
+    
+    State st = {};
+    std::ifstream f(_steam_state, std::ios::in);
+    if (!!f) {
+        Json json = Json::parse([&f]()->std::optional<char> {
+            int c = f.get();
+            return c == EOF?std::nullopt:std::optional<char>(c);
+        });
+        st.steam_id = json["steam_id"].as<uint64_t>();
+        st.publish_time = std::chrono::system_clock::from_time_t(json["publish_time"].as<time_t>());
+    }
+    return st;
+}
+
+PublishHelper::SteamData PublishHelper::get_steam_data() const {
+    SteamData out;
+    auto vis = _state.get(".VIS");
+    if (vis && vis->size()>0) out.visibility = *reinterpret_cast<unsigned char *>(vis->data());
+
+    auto tags = _state.get(".TAGS");
+    if (tags) {
+        std::string_view tdata(tags->data(),tags->size());
+        char sepchr = 0;
+        std::string_view sep(&sepchr, 1);
+        do {
+            auto t = utils::split_at(tdata, sep);
+            if (t.length()) out.tags.emplace_back(t);
+        } while (tdata.length());
+    }
+    return out;
+}
+
+void PublishHelper::set_steam_data(const SteamData &data) {
+    char visc = static_cast<char>(data.visibility);
+    _state.put(".VIS", {&visc,1}, 0);
+    std::vector<char> tags;
+    for (const auto &x : data.tags) {
+        if (x.length()) {
+            std::copy_n(x.c_str(), x.size()+1, std::back_inserter(tags));
+        }
+    }
+    _state.put(".TAGS", {tags.data(), tags.size()},0);
+}
+
+void PublishHelper::update_content_data(const ContentData &data) {
+    _state.put(".TITLE", data.title, 0);
+    _state.put(".DESC", data.description, 0);
+    _state.put(".ULANG", data.update_lang, 0);
+    _state.put(".CLANG", data.content_lang, 0);
+    _state.put(".BLANG", data.base_lang, 0);
+    _state.put(".AUTHOR", data.author, 0);
+}
+
+std::pair<std::string, std::vector<char> > PublishHelper::get_preview_image() const {
+    auto ctx = _state.get("imgctx");
+    if (!ctx) return  {};
+    auto data = _state.get("image");
+    if (!data) return {};
+    return {{ctx->data(),ctx->size()}, *data};   
+}
+
+void PublishHelper::set_preview_image(std::span<const char> image, std::string_view content_type) {
+    if (content_type != "image/jpeg" && content_type != "image/png") throw std::runtime_error("Unsupperted image type");
+    _state.put("image",{image.data(), image.size()},0);
+    _state.put("imgctx", content_type,0);
+
+}
+
+void PublishHelper::set_ingame_preview_image(std::span<const char> hi_image) {
+    _state.put(".PRVIMG", {hi_image.data(), hi_image.size()},11);
+}
+
+void PublishHelper::prepare_for_publish(std::string_view changelog) {
+    _state.put(".CHANGELOG", changelog,0);
+    _state.compact();
+    auto prep_ddl = _ddl;
+    prep_ddl.replace_extension(".pak");
+    DDLManager m(_ddl);
+    m.compact_to(prep_ddl);
+}
+
+/*
 PublishHelper::PublishState PublishHelper::get_state() const {
     auto x = _state.get("metadata");
     PublishState st;
@@ -117,6 +210,7 @@ void PublishHelper::create_ini(const std::filesystem::path &target, const Publis
     f.close();
 
 }
+
 PublishHelper::PublishReturn PublishHelper::publish(SteamService *steam, std::string change_desc, 
         std::function<void(bool running, int stage, float percent, int steam_error)> callback) {
     _state.compact();
@@ -204,6 +298,6 @@ PublishHelper::PublishReturn PublishHelper::publish(SteamService *steam, std::st
             }
     });
 }
-
+*/
 
 

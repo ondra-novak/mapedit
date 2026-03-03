@@ -31,8 +31,7 @@ add_executable(mapedit_server
     publisher.cpp
     langfiles.cpp
     publish_helper.cpp
-    steamservice.cpp
-    steamservice_steam.cpp
+    runsteam.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c

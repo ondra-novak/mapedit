@@ -6,15 +6,15 @@
 #include "skeldal_exe.hpp"
 #include "utils/json.hpp"
 #include "publish_helper.hpp"
-#include <cctype>
+#include "runsteam.hpp"
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
-#include <map>
 #include <memory>
 #include <mutex>
 #include "utils/json.hpp"
@@ -31,7 +31,6 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
-#include <variant>
 
 namespace server {
 
@@ -326,6 +325,7 @@ void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
     broadcast("\r\n\r\n");   
+    zombie_reaper();
  
 }   
 
@@ -771,60 +771,96 @@ void WebInterface::ws_file_copy(const WsRpc::Request &req) {
 
 void WebInterface::ws_publish_status(const WsRpc::Request &req){
     std::lock_guard _(_mx);
-    PublishHelper hlp( getUserDDL().get_path());
+    PublishHelper hlp(getUserDDL());;
     auto st = hlp.get_state();
     
-    std::vector<WsRpc::Attachment> attchs;
-
-    if (!st.image_content_type.empty()) {
-        attchs.push_back(std::move(st.image));
-    }
-
-
     req.send_response(Json{
-        {"item_id", st.steam_id},
-        {"last_publish", st.publish_time == std::chrono::system_clock::time_point()?Json():Json(std::chrono::system_clock::to_time_t(st.publish_time))},
-        {"tags",Json::Array(st.tags.begin(), st.tags.end())},
-        {"title", st.title},
-        {"description", st.description},
-        {"visibility", st.visibility},
-        {"update_lang", st.update_lang},
-        {"content_lang", st.content_lang},
-        {"base_lang", st.base_lang},
-        {"image_content_type", st.image_content_type}
-    },{attchs});
-
+        {"publish_time",std::chrono::system_clock::to_time_t(st.publish_time)},
+        {"steam_id", st.steam_id}
+    });
 
 }
 void WebInterface::ws_publish_set_image(const WsRpc::Request &req){
     std::lock_guard _(_mx);
     const auto ctx = req.params[0].as_text();
     const auto attch = req.attachments[0];
-    auto p = getUserDDL().get_path();
-    PublishHelper hlp(p);;
-    hlp.set_image(attch, ctx);
+    PublishHelper hlp(getUserDDL());;
+    hlp.set_preview_image(attch, ctx);
     req.send_response(true);
-
-
 }
 
-void WebInterface::ws_publish_store_metadata(const WsRpc::Request &req){
+void WebInterface::ws_publish_get_image(const WsRpc::Request &req) {
     std::lock_guard _(_mx);
-    auto p = getUserDDL().get_path();
-    PublishHelper hlp(p);
-    const auto &param = req.params[0];
-    auto title = param["title"].as<std::string>();
-    auto desc = param["description"].as<std::string>();
-    auto update_lang= param["update_lang"].as<std::string>();
-    auto content_lang= param["content_lang"].as<std::string>();
-    auto base_lang= param["base_lang"].as<std::string>();
-    auto tags = param["tags"].as_vector<std::string>();
-    auto visibility = param["visibility"].as<unsigned int>();
-    hlp.set_metadata(title, desc, update_lang, content_lang,base_lang, tags, visibility) ;
-    req.send_response(true);
+    PublishHelper hlp(getUserDDL());;
+    auto img = hlp.get_preview_image();
+    if (img.first.empty() || img.second.empty()) {
+        req.send_response(Json());        
+    } else {
+        req.send_response(img.first, {&img.second,1});
+    }
 
 }
-void WebInterface::ws_publish_publish(const WsRpc::Request &req){
+
+void WebInterface::ws_publish_set_hi_image(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    const auto attch = req.attachments[0];
+    PublishHelper hlp(getUserDDL());;
+    hlp.set_ingame_preview_image(attch);
+    req.send_response(true);
+}
+
+void WebInterface::ws_publish_set_steam_data(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    PublishHelper::SteamData stm;
+    stm.visibility = req.params[0]["visibility"].as_int();
+    stm.tags = req.params[0]["tags"].as_vector<std::string>();
+    hlp.set_steam_data(stm);
+    req.send_response(true);
+}
+
+void WebInterface::ws_publish_get_steam_data(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    auto stm = hlp.get_steam_data();
+    req.send_response(Json {
+        {"visibility", stm.visibility},
+        {"tags", Json::Array(stm.tags.begin(), stm.tags.end())}
+    });
+}
+
+void WebInterface::ws_publish_set_content_data(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    const auto &obj = req.params[0];
+    hlp.update_content_data({
+        obj["title"].as<std::string>(),
+        obj["description"].as<std::string>(),
+        obj["update_lang"].as<std::string>(),
+        obj["content_lang"].as<std::string>(),
+        obj["base_lang"].as<std::string>(),
+        obj["author"].as<std::string>()        
+    });
+    req.send_response(true);    
+}
+
+void WebInterface::ws_publish_prepare(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    hlp.prepare_for_publish(req.params[0].as_text());
+    req.send_response(true);    
+}
+
+void WebInterface::ws_publish_prepared(const WsRpc::Request &req) {
+    auto path = getUserDDL().get_path();
+    path.replace_extension(".pak");
+    std::array<std::string,2> args = {"-P",path.string()};
+    steam_applaunch(app_id, args);
+    req.send_response(true);    
+}
+
+/*
+void WebInterface::ws_publish_publish(const WsRpc::Request &){
     std::lock_guard _(_mx);
     ensure_steam_ready();
     if (!_steam || !_steam->is_available()) {
@@ -882,6 +918,7 @@ void WebInterface::ws_publish_publish(const WsRpc::Request &req){
     }
     
 }
+    */
 
 void WebInterface::ws_lang_list(const WsRpc::Request &req){
     Json::Array out;
@@ -983,14 +1020,6 @@ void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
 
 }
 
-void WebInterface::ensure_steam_ready() {
-    if (!_steam) {
-        auto curdur = std::filesystem::current_path();
-        std::filesystem::current_path(_user_dir);
-        _steam = std::make_unique<SteamService>(3533830);
-        std::filesystem::current_path(curdur);        
-    }
-}
 
 
 }

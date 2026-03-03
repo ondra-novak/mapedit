@@ -3,7 +3,6 @@
 #include "config.hpp"
 #include "ddlman.hpp"
 #include "server.hpp"
-#include "steamservice.hpp"
 #include "wsrpc.hpp"
 #include "mgifcomp.hpp"
 #include "skeldal_exe.hpp"
@@ -40,7 +39,6 @@ protected:
     std::u8string _current_ddl;
     std::stop_source _stop;
     Json _config;
-    std::unique_ptr<SteamService> _steam;
     WsPublisher _publisher;
     bool _check_active = false;
 
@@ -118,10 +116,15 @@ protected:
     void ws_control(const WsRpc::Request &req);
     void ws_file_history(const WsRpc::Request &req);    
     void ws_file_copy(const WsRpc::Request &req);   
-    void ws_publish_status(const WsRpc::Request &req);   
-    void ws_publish_store_metadata(const WsRpc::Request &req);   
-    void ws_publish_set_image(const WsRpc::Request &req);   
-    void ws_publish_publish(const WsRpc::Request &req);   
+    void ws_publish_status(const WsRpc::Request &req);
+    void ws_publish_set_image(const WsRpc::Request &req);
+    void ws_publish_get_image(const WsRpc::Request &req);
+    void ws_publish_set_hi_image(const WsRpc::Request &req);
+    void ws_publish_set_steam_data(const WsRpc::Request &req);
+    void ws_publish_set_content_data(const WsRpc::Request &req);
+    void ws_publish_get_steam_data(const WsRpc::Request &req);
+    void ws_publish_prepare(const WsRpc::Request &req);
+    void ws_publish_prepared(const WsRpc::Request &req);
     void ws_lang_list(const WsRpc::Request &req);
     void ws_lang_get(const WsRpc::Request &req);
     void ws_lang_put(const WsRpc::Request &req);
@@ -159,8 +162,13 @@ protected:
         {"preview_console_exec",&WebInterface::ws_preview_console_exec},
         {"publish.status", &WebInterface::ws_publish_status},
         {"publish.set_image", &WebInterface::ws_publish_set_image},
-        {"publish.store_metadata", &WebInterface::ws_publish_store_metadata},
-        {"publish.publish", &WebInterface::ws_publish_publish},
+        {"publish.get_image", &WebInterface::ws_publish_get_image},
+        {"publish.set_hi_image", &WebInterface::ws_publish_set_hi_image},
+        {"publish.set_steam_data", &WebInterface::ws_publish_set_steam_data},
+        {"publish.get_steam_data", &WebInterface::ws_publish_get_steam_data},
+        {"publish.set_content_data", &WebInterface::ws_publish_set_content_data},
+        {"publish.prepare", &WebInterface::ws_publish_prepare},
+        {"publish.publish_prepared", &WebInterface::ws_publish_prepared},
         {"lang.list", &WebInterface::ws_lang_list},
         {"lang.get", &WebInterface::ws_lang_get},
         {"lang.put", &WebInterface::ws_lang_put},
@@ -175,7 +183,6 @@ protected:
     std::optional<std::vector<char>  >file_get(std::string_view name, std::uint32_t rev);
     bool file_put(std::string_view name, std::uint32_t group, bool fail_if_exists, std::string_view data);
 
-    void ensure_steam_ready();
 
 };
 

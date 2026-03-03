@@ -46,49 +46,35 @@ export interface KeepAliveData {
 export interface DDLFileHistory {
     revision: number;
     timestamp: Date|null;
-}
+};
 
 export interface ModifiedFileNotify {
     name: string;
     group: number;
-}
+};
 
 export class Config {
     project = "";    
+};
+
+export interface PublishState {
+    publis_time: number;
+    steam_id: number;
+};
+
+export interface PublishSteamData {
+    visibility: number;
+    tags: string[];
 }
 
-export class PublishData {
-    tags:string[] = [];
-    visibility:number = 0;
-    title:string = "";
-    description:string = "";
-    content_lang:string = "";
-    update_lang:string = "";
-    base_lang:string = "";
+export interface PublishContentData {
+    title:string;
+    description:string;
+    update_lang:string;
+    content_lang:string;
+    base_lang:string;
+    author:string;
 };
-
-export class PublishStatus extends PublishData {
-    item_id:number = 0;
-    last_publish:Date|null = null;
-    image: Blob|null = null;
-};
-
-export interface PublishProgres {
-    type: "ok",
-    running: boolean,
-    stage: number,
-    percentage: number,
-    error: number
-};
-
-export interface PublishException {
-    type: "exception",
-    message: string,
-};
-
-export type PublishRunStatus = PublishProgres| PublishException;
-export type PublishInitiateStatus = "ok"|"reject"|"legal"|"invalid"|"unknown"|"n/a";
-
 
 export class ApiClient extends WsRpcClient{
 
@@ -228,34 +214,34 @@ export class ApiClient extends WsRpcClient{
         return (await this.call("file_copy",[from, to, to_group, from_rev],[])).data;
     }
 
-    async get_publish_status() : Promise<PublishStatus> {
-        const r =  await this.call("publish.status",[],[]);
-        const data = r.data as Record<string, any>;
-        const out =  Object.assign(new PublishData(), {
-            update_lang:data.update_lang,
-            content_lang:data.content_lang,
-            base_lang: data.base_lang,
-            description: data.description,
-            image: data.image_content_type?new Blob(r.attachments, {type:data.image_content_type}):null,
-            item_id: data.item_id,
-            last_publish: data.last_publish?new Date(data.last_publish * 1000):null,
-            tags:data.tags,
-            title: data.title,
-            visibility: data.visibility
-        });            
-        return out;
-    }
+    async get_publish_status() : Promise<PublishState> {
+        return (await this.call("publish.status",[],[])).data;    }
 
     async set_publish_image(image: ArrayBuffer, content_type: string): Promise<boolean> {
         return (await this.call("publish.set_image",[content_type],[image])).data;;
     }
-
-    async set_publish_metadata(data: PublishData) : Promise<boolean> {
-        return (await this.call("publish.store_metadata",[data],[])).data;
+    async set_publish_hi_image(image: ArrayBuffer): Promise<boolean> {
+        return (await this.call("publish.set_hi_image",[],[image])).data;;
     }
-
-    async publish(change_desc:string) : Promise<PublishInitiateStatus> {
-        return (await this.call("publish.publish", [change_desc],[])).data;
+    async get_publish_image(): Promise<Blob|null> {
+        const resp =  (await this.call("publish.get_image",[],[]));
+        if (resp.data == null) return null;
+        else return new Blob(resp.attachments, {type: resp.data});
+    }
+    async set_publish_steam_data(data: PublishSteamData) : Promise<boolean> {
+        return (await this.call("publish.set_steam_data",[data],[])).data;
+    }
+    async get_publish_steam_data() : Promise<PublishSteamData> {
+        return (await this.call("publish.get_steam_data",[],[])).data;
+    }
+    async set_publish_content_data(data: PublishContentData) : Promise<boolean> {
+        return (await this.call("publish.set_content_data",[data],[])).data;
+    }
+    async publish_prepare(changelog: string) : Promise<boolean> {
+        return (await this.call("publish.prepare",[changelog],[])).data;
+    }
+    async publish_prepared() : Promise<number> {
+        return (await this.call("publish.publish_prepared",[],[])).data;
     }
 
     async lang_list() : Promise<string[]>{
