@@ -161,8 +161,8 @@ async function resize_image(image_url: string) {
         img.onload = () => {
             const canvas = document.createElement('canvas');
             const ratio = img.height / img.width;
-            canvas.width = 280;
-            canvas.height = Math.round(280 * ratio);
+            canvas.width = 240;
+            canvas.height = Math.round(canvas.width * ratio);
             const ctx = canvas.getContext('2d');
             ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
             const data = ctx?.getImageData(0, 0, canvas.width, canvas.height, )
@@ -226,9 +226,8 @@ const dlc = computed({
 
 async function publish_publish() {
     await save_state.do_save();
-    if (await messageBoxConfirm("The editor will use Steam client to publish prepared package. "
-            +"If nothing happens, check the Steam client for an error message.\n\n"+
-            "Confirm you want to publish this content")) {                                
+    if (await messageBoxConfirm(
+        "The editor will use Steam client to publish prepared package.If nothing happens, check the Steam client for an error message.\n\nEnsure that the game is not currently running!\n\nConfirm you want to publish this content")) {                                
                 await server.publish_prepare(new_changelog.value);
                 await server.publish_prepared();
             }

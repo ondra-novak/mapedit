@@ -77,4 +77,7 @@ watch(dlg_ref, ()=>{
     max-width: 40rem;
     padding: 1rem;
 }
+.msg > div {
+    min-height: 1rem;
+}
 </style>
