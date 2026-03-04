@@ -227,9 +227,9 @@ const dlc = computed({
 async function publish_publish() {
     await save_state.do_save();
     if (await messageBoxConfirm(
-        "The editor will use Steam client to publish prepared package.If nothing happens, check the Steam client for an error message.\n\nEnsure that the game is not currently running!\n\nConfirm you want to publish this content")) {                                
+        "To publish this content, the editor will start the game via Steam and use it to upload the prepared package. If nothing happens, check the Steam client for any error messages.\n\nThe game must not be running before publishing.\n\nDo you want to continue?")) {                                
                 await server.publish_prepare(new_changelog.value);
-                await server.publish_prepared();
+//                await server.publish_prepared();
             }
         
     

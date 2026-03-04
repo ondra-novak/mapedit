@@ -180,7 +180,7 @@ export const MainStringtable = [
 [74,"Spell: Death by forbidden magic %s (she)"],
 [175,"Reserved"],
 [176,"Reserved"],
-[32,"Reserved"],
+[32,"Launcher: Continue last save"],
 [33,"Reserved"],
 [52,"Reserved"],
 [67,"Reserved"],
