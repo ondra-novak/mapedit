@@ -239,6 +239,8 @@ async function publish_publish_2() {
 function open_link_new_window(ev: Event) {
     const el = ev.target as HTMLAnchorElement;
     window.open(el.href);
+    ev.preventDefault();
+    ev.stopPropagation();
 }
 
 const publish_dialog = ref<HTMLDialogElement>();
