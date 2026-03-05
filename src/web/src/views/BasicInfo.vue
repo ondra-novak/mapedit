@@ -227,6 +227,7 @@ const dlc = computed({
 
 async function publish_publish() {
     publish_dialog.value?.showModal();
+    StatusBar.stop_game();
 }
 async function publish_publish_2() {
     publish_dialog.value?.close();

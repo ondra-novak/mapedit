@@ -17,6 +17,8 @@ import { mainMenuControl, type EditorRef } from './core/services';
 import DialogsEditor from './views/DialogsEditor.vue';
 import TranslationTools from './views/TranslationTools.vue';
 
+const version = import.meta.env.VITE_APP_VERSION;
+
 const active_item = ref<number>(0);
 
 
@@ -52,9 +54,11 @@ onMounted(()=>{
 </menu>
 <div class="workspace-outer">
   <div class="workspace-inner">
-    <x-workspace v-of="active_item == 0">
-      <div><img src="@/assets/logo.png"></div>
-      <div>Pre-alpha version</div>
+    <x-workspace v-of="active_item == 0"><
+      <div class="center">
+        <div><img src="@/assets/logo.png"></div>
+        <div>Alpa version: {{ version }}</div>
+      </div>
     </x-workspace>
     <div v-if="active_item == 1"><BasicInfo  /></div>
     <div><AssetsManager :active="active_item == 2"/></div>
@@ -148,4 +152,7 @@ menu > li.active {
   border-top: 1px solid black;
 }
 
+.center {
+  text-align:center;
+}
 </style>

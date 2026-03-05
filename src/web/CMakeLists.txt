@@ -22,7 +22,7 @@ add_custom_command(OUTPUT ${WEB_SRC_DIR}/generated/parser.js
 )
 
 add_custom_command(OUTPUT ${WEB_BUILD_DIR}/index.html    
-    COMMAND ${CMAKE_COMMAND} -E env VITE_OUTPUT_DIR=${WEB_BUILD_DIR} ${CMDPREFIX} npm run build
+    COMMAND ${CMAKE_COMMAND} -E env VITE_OUTPUT_DIR=${WEB_BUILD_DIR} VITE_APP_VERSION=${APP_VERSION} ${CMDPREFIX} npm run build
     WORKING_DIRECTORY ${WEB_SRC_DIR}
     DEPENDS ${WEB_SOURCES} ${WEB_SRC_DIR}/generated/parser.js
     BYPRODUCTS ${WEB_BUILD_DIR} 
