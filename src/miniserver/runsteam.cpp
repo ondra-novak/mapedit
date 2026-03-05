@@ -3,6 +3,7 @@
 #include <numeric>
 #include <string>
 #include <sys/wait.h>
+#include <system_error>
 #include <unistd.h>
 #include <vector>
 
@@ -41,7 +42,9 @@ void steam_applaunch(unsigned long long appid, std::span<const std::string> args
 
     auto cargs = to_execve_args(finargs);
 
-    if (fork()) {
+    int fr =  fork();
+    if (fr < 0) throw std::system_error(errno, std::system_category(), "fork failed");
+    if (!fr) {
         setsid();
         execvp(cargs.pointers[0],cargs.pointers.data());
     }   

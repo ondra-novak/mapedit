@@ -37,12 +37,14 @@ PublishHelper::State PublishHelper::get_state() const {
     State st = {};
     std::ifstream f(_steam_state, std::ios::in);
     if (!!f) {
-        Json json = Json::parse([&f]()->std::optional<char> {
-            int c = f.get();
-            return c == EOF?std::nullopt:std::optional<char>(c);
-        });
-        st.steam_id = json["steam_id"].as<uint64_t>();
-        st.publish_time = std::chrono::system_clock::from_time_t(json["publish_time"].as<time_t>());
+        uint64_t id = 0;
+        uint64_t pubtime = 0;
+        uint64_t licence = 0;
+        f >> id >> pubtime >> licence;
+
+        st.steam_id = id;
+        st.publish_time = std::chrono::system_clock::from_time_t(static_cast<time_t>(pubtime));
+        st.need_licence = !!licence;
     }
     return st;
 }

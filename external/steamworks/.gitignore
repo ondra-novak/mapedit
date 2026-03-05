@@ -1,6 +1,0 @@
-# Exclude all files
-*
-
-# Allow only get_sdk.md
-!get_sdk.md
-!.gitignore

@@ -39,4 +39,4 @@ add_executable(mapedit_server
     utils/fast_copy_file.cpp
     )
 
-target_link_libraries(mapedit_server PRIVATE mapedit_server_webcontent ${STEAMLIB})
+target_link_libraries(mapedit_server PRIVATE mapedit_server_webcontent)

@@ -58,8 +58,9 @@ export class Config {
 };
 
 export interface PublishState {
-    publis_time: number;
+    publish_time: number;
     steam_id: number;
+    licence: boolean;
 };
 
 export interface PublishSteamData {

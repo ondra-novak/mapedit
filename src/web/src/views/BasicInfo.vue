@@ -25,7 +25,7 @@ class BasicInfoData {
     start_map: string = "START.MAP";
     dlc:number = 0;
     language: string = "en";
-    langddl: string = "en";
+    langddl: string = "EN";
 };
 
 
@@ -94,15 +94,26 @@ async function save() {
     if (publish_steam_data.value) await server.set_publish_steam_data(publish_steam_data.value);
 }
 
+let publish_state_checker : NodeJS.Timeout;
+
 async function init() {
     save_state = await StatusBar.register_save_control();
     save_state.on_save(save);
     save_state.on_revert(reload);
     reload();
+    publish_state_checker = setInterval(async ()=>{
+        publish_state.value =  await server.get_publish_status();
+    },5000);
 }
 
+
+
 onMounted(init);
-onUnmounted(()=>save_state.unmount());
+onUnmounted(()=>{
+    if (image_url.value) URL.revokeObjectURL(image_url.value);
+    save_state.unmount()
+    clearInterval(publish_state_checker);
+});
 
 watch([basic_info, runes], ()=>save_state.set_changed(true),{deep:true});
 
@@ -150,9 +161,6 @@ function tag_change() {
     tag_add();
 }
 
-onUnmounted(()=>{
-    if (image_url.value) URL.revokeObjectURL(image_url.value);
-});
 
 
 async function resize_image(image_url: string) {
@@ -204,13 +212,6 @@ function upload_image() {
     input.click();
 }
 
-async function goto_licence_page() {
-    if (await messageBoxConfirm("You must agree to the Steam Community license agreement. Do you want to open the license agreement form?")) {
-        const st = await server.get_publish_status();
-        location.href = `steam://url/CommunityFilePage/`;
-    }
-}
-
 async function warning_msg() {
     setTimeout(()=>{
         if (basic_info.value.dlc) {
@@ -225,15 +226,21 @@ const dlc = computed({
 })
 
 async function publish_publish() {
-    await save_state.do_save();
-    if (await messageBoxConfirm(
-        "To publish this content, the editor will start the game via Steam and use it to upload the prepared package. If nothing happens, check the Steam client for any error messages.\n\nThe game must not be running before publishing.\n\nDo you want to continue?")) {                                
-                await server.publish_prepare(new_changelog.value);
-//                await server.publish_prepared();
-            }
-        
-    
+    publish_dialog.value?.showModal();
 }
+async function publish_publish_2() {
+    publish_dialog.value?.close();
+    await save_state.do_save();
+    await server.publish_prepare(new_changelog.value);
+    await server.publish_prepared();
+}
+        
+function open_link_new_window(ev: Event) {
+    const el = ev.target as HTMLAnchorElement;
+    window.open(el.href);
+}
+
+const publish_dialog = ref<HTMLDialogElement>();
 
 
 </script>
@@ -280,8 +287,8 @@ async function publish_publish() {
             </div>
             <x-form v-if="publish_state  && publish_steam_data">                 
 
-                <label><span>Steam ID</span><span v-if="publish_state.steam_id" > {{ publish_state.steam_id}} </span><span v-else>Not published yet</span></label>
-                <label><span>Publised date</span><span> {{ publish_state.publis_time? new Date(publish_state.publis_time*1000).toLocaleString():"N/A" }} </span></label>
+                <label><span>Steam ID</span><a :href="`steam://url/CommunityFilePage/${publish_state.steam_id}`" v-if="publish_state.steam_id" > {{ publish_state.steam_id}} </a><span v-else>Not published yet</span></label>
+                <label><span>Publised date</span><span> {{ publish_state.publish_time? new Date(publish_state.publish_time*1000).toLocaleString():"N/A" }} </span></label>
                 <label><span>Tags</span><div class="tags">
                     <div v-for="v of publish_steam_data.tags" @click="deltag(v)"> {{ v }}</div>
                     <input v-model="next_tag" @keydown="(e:KeyboardEvent)=>tag_keydown(e)" @change="tag_change" :list="taglist.id" placeholder="Click to add a tag">
@@ -296,11 +303,21 @@ async function publish_publish() {
         </x-section>
         <x-section>
             <x-section-title>Publish an update</x-section-title>
-            <label  v-if="publish_state?.publis_time"><span>Changelog (optional, recommended!):</span><w-y-s-i-w-y-gedit v-model="new_changelog" format="BBCode" class="chgdesc"/></label>
-            <div class="pub"><button @click="publish_publish">Publish</button></div>        
+            <label  v-if="publish_state?.publish_time"><span>Changelog (optional, recommended!):</span><w-y-s-i-w-y-gedit v-model="new_changelog" format="BBCode" class="chgdesc"/></label>
+            <div class="pub"><button :disabled="!basic_info.name.length || !image_url?.length || !basic_info.langddl" @click="publish_publish">Publish</button></div>        
         </x-section>
     </div>
 </div>
+<dialog ref="publish_dialog" class="pubdlg">
+    <header>Publish on Steam<button class="close" @click="publish_dialog?.close()"></button></header>
+    <p>To publish this content, the editor will start the game via <strong>Steam</strong> and use it to upload the prepared package. If nothing happens, check the Steam client for any error messages</p>
+    <p><strong>The game must not be running before publishing.</strong></p>
+    <p>By submitting this item, you agree to the <a href="http://steamcommunity.com/sharedfiles/workshoplegalagreement" @click="ev=>open_link_new_window(ev)">workshop terms of service</a>⧉</p>
+    <p>Do you want to continue?</p>
+    <footer>
+        <button @click="publish_publish_2">Publish</button><button @click="publish_dialog?.close()">Cancel</button>
+    </footer>
+</dialog>
 </x-workspace>
 
 
@@ -320,9 +337,6 @@ async function publish_publish() {
 .advinfo {
     width: 50rem;    
     
-}
-.publish {
-    width: 40rem;
 }
 .panels {
     padding-top: 1rem;    ;
@@ -348,14 +362,28 @@ async function publish_publish() {
 }
 
 .imagepreview {
-    height: 300px;
+    min-height: 400px;
+    width: 400px;
     position: relative;
     border: 1px solid;
     text-align: center;
+    margin: auto;
+    position: relative;
+}
+.imagepreview::before {
+    content: "1:1 ratio, max 1MB";
+    position: absolute;
+    inset: 0;
+    height: fit-content;
+    text-align: center;
+    margin: auto;
+
 }
 .imagepreview > img {
-    height: 300px;
-
+    width: 400px;
+    position: absolute;    
+    inset: 0;
+    margin: auto;
 }
 
 .imagepreview > button {
@@ -405,6 +433,9 @@ p.note  {
     margin-left: 0;
     margin-right: auto;
     background-color: green;
+}
+.pubdlg {
+    max-width: 35rem;
 }
 
 </style>

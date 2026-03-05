@@ -776,7 +776,8 @@ void WebInterface::ws_publish_status(const WsRpc::Request &req){
     
     req.send_response(Json{
         {"publish_time",std::chrono::system_clock::to_time_t(st.publish_time)},
-        {"steam_id", st.steam_id}
+        {"steam_id", st.steam_id},
+        {"licence", st.need_licence}
     });
 
 }

@@ -20,6 +20,7 @@ public:
     struct State {
         uint64_t steam_id = 0;
         std::chrono::system_clock::time_point publish_time = {};
+        bool need_licence;
     };
     
     struct SteamData {
