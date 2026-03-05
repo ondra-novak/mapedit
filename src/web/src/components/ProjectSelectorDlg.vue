@@ -1,9 +1,12 @@
 <script lang="ts" setup>
-import { type KeepAliveData, server, type DDLEntry } from '@/core/api';
+import { type KeepAliveData, server, type DDLEntry, type ModifiedFileNotify } from '@/core/api';
 import type { WsRpcResult } from "@/core/wsrpc";
 import { computed, onMounted, ref } from 'vue';
 import StatusBar from './statusBar.ts';
 import { useRouter } from 'vue-router';
+import { parse_stringtable } from '@/core/string_table.ts';
+import { ElementTypeName } from '@/core/common_defs.ts';
+import { keybcs2string } from '@/core/keybcs2.ts';
 
 const dlg = ref<HTMLDialogElement>();
 const list_of_projects = ref<DDLEntry[]>();
@@ -25,10 +28,25 @@ function switch_project() {
     dlg.value?.showModal();    
 }
 
+async function update_elements() {
+    const data = await server.getDDLFile("POPISY.TXT")
+    const dec = new TextDecoder();
+    const txt = keybcs2string(data);
+    const stable = parse_stringtable(txt);
+    const ids = [22,23,24,25,26];
+    ids.forEach((v,idx)=>{
+        const s= stable[v];
+        ElementTypeName[idx] = s;
+    });
+}
+
 function server_keep_alive(st:KeepAliveData) {
     if (st.current_ddl) {
-        cur_project = st.current_ddl;
-        StatusBar.set_project_switch(st.current_ddl, switch_project);
+        if (cur_project != st.current_ddl) {
+            cur_project = st.current_ddl;
+            update_elements();
+            StatusBar.set_project_switch(st.current_ddl, switch_project);
+        }
     } else {
         if (!force_switch.value) {
             force_switch.value = true;
@@ -41,6 +59,12 @@ async function init() {
     server.on("state",(x:WsRpcResult)=>{
         server_keep_alive(x.data);
     });
+    server.on("modified", (x:WsRpcResult)=>{
+        const n : ModifiedFileNotify = x.data;
+        if (n.name == "POPISY.TXT") {
+            update_elements();
+        }
+    })
 }
 
 async function project_selected(name: string) {

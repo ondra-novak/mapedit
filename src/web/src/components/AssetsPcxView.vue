@@ -6,7 +6,7 @@ import { extractImageData, findQuantizationAndGeneratePalette } from '@/core/ima
 import { PCX} from '@/core/pcx';
 import  SkeldalImage from "@/components/SkeldalImage.vue"
 import type  {ImageModel } from "@/components/SkeldalImage.vue"
-import { ref, watch, onMounted, computed, defineEmits } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { determineProfile } from '@/core/pcx_profle';
 
 const filename = defineModel<string | null>("file");

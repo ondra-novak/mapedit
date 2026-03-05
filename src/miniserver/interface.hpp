@@ -8,6 +8,7 @@
 #include "skeldal_exe.hpp"
 #include "wsrpc.hpp"
 #include "publisher.hpp"
+#include <atomic>
 #include <filesystem>
 #include <shared_mutex>
 #include <thread>
@@ -20,6 +21,8 @@ struct Request;
 
 class WebInterface {
 public:
+
+    static constexpr unsigned int app_id = 3533830;
 
     static constexpr auto keepalive_interval = std::chrono::seconds(5);
 
@@ -36,12 +39,17 @@ protected:
     std::u8string _current_ddl;
     std::stop_source _stop;
     Json _config;
+    WsPublisher _publisher;
     bool _check_active = false;
 
     WsRpc::MethodMap _methods;
 
-    MGifComp _mgfcomp;
     std::mutex _mgfcomp_mx;
+    MGifComp _mgfcomp;
+
+    std::atomic<bool> _publish_running = {};
+    std::jthread _publish_process;
+
 
     bool webserver(Request &req);
     bool webserver_index(Request &req);
@@ -101,15 +109,27 @@ protected:
     void ws_preview_start(const WsRpc::Request &req);
     void ws_preview_stop(const WsRpc::Request &req);
     void ws_preview_teleport(const WsRpc::Request &req);
+    void ws_preview_test_dialog(const WsRpc::Request &req);
     void ws_preview_reload(const WsRpc::Request &req);
     void ws_preview_console_show(const WsRpc::Request &req);
     void ws_preview_console_exec(const WsRpc::Request &req);
     void ws_control(const WsRpc::Request &req);
     void ws_file_history(const WsRpc::Request &req);    
     void ws_file_copy(const WsRpc::Request &req);   
-    void ws_publish_status(const WsRpc::Request &req);   
-    void ws_publish_set_image(const WsRpc::Request &req);   
-    void ws_publish_publish(const WsRpc::Request &req);   
+    void ws_publish_status(const WsRpc::Request &req);
+    void ws_publish_set_image(const WsRpc::Request &req);
+    void ws_publish_get_image(const WsRpc::Request &req);
+    void ws_publish_set_hi_image(const WsRpc::Request &req);
+    void ws_publish_set_steam_data(const WsRpc::Request &req);
+    void ws_publish_set_content_data(const WsRpc::Request &req);
+    void ws_publish_get_steam_data(const WsRpc::Request &req);
+    void ws_publish_prepare(const WsRpc::Request &req);
+    void ws_publish_prepared(const WsRpc::Request &req);
+    void ws_lang_list(const WsRpc::Request &req);
+    void ws_lang_get(const WsRpc::Request &req);
+    void ws_lang_put(const WsRpc::Request &req);
+    void ws_lang_delete(const WsRpc::Request &req);
+    void ws_lang_copyddl(const WsRpc::Request &req);
 
     void send_state_update(WsRpc &rpc);
 
@@ -137,20 +157,33 @@ protected:
         {"preview_stop",&WebInterface::ws_preview_stop},
         {"preview_teleport",&WebInterface::ws_preview_teleport},
         {"preview_reload",&WebInterface::ws_preview_reload},
+        {"preview_test_dialog",&WebInterface::ws_preview_test_dialog},
         {"preview_console_show",&WebInterface::ws_preview_console_show},
         {"preview_console_exec",&WebInterface::ws_preview_console_exec},
         {"publish.status", &WebInterface::ws_publish_status},
         {"publish.set_image", &WebInterface::ws_publish_set_image},
-        {"publish.publish", &WebInterface::ws_publish_publish},
+        {"publish.get_image", &WebInterface::ws_publish_get_image},
+        {"publish.set_hi_image", &WebInterface::ws_publish_set_hi_image},
+        {"publish.set_steam_data", &WebInterface::ws_publish_set_steam_data},
+        {"publish.get_steam_data", &WebInterface::ws_publish_get_steam_data},
+        {"publish.set_content_data", &WebInterface::ws_publish_set_content_data},
+        {"publish.prepare", &WebInterface::ws_publish_prepare},
+        {"publish.publish_prepared", &WebInterface::ws_publish_prepared},
+        {"lang.list", &WebInterface::ws_lang_list},
+        {"lang.get", &WebInterface::ws_lang_get},
+        {"lang.put", &WebInterface::ws_lang_put},
+        {"lang.delete", &WebInterface::ws_lang_delete},
+        {"lang.copyddl", &WebInterface::ws_lang_copyddl}
     };
 
 
-    WsPublisher _publisher;
     void publish_state();
     Json create_state();
 
     std::optional<std::vector<char>  >file_get(std::string_view name, std::uint32_t rev);
     bool file_put(std::string_view name, std::uint32_t group, bool fail_if_exists, std::string_view data);
+
+
 };
 
 

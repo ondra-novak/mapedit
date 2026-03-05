@@ -1,5 +1,7 @@
-import { ItemWearPlace } from "./items_struct";
+import { make_identifiers } from "./common_defs";
 import { keybcs2string, string2keybcs } from "./keybcs2";
+import Hive from "@/utils/hive"
+import type { TranslateTable } from "./translate";
 
 export interface THuman {
   jmeno: string;
@@ -13,8 +15,10 @@ export interface THuman {
   stats: number[];
   sipy: number;
   sip_druh:number;
-  npcflags: number;
+  npcflags: {HIDE_INV: boolean, HIDE_GEAR: boolean}
 }
+
+export class HumanHive extends Hive<THuman> {};
 
 export  const createTHuman = (): THuman => {
         return {
@@ -28,7 +32,7 @@ export  const createTHuman = (): THuman => {
         stats: new Array(24).fill(0),
         sipy: 0,
         sip_druh:0,
-        npcflags:0,
+        npcflags:{HIDE_GEAR:false,HIDE_INV:false},
         rings:[]
         }
     }
@@ -51,6 +55,8 @@ export const HumanWearPlaceName = [
     "Bag slot","Upper body","Lower body","Head","Feet","Robe","Neck","Left hand","Right hand"
 ] as const;
 
+
+export const HumanWearPlaceVariables = make_identifiers("equipment.", HumanWearPlaceName);
 
 class Iterator {
     lines:string[] = [];
@@ -98,9 +104,14 @@ export class Runes {
 
 
 export interface THumanData  {
-    characters: THuman[],
+    characters: HumanHive,
     runes: Runes;
 }
+
+const NpcFlags = {
+    HIDE_GEAR: 0x2,
+    HIDE_INV: 0x1
+} as const;
 
 export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
   const data = keybcs2string(Array.from(new Uint8Array(buff)));
@@ -174,9 +185,11 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
                     num = iter.getNumber();
                 }
                 break;
-            case 139:
-                human.npcflags = iter.getNumber() || 0;
-                break
+            case 139: {
+                const npcflags = iter.getNumber() || 0;
+                human.npcflags.HIDE_GEAR = (npcflags & NpcFlags.HIDE_GEAR) != 0;
+                human.npcflags.HIDE_INV = (npcflags & NpcFlags.HIDE_INV) != 0;
+                } break
             case -1:
                 if (!skip_add) humans.push(human);
                 skip_add = true;
@@ -189,11 +202,12 @@ export function humanDataFromArrayBuffer(buff: ArrayBuffer): THumanData {
         }
     }
 
-
+    const hive = new HumanHive();
+    humans.forEach((v, idx) => v.jmeno == "#"?null:hive.set(idx,v));
 
   return {
     runes: runes,
-    characters: humans
+    characters: hive
   };
 }
 
@@ -213,7 +227,11 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
         lines.push(-1);
     })
 
-    data.characters.forEach(h=>{
+    data.characters.get_raw().forEach(h=>{
+        if (h === null) {
+            h = createTHuman();
+            h.jmeno = "#";
+        }
         lines.push(128,h.jmeno);
         lines.push(129,h.female?1:0);
         lines.push(130,h.xicht);
@@ -236,7 +254,7 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
         lines.push(136,h.sipy);
         lines.push(137,h.sip_druh);
         lines.push(138,...h.rings, -1);
-        lines.push(139,h.npcflags);
+        lines.push(139,(h.npcflags.HIDE_GEAR?NpcFlags.HIDE_GEAR:0)+(h.npcflags.HIDE_INV?NpcFlags.HIDE_INV:0));
         h.stats.forEach((v,idx) => {
             lines.push(idx, v);
         });
@@ -251,4 +269,17 @@ export function humanDataToArrayBuffer(data: THumanData) : ArrayBuffer {
     }).join("\r\n")+"\r\n";
 
     return Uint8Array.from(string2keybcs(whole_str)).buffer;
+}
+
+export function characters_generate_translation(e: HumanHive, tbl: TranslateTable) {
+    const target = tbl.openFile("char")
+    e.forEach((x, idx)=>{
+        target.store(`${idx}`, x.jmeno);
+    });
+}
+export function characters_translate(e: HumanHive, tbl: TranslateTable) {
+    const target = tbl.openFile("char")
+    e.forEach((x, idx)=>{
+        x.jmeno = target.translate(`${idx}`, x.jmeno);
+    });
 }

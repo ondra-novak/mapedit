@@ -1,5 +1,6 @@
 #include "ddlman.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <fstream>
 #include <optional>
@@ -86,11 +87,20 @@ void DDLManager::compact() const
     std::filesystem::path bk_file = _pathname;
     new_file += ".new";
     bk_file += ".bak";
-    DDLManager newddl(new_file);
+
+    if (compact_to(new_file)) {
+        std::filesystem::rename(_pathname, bk_file);
+        std::filesystem::rename(new_file, _pathname);
+    }
+
+}
+bool DDLManager::compact_to(const std::filesystem::path &target) const {
+
+    DDLManager newddl(target);
 
     std::vector<DirItemGroup> items;
     std::ifstream sf(_pathname, std::ios::in| std::ios::binary);
-    if (!sf) return;
+    if (!sf) return false;
 
     parse_ddl(sf, [&](const DirItemGroup &it){
         auto n = it.get_name();
@@ -108,8 +118,7 @@ void DDLManager::compact() const
     }
     sf.close();
     tf.close();
-    std::filesystem::rename(_pathname, bk_file);
-    std::filesystem::rename(new_file, _pathname);
+    return true;
 }
 
 DDLManager::Stats DDLManager::get_stats() const
@@ -253,7 +262,7 @@ void DDLManager::prepare_directory(std::span<const PreparedDirItem> src, std::sp
 
 std::fstream DDLManager::create_ddl(unsigned int entries) const {
         std::fstream f(_pathname, std::ios::in|std::ios::out|std::ios::trunc|std::ios::binary);    
-        if (!f) throw std::runtime_error("Failed to create new version od DDL archive");
+        if (!f) throw std::runtime_error("Failed to create new version of DDL archive");
         create_ddl(f,entries);
         return f;
 }
@@ -310,7 +319,7 @@ std::optional<std::pair<DDLManager::DirItem, unsigned int> > DDLManager::find_fi
     unsigned int index = 0;
     parse_ddl(f, [&](const DirItem &item) {
         auto n2 = item.get_name();
-        if (n2 != n1) {
+        if (!equal_icase(n2 ,n1)) {
             ++index;
             return true;
         }
@@ -486,3 +495,18 @@ std::vector<std::pair<std::uint32_t, std::chrono::system_clock::time_point> > DD
     return out;   
 }
 
+
+bool DDLManager::equal_icase(std::string_view a, std::string_view b) {
+    if (a.length() != b.length()) return false;
+    auto cnt = a.length();
+    for (std::size_t i = 0; i < cnt; ++i) {
+        char ac = a[i];
+        char bc = b[i];
+        if (ac != bc) {
+            if (ac >= 'a' && ac <= 'z') ac = ac - 'a' + 'A';
+            if (bc >= 'a' && bc <= 'z') bc = bc - 'a' + 'A';
+            if (ac != bc) return false;
+        }
+    }
+    return true;
+}

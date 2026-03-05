@@ -46,16 +46,36 @@ export interface KeepAliveData {
 export interface DDLFileHistory {
     revision: number;
     timestamp: Date|null;
-}
+};
 
 export interface ModifiedFileNotify {
     name: string;
     group: number;
-}
+};
 
 export class Config {
     project = "";    
+};
+
+export interface PublishState {
+    publish_time: number;
+    steam_id: number;
+    licence: boolean;
+};
+
+export interface PublishSteamData {
+    visibility: number;
+    tags: string[];
 }
+
+export interface PublishContentData {
+    title:string;
+    description:string;
+    update_lang:string;
+    content_lang:string;
+    base_lang:string;
+    author:string;
+};
 
 export class ApiClient extends WsRpcClient{
 
@@ -159,8 +179,11 @@ export class ApiClient extends WsRpcClient{
         return (await this.call("preview_console_exec",[cmd],[])).data;
     }
 
-    async game_client_teleport(map: string, sector: number, side: number) : Promise<boolean> {
-        return (await (this.call("preview_teleport",[{map,sector,side}],[]))).data;
+    async game_client_teleport(map: string, sector: number, side: number,ghost:number) : Promise<boolean> {
+        return (await (this.call("preview_teleport",[{map,sector,side,ghost}],[]))).data;
+    }
+    async game_client_test_dialog(id: number) : Promise<boolean> {
+        return (await (this.call("preview_test_dialog",[id],[]))).data;
     }
 
     async set_current_ddl(ddl: string) {
@@ -192,21 +215,50 @@ export class ApiClient extends WsRpcClient{
         return (await this.call("file_copy",[from, to, to_group, from_rev],[])).data;
     }
 
-    async get_publish_status() : Promise<WsRpcResult> {
-        return await this.call("publish.status",[],[]);
-    }
+    async get_publish_status() : Promise<PublishState> {
+        return (await this.call("publish.status",[],[])).data;    }
 
     async set_publish_image(image: ArrayBuffer, content_type: string): Promise<boolean> {
         return (await this.call("publish.set_image",[content_type],[image])).data;;
     }
+    async set_publish_hi_image(image: ArrayBuffer): Promise<boolean> {
+        return (await this.call("publish.set_hi_image",[],[image])).data;;
+    }
+    async get_publish_image(): Promise<Blob|null> {
+        const resp =  (await this.call("publish.get_image",[],[]));
+        if (resp.data == null) return null;
+        else return new Blob(resp.attachments, {type: resp.data});
+    }
+    async set_publish_steam_data(data: PublishSteamData) : Promise<boolean> {
+        return (await this.call("publish.set_steam_data",[data],[])).data;
+    }
+    async get_publish_steam_data() : Promise<PublishSteamData> {
+        return (await this.call("publish.get_steam_data",[],[])).data;
+    }
+    async set_publish_content_data(data: PublishContentData) : Promise<boolean> {
+        return (await this.call("publish.set_content_data",[data],[])).data;
+    }
+    async publish_prepare(changelog: string) : Promise<boolean> {
+        return (await this.call("publish.prepare",[changelog],[])).data;
+    }
+    async publish_prepared() : Promise<number> {
+        return (await this.call("publish.publish_prepared",[],[])).data;
+    }
 
-    async publish(title: string, 
-                 desc:string, 
-                 lang:string, 
-                 tags: string[],
-                 visbility: number,
-                 change_desc:string) : Promise<boolean> {
-        return (await this.call("publish.publish", [title,desc,lang,tags,visbility,change_desc],[])).data;
+    async lang_list() : Promise<string[]>{
+        return (await this.call("lang.list",[],[])).data;
+    }
+    async lang_get(lang:string) : Promise<ArrayBuffer>{
+        return (await this.call("lang.get",[lang],[])).attachments[0];
+    }
+    async lang_put(lang:string, content: ArrayBuffer) : Promise<boolean>{
+        return (await this.call("lang.put",[lang],[content])).data;
+    }
+    async lang_delete(lang:string) : Promise<void>{
+        await this.call("lang.delete",[lang],[]);
+    }
+    async lang_copyddl(target:string, ignore_files:string[]): Promise<void>{
+        await this.call("lang.copyddl", [target, ignore_files],[]);
     }
 
 }

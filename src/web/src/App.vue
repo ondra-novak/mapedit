@@ -4,7 +4,7 @@ import MessageBoxComponent from './utils/messageBoxComponent.vue';
 import MissingFiles from './components/tools/MissingFiles.vue';
 import ProjectSelectorDlg from './components/ProjectSelectorDlg.vue';
 import ServerConfigDlg from './components/GameClientCfgDlg.vue';
-import { onMounted, ref, triggerRef, watch } from 'vue';
+import { onMounted, ref } from 'vue';
 import BasicInfo from './views/BasicInfo.vue';
 import MapEditor from './views/MapEditor.vue';
 import AssetsManager from './views/AssetsManager.vue';
@@ -14,20 +14,26 @@ import SpellsEditor from './views/SpellsEditor.vue';
 import CharacterEditor from './views/CharacterEditor.vue';
 import ShopsEditor from './views/ShopsEditor.vue';
 import { mainMenuControl, type EditorRef } from './core/services';
+import DialogsEditor from './views/DialogsEditor.vue';
+import TranslationTools from './views/TranslationTools.vue';
+
+const version = import.meta.env.VITE_APP_VERSION;
 
 const active_item = ref<number>(0);
 
 
-const items = {
-  1:"General",
-  2:"Assets",
-  3:"Map",
-  4:"Items",
-  5:"Enemies",
-  6:"Spells",
-  7:"Characters",
-  8:"Shops"  
-}
+const items : [number,string][]= [
+  [1,"General"],
+  [2,"Assets"],
+  [3,"Map"],
+  [4,"Items"],
+  [5,"Enemies"],
+  [6,"Spells"],
+  [7,"Characters"],
+  [8,"Shops" ],
+  [9,"Dialogs"],
+  [10,"Translation"]
+] as const;
 
 function open_editor(id:EditorRef) {
   active_item.value = id;  
@@ -44,13 +50,15 @@ onMounted(()=>{
 <template>
 <div class="screen">
 <menu>
-  <li v-for="(n, i) of items" @click="active_item = i" :class="{active: active_item == i}"> {{ n }}</li>
+  <li v-for="n of items" @click="active_item = n[0]" :class="{active: active_item == n[0]}"> {{ n[1] }}</li>
 </menu>
 <div class="workspace-outer">
   <div class="workspace-inner">
-    <x-workspace v-of="active_item == 0">
-      <div><img src="@/assets/logo.png"></div>
-      <div>Pre-alpha version</div>
+    <x-workspace v-of="active_item == 0"><
+      <div class="center">
+        <div><img src="@/assets/logo.png"></div>
+        <div>Alpa version: {{ version }}</div>
+      </div>
     </x-workspace>
     <div v-if="active_item == 1"><BasicInfo  /></div>
     <div><AssetsManager :active="active_item == 2"/></div>
@@ -60,6 +68,8 @@ onMounted(()=>{
     <div v-if="active_item == 6"><SpellsEditor /></div>
     <div v-if="active_item == 7"><CharacterEditor /></div>
     <div v-if="active_item == 8"><ShopsEditor /></div>
+    <div><DialogsEditor :active="active_item == 9"/></div>
+    <div v-if="active_item == 10"><TranslationTools/></div>
   </div>
 </div>
 <div class="statusbar">  
@@ -142,4 +152,7 @@ menu > li.active {
   border-top: 1px solid black;
 }
 
+.center {
+  text-align:center;
+}
 </style>

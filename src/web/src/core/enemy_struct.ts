@@ -1,7 +1,9 @@
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, parseSection, splitArrayBuffer, writeSection, type Schema, type SchemaObject, type SchemaType } from "./binary";
+import Hive from '@/utils/hive'
+import type { TranslateTable } from "./translate";
 
 
-const MOBS_INV = 16;
+const MOBS_INV = 15;
 const MOB_SOUNDS = 4;
 
 
@@ -69,6 +71,7 @@ export class EnemyDef{
   money: number = 0; // peníze (word)
   specproc: number = 0; // speciální akce (word)
   reserved: number[] = []; // rezervovaná data (char[3])
+  kill_dialog:number = 0;
 };
 
 const EnemySchema : Schema = {
@@ -84,6 +87,7 @@ const EnemySchema : Schema = {
   anim_counter: "uint16",
   vlastnosti: ["uint16", 24],
   inv: ["int16", MOBS_INV],
+  kill_dialog: "int16",
   lives: "int16",
   cislo_vzoru: "int16",
   speed: "int16",
@@ -115,51 +119,52 @@ const EnemySchema : Schema = {
 
 
 const EnemySchemaNew : Schema = {
-  name: "char[30]",                 //30
-  casting: "int16",                 //32
-  adjusting: ["int16", 6, 16],      //224
-  sector: "uint16",                 //226
-  dir: "uint16",                    //228
+  name: "char[30]",                 
+  casting: "int16",                 
+  adjusting: ["int16", 6, 16],      
+  sector: "uint16",                 
+  dir: "uint16",                    
   locx: "int8",
   locy: "int8",
   headx: "int8",
-  heady: "int8",                    //232
-  anim_counter: "uint16",           //234
-  vlastnosti: ["uint16", 24],       //282
-  inv: ["int16", MOBS_INV],         //314
-  lives: "int16",                   //316
-  cislo_vzoru: "int16",             //318
-  speed: "int16",                   //320
-  dohled: "int16",                  //322
-  dosah: "int16",                   //324
-  stay_strategy: "uint8",           //325
-  walk_data: "int8",                //326
-  bonus: "uint16",                  //328
-  flee_num: "int8",                 //329
-  anim_counts: ["int8", 6],         //335
-  mobs_name: "char[7]",             //342
-  flags2:  "uint8",                 //343
-  reserved: "uint8",                //344
-  experience: "int32",              //348
-  vlajky: "uint8",                  //349
-  anim_phase: "uint8",              //350
-  csektor: "int16",                 //352
-  home_pos: "int16",                //354
-  next: "int16",                    //356
-  actions: "uint8",                 //357
-  hit_pos: "uint8",                 //358
-  sounds: ["uint16", MOB_SOUNDS],   //366
-  paletts_count: "int8",            //367
-  mode: "int8",                     //368
-  dialog: "int16",                  //370
-  dialog_flags: "int16",            //372
-  money: "uint16",                  //374
-  specproc: "uint16",               //376
-  reserved2: "uint16",              //378
-  reserved3: "uint16",              //380
+  heady: "int8",                    
+  anim_counter: "uint16",           
+  vlastnosti: ["uint16", 24],       
+  inv: ["int16", MOBS_INV],         
+  kill_dialog: "int16",             
+  lives: "int16",                   
+  cislo_vzoru: "int16",             
+  speed: "int16",                   
+  dohled: "int16",                  
+  dosah: "int16",                   
+  stay_strategy: "uint8",           
+  walk_data: "int8",                
+  bonus: "uint16",                  
+  flee_num: "int8",                 
+  anim_counts: ["int8", 6],         
+  mobs_name: "char[7]",             
+  flags2:  "uint8",                 
+  reserved: "uint8",                
+  experience: "int32",              
+  vlajky: "uint8",                  
+  anim_phase: "uint8",              
+  csektor: "int16",                 
+  home_pos: "int16",                
+  next: "int16",                    
+  actions: "uint8",                 
+  hit_pos: "uint8",                 
+  sounds: ["uint16", MOB_SOUNDS],   
+  paletts_count: "int8",            
+  mode: "int8",                     
+  dialog: "int16",                  
+  dialog_flags: "int16",            
+  money: "uint16",                  
+  specproc: "uint16",               
+  reserved2: "uint16",              
+  reserved3: "uint16",              
 } as const;
 
-export type Enemies = EnemyDef[];
+export class Enemies extends Hive<EnemyDef> {}
 export type EnemySounds = string[];
 
 
@@ -177,23 +182,25 @@ function enemyFromArrayBufferOld(buffer:ArrayBuffer ): Enemies {
     const iter = new BinaryIterator(buffer);
     const hdr = iter.parse(EnemyHdrSchema);
     if (hdr.ver != 256) throw new Error("Invalid ENEMY.DAT version");
-    const enms = [] as Enemies;
+    const enms = new Enemies;
     while (!iter.eof()) {
         const e = new EnemyDef;
         Object.assign(e, iter.parse(EnemySchema));
-        enms.push(e);
+        enms.add(e);
     }
+    enms.forEach((x,idx)=>!x.name.length?enms.remove(idx):null);
     return enms;
 }
 
 export function enemyFromArrayBufferNew(buffer:ArrayBuffer ): Enemies {
     const iter = new BinaryIterator(buffer);
-    const enms = [] as Enemies;
+    const enms = new Enemies;
     while (!iter.eof()) {
         const e = new EnemyDef;
         Object.assign(e, iter.parse(EnemySchemaNew));
-        enms.push(e);
+        enms.add(e);
     }
+    enms.forEach((x,idx)=>!x.name.length?enms.remove(idx):null);
     return enms;
 }
 
@@ -209,8 +216,9 @@ export function enemyToArrayBuffer(enms: Enemies) : ArrayBuffer {
 }
 export function enemyToArrayBufferNew(enms: Enemies) : ArrayBuffer {
     const wrt = new BinaryWriter();
-    enms.forEach(x=>{
-        wrt.write(EnemySchemaNew, x);
+    enms.get_raw().forEach(x=>{
+        if (x === null) wrt.write(EnemySchemaNew, new EnemyDef)
+        else wrt.write(EnemySchemaNew, x);
     });
     return wrt.getBuffer();
 }
@@ -254,7 +262,7 @@ export function enemyAndSoundFromArrayBuffer(buff: ArrayBuffer): [Enemies, Enemy
         return null;
     }    
     const rd = new BinaryIterator(buff);
-    let enemies: Enemies = [];
+    let enemies = new Enemies;
     let sounds: EnemySounds = [];
     let s = parseSection(rd);
     while (s.type != 0x8000) {
@@ -282,3 +290,12 @@ export const EnemySounds = {
     "MBS_ATTACK": 1,
     "MBS_HIT": 2
 } as const;
+
+export function enemy_generate_translation(e: Enemies, tbl: TranslateTable) {
+    const target = tbl.openFile("enemy")
+    e.forEach((x, idx)=>target.store(`${idx}`, x.name));
+}
+export function enemy_translate(e: Enemies, tbl: TranslateTable) {
+    const target = tbl.openFile("enemy")
+    e.forEach((x, idx)=>{x.name = target.translate(`${idx}`, x.name);});
+}

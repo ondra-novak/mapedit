@@ -1,13 +1,16 @@
 #include "interface.hpp"
 #include "ddlman.hpp"
 #include "handler_map.hpp"
+#include "langfiles.hpp"
 #include "mgifdecomp.hpp"
 #include "skeldal_exe.hpp"
 #include "utils/json.hpp"
 #include "publish_helper.hpp"
+#include "runsteam.hpp"
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -21,10 +24,13 @@
 #include <numeric>
 #include <optional>
 #include <shared_mutex>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace server {
 
@@ -318,8 +324,10 @@ void WebInterface::basic_timer_worker(std::stop_token stp)
 void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
-    broadcast("\r\n\r\n");    
-}
+    broadcast("\r\n\r\n");   
+    zombie_reaper();
+ 
+}   
 
 
 
@@ -597,17 +605,22 @@ void WebInterface::ws_ddl_mpg_close(const WsRpc::Request &req) {
     }
     
 }
-void WebInterface::ws_ddl_active(const WsRpc::Request &req) {
-    auto name = req.params[0].as<std::u8string>();
+static bool validate_ddl_name(const std::u8string &name, const WsRpc::Request &req) {
     for (char c: name) {
         if (!((c >= '0' && c <= '9')
             || (c >= 'A' && c <='Z')
             || (c >= 'a' && c <='z')
             || (c == '_' || c == '-' || c =='.'))) {
                 req.send_error(400, "DDL Archive name validation failed (unsupported characters)");
-                return;
+                return false;
             }                           
     }
+    return true;
+}
+
+void WebInterface::ws_ddl_active(const WsRpc::Request &req) {
+    auto name = req.params[0].as<std::u8string>();
+    if (!validate_ddl_name(name, req)) return;
     _current_ddl = name;
     _config.set("project", _current_ddl);
      save_config();        
@@ -658,6 +671,24 @@ void WebInterface::ws_preview_stop(const WsRpc::Request &req) {
     }
 
 }
+
+void WebInterface::ws_preview_test_dialog(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    if (!_game_control) {
+        req.send_error(404, "Not configured");
+        return;
+    }
+    int id = req.params[0].as<int>();
+    std::filesystem::path ddlpath(_user_dir/_current_ddl);
+    if (ddlpath != _game_control->get_current_ddlpath()) {
+        return req.send_error(409,"Conflict");
+    }
+
+    _game_control->test_dialog(id);
+    req.send_response(true);
+
+}
+
 void WebInterface::ws_preview_teleport(const WsRpc::Request &req) {
     std::lock_guard _(_mx);
     if (!_game_control) {
@@ -667,13 +698,16 @@ void WebInterface::ws_preview_teleport(const WsRpc::Request &req) {
     std::string map = req.params[0]["map"].as<std::string>();
     unsigned int sect = req.params[0]["sector"].as<unsigned int>();
     unsigned int side = req.params[0]["side"].as<unsigned int>();
+    auto ghost = req.params[0]["ghost"];
+    int ghost_form = -1;
+    if (ghost.is_number()) ghost_form = ghost.as<int>();
 
     std::filesystem::path ddlpath(_user_dir/_current_ddl);
     if (ddlpath != _game_control->get_current_ddlpath()) {
         return req.send_error(409,"Conflict");
     }
 
-    _game_control->teleport_to(map,sect,side);
+    _game_control->teleport_to(map,sect,side,ghost_form);
     req.send_response(true);
 
 }
@@ -736,56 +770,258 @@ void WebInterface::ws_file_copy(const WsRpc::Request &req) {
 }
 
 void WebInterface::ws_publish_status(const WsRpc::Request &req){
-    PublishHelper hlp(_game_folder);;
-    auto p = getUserDDL().get_path();
-    auto st = hlp.get_state(p);
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    auto st = hlp.get_state();
     
-    std::vector<WsRpc::Attachment> attchs;
-
-    auto [data,ctx] = hlp.get_image(p);
-    if (!ctx.empty()) {
-        attchs.push_back(std::move(data));
-    }
-
-
-    req.send_response(Json{{
-        {"item_id", st.steam_id},
-        {"last_publish", st.publish_time == std::chrono::system_clock::time_point()?Json():Json(std::chrono::system_clock::to_time_t(st.publish_time))},
-        {"tags",Json::Array(st.tags.begin(), st.tags.end())},
-        {"visibility", st.visibility},        
-    },ctx},{attchs});
-
+    req.send_response(Json{
+        {"publish_time",std::chrono::system_clock::to_time_t(st.publish_time)},
+        {"steam_id", st.steam_id},
+        {"licence", st.need_licence}
+    });
 
 }
 void WebInterface::ws_publish_set_image(const WsRpc::Request &req){
+    std::lock_guard _(_mx);
     const auto ctx = req.params[0].as_text();
     const auto attch = req.attachments[0];
-    auto p = getUserDDL().get_path();
-    PublishHelper hlp(_game_folder);;
-    hlp.set_image(p, attch, ctx);
+    PublishHelper hlp(getUserDDL());;
+    hlp.set_preview_image(attch, ctx);
     req.send_response(true);
+}
 
+void WebInterface::ws_publish_get_image(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    auto img = hlp.get_preview_image();
+    if (img.first.empty() || img.second.empty()) {
+        req.send_response(Json());        
+    } else {
+        req.send_response(img.first, {&img.second,1});
+    }
 
 }
-void WebInterface::ws_publish_publish(const WsRpc::Request &req){
-    auto title = req.params[0].as<std::string>();
-    auto desc = req.params[1].as<std::string>();
-    auto lang= req.params[2].as<std::string>();
-    auto tags = req.params[3].as_array();
-    auto visibility = req.params[4].as<unsigned int>();
-    auto change_desc = req.params[5].as<std::string>();
-    std::vector<std::string> taglst;
-    std::transform(tags.begin(), tags.end(), std::back_inserter(taglst),
-            [](const Json &x){return x.as<std::string>();});
 
-    auto p = getUserDDL().get_path();
-    PublishHelper hlp(_game_folder);
-    hlp.publish(p, std::move(title), std::move(desc), 
-            std::move(lang), std::move(taglst), 
-            visibility, std::move(change_desc));
+void WebInterface::ws_publish_set_hi_image(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    const auto attch = req.attachments[0];
+    PublishHelper hlp(getUserDDL());;
+    hlp.set_ingame_preview_image(attch);
     req.send_response(true);
+}
+
+void WebInterface::ws_publish_set_steam_data(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    PublishHelper::SteamData stm;
+    stm.visibility = req.params[0]["visibility"].as_int();
+    stm.tags = req.params[0]["tags"].as_vector<std::string>();
+    hlp.set_steam_data(stm);
+    req.send_response(true);
+}
+
+void WebInterface::ws_publish_get_steam_data(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    auto stm = hlp.get_steam_data();
+    req.send_response(Json {
+        {"visibility", stm.visibility},
+        {"tags", Json::Array(stm.tags.begin(), stm.tags.end())}
+    });
+}
+
+void WebInterface::ws_publish_set_content_data(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    const auto &obj = req.params[0];
+    hlp.update_content_data({
+        obj["title"].as<std::string>(),
+        obj["description"].as<std::string>(),
+        obj["update_lang"].as<std::string>(),
+        obj["content_lang"].as<std::string>(),
+        obj["base_lang"].as<std::string>(),
+        obj["author"].as<std::string>()        
+    });
+    req.send_response(true);    
+}
+
+void WebInterface::ws_publish_prepare(const WsRpc::Request &req) {
+    std::lock_guard _(_mx);
+    PublishHelper hlp(getUserDDL());;
+    hlp.prepare_for_publish(req.params[0].as_text());
+    req.send_response(true);    
+}
+
+void WebInterface::ws_publish_prepared(const WsRpc::Request &req) {
+    auto path = getUserDDL().get_path();
+    path.replace_extension(".pak");
+    std::array<std::string,2> args = {"-P",path.string()};
+    steam_applaunch(app_id, args);
+    req.send_response(true);    
+}
+
+/*
+void WebInterface::ws_publish_publish(const WsRpc::Request &){
+    std::lock_guard _(_mx);
+    ensure_steam_ready();
+    if (!_steam || !_steam->is_available()) {
+        req.send_response("n/a");
+        _steam.reset();
+        return;
+    }
+    if (_publish_running.load()) throw std::runtime_error("Publish pending");
+    if (_publish_process.joinable()) _publish_process.join();
+    auto change_desc = req.params[0].as<std::string>();
+    auto p = getUserDDL().get_path();
+    PublishHelper hlp(p);;
+    _publish_running = true;
+
+    auto resp = hlp.publish(_steam.get(), change_desc, 
+        [this](bool running, int stage, float percentage, int error) {
+            _publish_running = running;
+            if (!running && stage == -1) {
+                auto exp = std::current_exception();
+                if (exp) {
+                    try {
+                        std::rethrow_exception(exp);
+                    } catch (const std::exception &e) {
+                        _publisher.publish("upload_progress", {
+                            {"type","exception"},
+                            {"message",e.what()}
+                        });
+                    }
+                    return;
+                }
+            }
+            _publisher.publish("upload_progress", {
+                {"type","ok"},
+                {"running",running},
+                {"stage",stage},
+                {"percentage", percentage},
+                {"error", error}
+            });
+        });
+        
+    if (std::holds_alternative<PublishHelper::PublishResult>(resp)) {
+        auto pr = std::get<PublishHelper::PublishResult>(resp);
+        std::string_view resp;
+        switch (pr) {    
+            case PublishHelper::PublishResult::create_rejected: resp="reject";break;
+            case PublishHelper::PublishResult::need_legal_agr: resp="legal";break;
+            case PublishHelper::PublishResult::invalid: resp="invalid";break;
+            default: resp = "unknown";break;
+        }
+        _publish_running = false;
+        req.send_response(resp);
+    } else {
+        _publish_process = std::move(std::get<std::jthread>(resp));        
+        req.send_response("ok");
+    }
     
 }
+    */
+
+void WebInterface::ws_lang_list(const WsRpc::Request &req){
+    Json::Array out;
+    auto langs = LangFiles::get_available_languages(_user_dir/_current_ddl);
+    out.resize(langs.size());
+    std::copy(langs.begin(), langs.end(), out.begin());
+    req.send_response(out);
+}
+
+static bool validate_lang(const std::string_view &lang) {
+    for (char c: lang) {
+        if (!((c>='0' && c <='9') || (c>='a' && c<='z'))) return false;
+    }
+    return true;
+}
+
+void WebInterface::ws_lang_get(const WsRpc::Request &req){
+    auto lang = req.params[0].as<std::string>();
+    if (!validate_lang(lang)) return req.send_error(400, "invalid lang");
+    auto content = LangFiles::get_language_file(_user_dir/_current_ddl, std::move(lang));
+    if (!content.has_value()) return req.send_error(404, "file not found");    
+    return req.send_response({},std::span(&(*content),1));
+}
+void WebInterface::ws_lang_put(const WsRpc::Request &req){
+    auto lang = req.params[0].as<std::string>();
+    if (!validate_lang(lang)) return req.send_error(400, "invalid lang");
+    if (req.attachments.empty()) return req.send_error(400,"expect attachment");
+    return req.send_response(
+        LangFiles::update_lang_file(_user_dir/_current_ddl, lang, req.attachments[0]));
+}
+
+void WebInterface::ws_lang_delete(const WsRpc::Request &req) {
+    auto lang = req.params[0].as<std::string>();
+    if (!validate_lang(lang)) return req.send_error(400, "invalid lang");
+    LangFiles::delete_lang_file(_user_dir/_current_ddl, lang);
+    return req.send_response(true);
+}
+
+constexpr auto copy_files = std::array<std::string_view, 10>({
+    "ITEMS.DAT","KOUZLA.DAT","DIALOGY.JSON",
+    "ENEMY.DAT","SHOPS.DAT","POSTAVY.DAT"
+});
+
+
+void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
+    auto new_ddl = req.params[0].as<std::u8string>();
+    auto ignore_list_json = req.params[1];
+    std::unordered_set<std::string> ignore_list;
+
+    for (const auto &v : ignore_list_json.as_array()) {
+        ignore_list.insert(v.as<std::string>());
+    }
+
+
+    if (!validate_ddl_name(new_ddl, req)) return;
+    auto src = _user_dir/_current_ddl;
+    auto trg = _user_dir/new_ddl;
+    if (src == trg) return req.send_error(409, "Can't copy to itself");
+
+    DDLManager srcddl(src);
+    DDLManager trgddl(trg);
+    auto srclist = srcddl.list();
+    std::unordered_map<std::string, std::uint32_t> manifest;
+    auto mftsrc = trgddl.get(".MANIFEST");
+    if (mftsrc.has_value()) {
+        std::span<const DDLManager::DirItem> mft(reinterpret_cast<const DDLManager::DirItem *>(mftsrc->data()), mftsrc->size()/sizeof(DDLManager::DirItem));
+        for (const auto &x: mft) manifest.emplace(x.get_name(), x.offset);
+    }
+
+    bool mchg = false;
+    std::hash<std::string_view> hasher;
+    for (const auto &s: srclist) {
+        auto iter = manifest.find(s.name);
+        auto data = srcddl.get(s.name);
+        if (data.has_value()) {
+            std::uint32_t h = static_cast<std::uint32_t>(hasher({data->data(), data->size()}));
+            if (iter == manifest.end() || (iter->second != h && ignore_list.find(iter->first)  == ignore_list.end())) {
+                manifest[s.name] = h;
+                mchg = true;
+                trgddl.put(s.name, {data->data(), data->size()}, s.group);
+            }
+        }
+    }
+
+    if (mchg) {
+        std::vector<DDLManager::DirItem> mftout;
+        for (const auto &[name, sz]: manifest) {
+            DDLManager::DirItem itm;
+            itm.offset = sz;
+            itm.set_name(name);
+            mftout.push_back(itm);
+        }
+        trgddl.put(".MANIFEST", {reinterpret_cast<const char *>(mftout.data()), mftout.size()*sizeof(DDLManager::DirItem)}, 0);
+    }
+
+    _current_ddl = new_ddl;
+    req.send_response(true);
+    publish_state();
+
+}
+
+
 
 }
 

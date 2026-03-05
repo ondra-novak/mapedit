@@ -1,6 +1,7 @@
 import { server } from "./api";
 import { AssetGroup } from "./asset_groups";
 import { enc2string, keybcs2string, string2keybcs } from "./keybcs2";
+import type { TranslateTable } from "./translate";
         
 export function parse_stringtable(txt:string) : string[] {
     return txt.split('\n').map(x=>x.trim())
@@ -9,7 +10,7 @@ export function parse_stringtable(txt:string) : string[] {
                 const p = b.indexOf(' ');
                 if (p == -1) return a;
                 const idx = b.substring(0,p);
-                const val = b.substring(p+1).trim();
+                const val = b.substring(p+1).trim().replaceAll("|","\n")
                 const idxval = parseInt(idx);
                 if (isFinite(idxval) && idxval >= 0) {
                     a[idxval] = val;
@@ -18,10 +19,23 @@ export function parse_stringtable(txt:string) : string[] {
             },[] as string[]);        
 }
 
+export function stringtable_generate_translation(name: string, stbl: string[], ttbl: TranslateTable) {
+    const t = ttbl.openFile(name);
+    stbl.forEach((x,idx)=>t.store(`${idx}`, x));
+}
+
+export function stringtable_translation(name: string, stbl: string[], ttbl: TranslateTable) {
+    const t = ttbl.openFile(name);
+    stbl.forEach((_,idx)=>{
+        const v = t.translate(`${idx}`, "");
+        if (v) stbl[idx] = v;
+    });
+}
 
 export function serialize_stringtable(ss:string[]) :string{
     const out = ss.reduce((a,txt,idx)=>{
-        a.push(`${idx} ${txt}`);
+        const txts = txt.replaceAll("\n","|").replaceAll("\r","");        
+        a.push(`${idx} ${txts}`);
         return a;
     },[] as string[]);
     out.push("-1");

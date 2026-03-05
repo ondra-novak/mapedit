@@ -23,12 +23,9 @@ function reload() {
 }
 
 function teleport_to(map_name: string, sector: number, side: number, flags: TeleporToFlags) {
-    server.game_client_teleport(map_name, sector, side);
-
-    const console_cmds = ["ghost-form","no-hassle","iron-skin","levitation"];
-    const sw = flags.ghost_form?"on":"off";
-    const cmd = console_cmds.map(n=> n + " " + sw).join("~");
-    server.game_client_console_exec(cmd);        
+    let gf : number;
+    if ("ghost_form" in flags) gf = flags.ghost_form?1:0; else gf = -1;
+    server.game_client_teleport(map_name, sector, side, gf);
 }
 
 
@@ -60,6 +57,9 @@ watch(dlg, async ()=>{
 function on_connection_state_change(x:boolean) {
     StatusBar.update_connect_status(x);
 }
+function test_dialog(id: number) {
+    server.game_client_test_dialog(id);
+}
 
 function on_state_change(x: WsRpcResult) {
     const st = x.data as KeepAliveData;
@@ -70,7 +70,8 @@ function on_state_change(x: WsRpcResult) {
                 reload,
                 teleport_to,
                 stop,
-                configure
+                configure,
+                test_dialog
 
             })
             reg_ok = true;

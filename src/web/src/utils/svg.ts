@@ -99,8 +99,12 @@ export class SVGPath extends SVGSet{
         return this.commands.length == 0;
     }
 
+    get_path_data() {
+        return this.commands.join(" ");
+    }
+
     build() : SVGElement {
-        const pathData = this.commands.join(" ");
+        const pathData = this.get_path_data();
         const pathAttributes = { d: pathData, ...this.attributes };
         return SVGDrawing.createElement("path", pathAttributes, this.className);
     }

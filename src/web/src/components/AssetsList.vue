@@ -17,7 +17,7 @@ function update_list(n:ModifiedFileNotify) {
   const ng = n.group as AssetGroupType;
   for (const [g, lst] of files_per_group.value) {
       const idx = lst.findIndex(v=>v.name.toUpperCase() == n.name.toUpperCase());
-      if (idx > 0) {
+      if (idx >= 0) {
           lst.splice(idx,1);
       }
   }

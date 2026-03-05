@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue';
 import { getMessageBoxRefData, type MessageBoxData } from './messageBox';
+import { ref } from 'vue';
 
 
 const dlg = getMessageBoxRefData();
@@ -41,73 +42,42 @@ function on_keyboard_enter(event : Event) {
 watch(dlg, (new_val, old_val)=>{
     if (new_val) {
         if (!old_val) {
-            window.addEventListener("keydown", on_keyboard_enter);
+            dlg_ref.value!.showModal();
         }
     } else {
-            window.removeEventListener("keydown", on_keyboard_enter);
+        dlg_ref.value!.close();
+    }
+})
+
+const dlg_ref = ref<HTMLDialogElement>();
+
+watch(dlg_ref, ()=>{
+    if (dlg_ref.value) {
+        dlg_ref.value.addEventListener("keydown", on_keyboard_enter);
     }
 })
 
 
-
 </script>
 <template>
-    <template v-if="dlg">
-    <div class="dark">
-    <div class="popup">
-        <div>
-            <div class="msg"><div v-for="ln of dlg.message.split('\n')"> {{ ln  }}</div></div>
-            <div class="buttons"><button v-for="(v,idx) of dlg.buttons" :key="idx" @click="on_button_click(idx)">{{ v }}</button></div>
-        </div>
-    </div>
-    </div>
-    </template>
-
+    <dialog ref="dlg_ref">
+        <template v-if="dlg">
+        <header>
+            {{  dlg.title }}
+        </header>
+        <div class="msg"><div v-for="ln of dlg.message.split('\n')"> {{ ln  }}</div></div>
+        <footer>
+            <button v-for="(v,idx) of dlg.buttons" :key="idx" @click="on_button_click(idx)">{{ v }}</button>
+        </footer>
+        </template>
+    </dialog>
 </template>
-
-<style scoped>
-.dark {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    background-color: #0008;
-    z-index: 1000;
-}
-.popup {
-    position: fixed;
-    left: 0;
-    right: 0;
-    top: 30vh;
-    text-align: center;
-    width: fit-content;
-    margin: auto;
-    border: 1px solid;
-    background-color: white;
-    box-shadow: 3px 3px 5px black;    
-}
-
-.popup .msg {
-    text-align: left;
+<style lang="css" scoped> 
+.msg {
+    max-width: 40rem;
     padding: 1rem;
 }
-
-.popup .msg > div{
+.msg > div {
     min-height: 1rem;
-}
-
-.buttons {
-    border-top: 1px solid;
-    padding: 0.5rem;
-    background-color: #ccc;
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-    align-items: stretch;
-}
-
-.buttons > button {
-    min-width: 5em;
 }
 </style>

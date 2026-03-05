@@ -226,6 +226,9 @@ export class MAPGLOBAL extends WithSchema {
     map_effector:number=0;
     local_monsters:number=0;
     map_autofadefc:number=0;
+    fade_mult: number = 1;
+    fade_end: number = 1;
+    align: string = "";
 
     getSchema() : Schema { return {
         back_fnames:["char[13]",4],
@@ -237,7 +240,10 @@ export class MAPGLOBAL extends WithSchema {
         mapname:"char[30]",
         map_effector:"uint8",
         local_monsters:"uint8", 
-        map_autofadefc:"uint8" 
+        map_autofadefc:"uint8" ,
+        align: "char[3]",
+        fade_mult:"float32",
+        fade_end: "float32"
     }};;
 };
 
@@ -448,6 +454,7 @@ export class TMA_LOADLEV extends TMA_GEN {
     };;
 };
 
+
 export class TMA_DROPITM extends TMA_GEN {
 
     item: number | null = null;
@@ -543,6 +550,23 @@ export class TMA_TWOP extends TMA_GEN {
         return Object.assign(super.getSchema(),{
             parm1: "int16",
             parm2: "int16"
+        })
+    };;
+};
+
+export class TMA_CHANGELIGHT extends TMA_GEN {
+
+    r:number = 0;
+    g:number = 0;
+    b:number = 0;
+    align: number = 0;
+
+    getSchema() : Schema { 
+        return Object.assign(super.getSchema(),{
+            align: "int8",
+            r:"uint16",
+            g:"uint16",
+            b:"uint16",
         })
     };;
 };
@@ -650,8 +674,9 @@ const action_to_schema = [
    TMA_IFJMP,TMA_TWOP,TMA_IFJMP,TMA_TEXT,TMA_IFJMP,
    TMA_TWOP,TMA_TELEPORT,TMA_LOADLEV,TMA_DROPITM,
    TMA_IFJMP,TMA_TWOP,TMA_UNIQUE,TMA_TWOP,TMA_UNIQUE,
-   TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_LOADLEV,
-   TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_IFSEC,TMA_TWOP
+   TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_GEN,
+   TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_CHANGELIGHT,
+   TMA_TEXT, TMA_TEXT, TMA_LOADLEV
 ]
 
 export const ActionType = {
@@ -692,9 +717,11 @@ export const ActionType = {
     GOMOB: 34,
     SHRMA: 35,
     MUSIC: 36,
-    GLOBE: 37,  //global events
-    IFSEC: 38,	 //if sector num
-    IFSTP: 39,  //if sector type
+    GLOBE: 37,
+    CHGLG: 38,
+    PLMUS: 39,
+    FAILG: 40,
+    ENDG2: 41
 }
 
 export function create_action_instance(type: typeof ActionType[keyof typeof ActionType], event: number) {
@@ -1489,6 +1516,44 @@ export class GlobalMapPalettes {
         
     }
     
+}
+
+export function mapExtractName(mapBin: ArrayBuffer) : string | null{
+    const it = new BinaryIterator(mapBin);
+    while (true) {
+        const sect = parseSection(it);
+        if (sect.type == MapSections.MAPEND) break;
+        if (sect.type == MapSections.MAPGLOB) {
+            
+            const nfo = new MAPGLOBAL;
+            Object.assign(nfo, (new BinaryIterator(sect.data)).parse(nfo.getSchema()));
+            return nfo.mapname;            
+        }
+    }
+    return null;
+}
+
+export function mapTranslateName(mapBin: ArrayBuffer, name: string): ArrayBuffer | null {
+    const it = new BinaryIterator(mapBin);
+    const wr = new BinaryWriter();
+    let changed = false;
+    while (true) {
+        const sect = parseSection(it);
+        if (sect.type == MapSections.MAPEND) break;
+        if (sect.type == MapSections.MAPGLOB) {
+            const nfo = new MAPGLOBAL;
+            Object.assign(nfo, (new BinaryIterator(sect.data)).parse(nfo.getSchema()));
+            nfo.mapname = name;
+            const wr2 = new BinaryWriter();
+            wr2.write(nfo.getSchema(), nfo);
+            writeSection(wr, sect.type, wr2.getBuffer());
+            changed = true;
+        } else {
+            writeSection(wr, sect.type, sect.data);
+        }
+    }
+    writeSection(wr,MapSections.MAPEND, new ArrayBuffer());
+    return changed?wr.getBuffer():null;
 }
 
 

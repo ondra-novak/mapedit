@@ -2,7 +2,7 @@
 import { server,} from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted,  ref, shallowRef, watch} from 'vue';
-import { ItemDef, itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName } from '@/core/items_struct';
+import { ItemDef, ItemHive, itemsFromArrayBuffer, itemsToArrayBuffers, ItemType, ItemTypeName, ItemWearPlace, ItemWearPlaceName, WeaponTypeName } from '@/core/items_struct';
 import CanvasView from '@/components/CanvasView.vue';
 import { PCX, PCXProfile, type PCXProfileType } from '@/core/pcx';
 import { loadAllIcons } from '@/core/IconLIB';
@@ -13,10 +13,13 @@ import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import BitCheckbox from '@/components/BitCheckbox.vue';
 import AbilitySheet from '@/components/AbilitySheet.vue';
 import EffectSheet from '@/components/EffectSheet.vue';
+import { spellsFromArrayBuffer } from '@/core/spell_structs';
+import DelayLoadedList from '@/components/DelayLoadedList.vue';
+import getGlobalDialogs from '@/utils/global_dialog_list';
 
 const selected_item = ref<number|null>(null);
 
-const item_list = ref<ItemDef[]>([]);
+const item_list = ref(new ItemHive());
 const filter_kind = ref<number>(-1);
 const filter_search = ref<string>("");
 const appearence = shallowRef<PCX>();
@@ -35,7 +38,7 @@ let save_state: SaveRevertControl;
 
 function reload() {
     getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(x=>{
-        item_list.value = x?itemsFromArrayBuffer(x):[];
+        item_list.value = x?itemsFromArrayBuffer(x):new ItemHive;
         selected_item.value = null;
         nextTick(()=>save_state.set_changed(false));
     });
@@ -70,25 +73,22 @@ function reg_save() {
 }
 
 
-function deleteItem() {
-    if (selected_item.value !== null && item_list.value) {
+async function deleteItem() {
+    const sel = selected_item.value
+    if (sel !== null && item_list.value) {
         const lst = item_list.value;
-        if (confirm("Are you sure delete item: " + lst[selected_item.value].jmeno)) {
-            lst[selected_item.value].jmeno = "";
+        if (confirm("Are you sure delete item: " + lst.get(sel).jmeno)) {
+            lst.remove(sel);
             selected_item.value = null;
-        }
-        while (lst.length && !lst[lst.length-1].jmeno) lst.pop();
+        }        
     }
 }
 function addItem() {
-    let pos = item_list.value.findIndex(x=>x.jmeno.length == 0);
-    if (pos < 0) pos = item_list.value.length;
-    const cloned = selected_item.value?item_list.value[selected_item.value]:null;
-    const new_item = new ItemDef();
+    const new_item = new ItemDef;
+    const cloned = selected_item.value?item_list.value.get(selected_item.value):null;
     if (cloned) Object.assign(new_item, JSON.parse(JSON.stringify(cloned)));
     new_item.jmeno = "New item"
-    item_list.value[pos] = new_item;
-    selected_item.value = pos;
+    selected_item.value = item_list.value.add(new_item);
 }
 
 const filteredAndSortedItems = computed(() => {
@@ -154,7 +154,7 @@ function onSelectIcon() {
 const key_mode = ref<number>(0);
 
 
-const form = computed<ItemDef>(()=>selected_item.value?item_list.value[selected_item.value]:new ItemDef);
+const form = computed<ItemDef>(()=>typeof selected_item.value == "number"?item_list.value.get(selected_item.value):new ItemDef);
 
 
 
@@ -260,7 +260,7 @@ const negative_keylock_id=computed({
 
 function save() {
     if (item_list.value) {
-        const buff = itemsToArrayBuffers(item_list.value);
+        const buff = itemsToArrayBuffers(item_list.value as ItemHive);
         server.putDDLFile("ITEMS.DAT",buff, AssetGroup.MAPS);
     }
 }
@@ -288,6 +288,19 @@ watch(change_icon_popup, ()=>{
 })
 
 
+async function load_spells() {
+    const out : {value:number, label:string}[] = [{value:0,label:"(none)"}];
+    try {   
+        const spls = spellsFromArrayBuffer(await server.getDDLFile("KOUZLA.DAT"));
+        spls.forEach((x,idx)=>idx?out.push({value:idx, label:x.spellname}):0);
+    } catch (e) {
+    }
+    return out;
+}
+async function load_dialogs() {
+    return (await getGlobalDialogs()).map(x=>({value:x[0],label:x[1]}));
+}
+    
 watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true});
 </script>
 <template>
@@ -333,6 +346,9 @@ watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true}
                 <label v-if="form.druh == ItemType.TYP_RUNA"><span>Rune</span><select v-model="form.user_value">
                     <option v-for="(n,i) of runeList" :key="i" :value="i">{{ n  }}</option>
                 </select></label>
+                <label v-if="form.druh == ItemType.TYP_DLGPICK || form.druh == ItemType.TYP_DLGUSE"><span>Dialog</span>
+                    <DelayLoadedList v-model="form.user_value" :list="load_dialogs()" />
+                </label>
                 <label v-if="form.druh == ItemType.TYP_JIDLO || form.druh == ItemType.TYP_VODA"><span>Hours</span><input type="number"  v-model="form.user_value" v-watch-range min="1" max="9999"/></label>
                 <label v-if="form.druh == ItemType.TYP_SVITXT"><span>Book page</span><input type="number"  v-model="form.user_value" v-watch-range min="0" max="9999"/></label>
                 <label v-if="form.druh == ItemType.TYP_VRHACI"><span>Split on destroy</span><input type="number"  v-model="form.user_value" v-watch-range min="0" max="4"/></label>
@@ -357,7 +373,7 @@ watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true}
                         <template v-if="form.druh != ItemType.TYP_UTOC && form.druh != ItemType.TYP_SVITEK && form.druh != ItemType.TYP_LEKTVAR">
                             <input type="checkbox" :checked="form.magie > 0" @change="form.magie=($event.target as HTMLInputElement).checked?1:0"> enabled 
                         </template>
-                    </span><input type="number" v-model="form.spell"  v-watch-range min="0" max="10000"/></label>
+                    </span><DelayLoadedList v-model="form.spell" :list="load_spells()" class="spells"/></label>
                 </template>
                 <label  v-if="form.umisteni == ItemWearPlace.PL_BATOH"><span>Capacity</span><input type="number" v-watch-range min="1" max="24" v-model="form.nosnost"/></label>
                 <label><BitCheckbox v-model="form.flags" :mask="0x1"/><span>Destroy on impact</span></label>
@@ -610,6 +626,9 @@ background-position: 0px 2px, 4px 35px, 29px 31px, 34px 6px;
 
 x-form label input[type="text"] {
     width: 10rem;
+}
+.spells {
+    width: 6rem;
 }
 
 </style>

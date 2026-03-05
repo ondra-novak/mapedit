@@ -1,12 +1,12 @@
 <script lang="ts" setup>
-import type { ItemDef } from '@/core/items_struct';
+import type { ItemDef, ItemHive} from '@/core/items_struct';
 import { create_datalist, type DataListItem } from '@/utils/datalist';
 import globalGetItems from '@/utils/global_item_list';
 import { onMounted, ref, watch} from 'vue';
 
 
 const itmlist = defineModel<number[]>();
-const item_templates = ref<ItemDef[]>();
+const item_templates = ref<ItemHive>();
 const cur_inv_item = ref<string>("");
 const put_inside = ref(false);
 
@@ -58,7 +58,7 @@ function get_item_name(idx: number) : string{
     if (idx === undefined) return "";
     if (item_templates.value) {
         const adjidx = idx<0?(-idx-2):idx;
-        const v = item_templates.value[adjidx];
+        const v = item_templates.value.get(adjidx);
         if (v) return v.jmeno;                
         else return `#${idx}`;
     } else {
@@ -96,15 +96,6 @@ onMounted(async ()=>{
 
 });
 
-import { computed } from 'vue';
-
-const filtered_items = computed(() => {
-    if (!item_templates.value) return [];
-    if (typeof props.filter === 'function') {
-        return item_templates.value.filter(props.filter);
-    }
-    return item_templates.value;
-});
 
 function create_list() : DataListItem[]{
     if (!item_templates.value) return [];

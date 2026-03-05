@@ -3,21 +3,22 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts';
-import { createTHuman, humanDataFromArrayBuffer, humanDataToArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman, type THumanData } from '@/core/character_structs';
+import { createTHuman, humanDataFromArrayBuffer, humanDataToArrayBuffer, HumanWearPlace, HumanWearPlaceName, type THuman, type THumanData , HumanHive} from '@/core/character_structs';
 import { PCX, PCXProfile } from '@/core/pcx';
-import { itemsFromArrayBuffer, ItemWearPlace, ItemWearPlaceName, type ItemDef } from '@/core/items_struct';
-import { CharacterStats, CharacterStatsNames, ElementTypeName, SpellEffectName, SpellEffects } from '@/core/common_defs';
+import { ItemHive, itemsFromArrayBuffer, ItemWearPlace } from '@/core/items_struct';
+import { CharacterStats, SpellEffectName, SpellEffects } from '@/core/common_defs';
 import { useBitmaskCheckbox2 } from '@/core/flags';
 import { messageBoxConfirm } from '@/utils/messageBox';
 import ItemList from '@/components/ItemList.vue'
 import { create_datalist, type DataListHandle } from '@/utils/datalist';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
+import EffectSheet from '@/components/EffectSheet.vue';
+import AbilitySheet from '@/components/AbilitySheet.vue';
 
-let humand_data: THumanData = {characters:[], runes:{air:[],earth:[],fire:[],mind:[],water:[]}};
-const postavy = ref<THuman[]>([]);
-const selected = ref<number>();
-const items  = ref<ItemDef[]>([]);
-const selected_char = ref<THuman>();
+let humand_data: THumanData = {characters:new HumanHive, runes:{air:[],earth:[],fire:[],mind:[],water:[]}};
+const postavy = ref(new HumanHive);
+const selected = ref<number>(-1);
+const items  = ref(new ItemHive);
 const list_of_xichts = ref<number[]>();
 const change_appearence_index=ref<number>();
 const portraits = ref<HTMLElement[]>([]);
@@ -31,19 +32,11 @@ let save_state: SaveRevertControl;
 
 
 
-const [npcflags, chk_npcflags] = useBitmaskCheckbox2({
-    HIDE_INV: 0x1,
-    HIDE_GEAR: 0x2
-});
-const [effects, chk_effects] = useBitmaskCheckbox2(SpellEffects);
 
-watch(selected, ()=>{    
-    selected_char.value = postavy.value && selected.value !== undefined ?postavy.value[selected.value]:undefined;
-    if (selected_char.value) {
-        npcflags.value = selected_char.value.npcflags;
-        effects.value = selected_char.value.stats[CharacterStats.VLS_KOUZLA];
-    }
-});
+const selected_char = computed(()=>
+    selected.value < 0?null:postavy.value.get(selected.value)
+);
+
 
 const PO_XS:number= 194;
 const PO_YS:number= 340;
@@ -97,13 +90,13 @@ watch([selected_char,preview_box],()=>{
                 place_human_item(c,0,0);
                 bx.appendChild(c);
                 let wr = ch.wearing;
-                if ((ch.npcflags & 0x2)) {
-                    if (ch.npcflags & 0x1) {
+                if ((ch.npcflags.HIDE_GEAR)) {
+                    if (ch.npcflags.HIDE_INV) {
                         wr = [];
                     } else {
                         wr = ch.wearing.filter((_,idx)=>idx == HumanWearPlace.BATOH);
                     }
-                } else if (ch.npcflags & 0x1) {
+                } else if (ch.npcflags.HIDE_INV) {
                            wr = ch.wearing.filter((_,idx)=>idx != HumanWearPlace.BATOH);                
                 } else {
                     wr = ch.wearing;
@@ -112,7 +105,7 @@ watch([selected_char,preview_box],()=>{
                 wr.forEach((item_ref: number, idx: number)=>{
                     let itmpcx: Promise<PCX>|undefined;
                     const key = item_ref*2+(ch.female?1:0);
-                    const item = items.value[item_ref];
+                    const item = items.value.get(item_ref)!;
                     if (preview_items_cache.has(key)) {
                         itmpcx = preview_items_cache.get(key);
                     } else {
@@ -135,8 +128,6 @@ watch([selected_char,preview_box],()=>{
     }
 },{deep:true})
 
-watch([npcflags], ()=>{if (selected_char.value && npcflags.value !== undefined) selected_char.value.npcflags = npcflags.value;});
-watch([effects], ()=>{if (selected_char.value && effects.value !== undefined) selected_char.value.stats[CharacterStats.VLS_KOUZLA] = effects.value;});
 
 async function init() {
     function reload() {
@@ -145,25 +136,25 @@ async function init() {
                 humand_data = humanDataFromArrayBuffer(buff);
                 postavy.value = humand_data.characters;
             } else {
-                postavy.value = [];
+                postavy.value = new HumanHive;
             }
             nextTick(()=>save_state.set_changed(false));
         })
         getDDLFileWithImport(server,"ITEMS.DAT",AssetGroup.MAPS).then(buff=>{
             if (buff) items.value = itemsFromArrayBuffer(buff);
-            else items.value = [];                    
+            else items.value = new ItemHive;                    
         });
     }
     save_state = await StatusBar.register_save_control();
     save_state.on_save(()=>{
         if (postavy.value) {
-            humand_data.characters = postavy.value;
+            humand_data.characters = postavy.value as HumanHive;
             const buff = humanDataToArrayBuffer(humand_data)
             server.putDDLFile("POSTAVY.DAT", buff, AssetGroup.MAPS);
             }
         })
     save_state.on_revert(() => {
-            selected.value = undefined;
+            selected.value = -1;
             reload();
     });
 
@@ -176,7 +167,7 @@ onUnmounted(()=>save_state.unmount());
 function get_item_name(idx: number) : string{
     if (idx === undefined) return "";
     if (items.value) {
-        const v = items.value[idx];
+        const v = items.value.get(idx);
         if (v) return v.jmeno;                
         else return `#${idx}`;
     } else {
@@ -215,7 +206,7 @@ const inventory = HumanWearPlaceName.map((_,idx)=>{
         get:() =>{
             if (selected_char.value && items.value) {
                 const c = selected_char.value;
-                const v = items.value[c.wearing[idx]];
+                const v = items.value.get(c.wearing[idx]);
                 if (v) return v.jmeno;                
                 else return `#${c.wearing[idx]}`;
             } else {
@@ -293,39 +284,29 @@ const portraits_to_select = ref<HTMLElement[]>([]);
 async function add_xicht() {
     list_of_xichts.value = 
         (await server.getDDLFiles(AssetGroup.UI,null)).files.filter(x=>x.name.startsWith("XICHT")).map(x=>x.name)
-        .map(v =>  parseInt((/XICHT([0-9a-fA-F]+).PCX/.exec(v || '') || ["","0"])[1]))
+        .map(v =>  parseInt((/XICHT([0-9a-fA-F]+).PCX/.exec(v || '') || ["","0"])[1],16))
         .filter(v=>v);
 }
 
 function add_char(xicht: number){
-    if (change_appearence_index.value !== undefined) {
-        if (postavy.value) {
-            postavy.value[change_appearence_index.value].xicht = xicht;
-        }
+    if (change_appearence_index.value !== undefined) {        
+        postavy.value.get(change_appearence_index.value).xicht = xicht;        
         change_appearence_index.value = undefined;
         list_of_xichts.value = undefined;
         return;
     }
     const h = createTHuman();
     h.xicht = xicht;
-    selected.value = postavy.value.length;
-    postavy.value.push(h)
+    selected.value = postavy.value.add(h);
     list_of_xichts.value = undefined;
 }
 
 async function delete_char(index: number) {
     const p = postavy.value;
     if (p) {
-        if (await messageBoxConfirm("Confirm you want to delete character: " + p[index].jmeno)) {
-            if (p.length-1 == index) p.pop();
-            else {
-                const z = p[p.length-1];
-                p[p.length-1] = p[index];
-                p[index] = z;
-                p.pop();
-            }
-            selected.value = undefined;
-            selected_char.value = undefined;;
+        if (await messageBoxConfirm("Confirm you want to delete character: " + p.get(index).jmeno)) {
+            p.remove(index);
+            selected.value = -1;
         }
     }
 }
@@ -365,14 +346,16 @@ watch(items, ()=>{
 <template>
     <x-workspace>
     <div class="top-panel">
-        <div v-for="(p,idx) of postavy" :key="idx" @click="selected = idx" :class="{selected: selected == idx}">
-            <div class="portrait" :data-xicht="p.xicht" ref="portraits">
+        <template v-for="(p,idx) of postavy.get_raw()" :key="idx">
+            <div v-if="p"  @click="selected = idx" :class="{selected: selected == idx}">
+                <div class="portrait" :data-xicht="p.xicht" ref="portraits">
 
+                </div>
+                <div class="desc">
+                    {{ p.jmeno }}
+                </div>          
             </div>
-            <div class="desc">
-                {{ p.jmeno }}
-            </div>          
-        </div>
+        </template>
         <div @click="add_xicht">
             <div class="portrait add" >
 
@@ -384,15 +367,15 @@ watch(items, ()=>{
     </div>
     <div class="main-panel" v-if="selected_char">
         <x-section>
-            <x-section-title>Basic info</x-section-title>
+            <x-section-title>Basic info (ID: {{ selected }})</x-section-title>
             <x-form>
                 <label><span>Name</span><input type="text" v-model="selected_char.jmeno"></label>
                 <label><span>Gender</span><div><span><input v-model="selected_char.female" type="radio" :value="false" />Male</span>
                                             <span><input v-model="selected_char.female" type="radio" :value="true" />Female</span></div></label>
                 <label><span>Level</span><input type="number" v-model="selected_char.level" min="1" max="40" v-watch-range ></label>
                 <label><span>Experience</span><input type="number" v-model="selected_char.exp" min="0" max="999999999" v-watch-range></label>
-                <label><input type="checkbox" v-model="chk_npcflags.HIDE_GEAR"><span>Hide gear</span></label>
-                <label><input type="checkbox" v-model="chk_npcflags.HIDE_INV"><span>Hide inventory</span></label>
+                <label><input type="checkbox" v-model="selected_char.npcflags.HIDE_GEAR"><span>Hide gear</span></label>
+                <label><input type="checkbox" v-model="selected_char.npcflags.HIDE_INV"><span>Hide inventory</span></label>
             </x-form>
             <div class="preview-items" ref="preview_box">
             </div>
@@ -420,41 +403,11 @@ watch(items, ()=>{
         </x-section>
         <x-section>
             <x-section-title>Stats</x-section-title>
-            <x-form>
-                <label><span>Strength</span><input v-model="selected_char.stats[CharacterStats.VLS_SILA]" type="number" v-watch-range min="0" max="32767" /></label>
-                <label><span>Magic</span><input v-model="selected_char.stats[CharacterStats.VLS_SMAGIE]" type="number" v-watch-range min="0" max="32767" /></label>
-                <label><span>Speed</span><input v-model="selected_char.stats[CharacterStats.VLS_POHYB]" type="number" v-watch-range min="0" max="32767" /></label>
-                <label><span>Dexterity</span><input v-model="selected_char.stats[CharacterStats.VLS_OBRAT]" type="number" v-watch-range min="0" max="32767" /></label>
-                <label><span>Max hitpoints</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXHIT]" type="number" v-watch-range min="0" max="32767" /></label>
-                <label><span>Max vitality</span><input v-model="selected_char.stats[CharacterStats.VLS_KONDIC]" type="number" v-watch-range min="0" max="32767" /></label>
-                <label><span>Max mana</span><input v-model="selected_char.stats[CharacterStats.VLS_MAXMANA]" type="number" v-watch-range min="0" max="32767" /></label>
-                <label><span>Attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_L]" v-watch-range min="0" max="32767"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_UTOK_H]" v-watch-range min="0" max="32767"/></div></label>
-                <label><span>Defese</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_L]" v-watch-range min="0" max="32767"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_OBRAN_H]" v-watch-range min="0" max="32767"/></div></label>
-                <label><span>Magic attack</span><div><input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_L]" v-watch-range min="0" max="32767"/>-<input type="number" v-model="selected_char.stats[CharacterStats.VLS_MGSIL_H]" v-watch-range min="0" max="32767"/></div></label>
-                <label><span>Magic attack type</span><div><select v-model="selected_char.stats[CharacterStats.VLS_MGZIVEL]">
-                    <option value="-1">--select--</option>
-                    <option value="0">fire</option>
-                    <option value="1">water</option>
-                    <option value="2">earth</option>
-                    <option value="3">air</option>
-                    <option value="4">mind</option>
-                </select></div></label>
-                <label><span>Extra damage</span><input v-model="selected_char.stats[CharacterStats.VLS_DAMAGE]" type="number" v-watch-range min="-10000" max="10000" /></label>
-                <label><span>Protection fire</span><input v-model="selected_char.stats[CharacterStats.VLS_OHEN]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection water</span><input v-model="selected_char.stats[CharacterStats.VLS_VODA]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection earth</span><input v-model="selected_char.stats[CharacterStats.VLS_ZEME]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection air</span><input v-model="selected_char.stats[CharacterStats.VLS_VZDUCH]" type="number" v-watch-range min="-100" max="100" /></label>
-                <label><span>Protection mind</span><input v-model="selected_char.stats[CharacterStats.VLS_MYSL]" type="number" v-watch-range min="-100" max="100" /></label>
-            </x-form>
+            <AbilitySheet v-model="selected_char.stats"></AbilitySheet>
         </x-section>
         <x-section>
             <x-section-title>Flags and effects</x-section-title>
-            <x-form>
-                <label v-for="(v,idx) of Object.keys(SpellEffects)" :key="idx">
-                    <input type="checkbox" v-model="(chk_effects as Record<string, boolean>)[v]"> 
-                    <span> {{ SpellEffectName[idx] }}</span>
-                </label>
-            </x-form>
+            <EffectSheet v-model="selected_char.stats[CharacterStats.VLS_KOUZLA]"></EffectSheet>
         </x-section>
 
     </div>
@@ -470,7 +423,7 @@ watch(items, ()=>{
         <x-section>
             <x-section-title @click="add_char_info_box=!add_char_info_box" :class="add_char_info_box?'expanded':''">How to add new characters</x-section-title>
             <div clas="help" v-if="add_char_info_box">
-            <p>To add a new character, choose any two random numbers or letters between A and F, then upload two files using the <RouterLink to="/assets">Assets Manager</RouterLink>:
+            <p>To add a new character, choose any two random numbers or letters between A and F, then upload two files using the <b>Assets Manager</b>:
                 CHAR??.PCX and XICHT??.PCX, where ?? are your chosen characters.            
             </p>
             <p class="note">

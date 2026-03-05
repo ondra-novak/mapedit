@@ -67,6 +67,7 @@ public:
      * @brief Reclaims unused space in the archive by compacting it.
      */
     void compact() const;
+    bool compact_to(const std::filesystem::path &target) const;
 
     struct Stats {
         std::size_t entries_used = 0;
@@ -85,9 +86,7 @@ public:
 
     std::vector<std::pair<std::uint32_t, std::chrono::system_clock::time_point> > get_history(std::string_view name);
 
-protected:
-    /// Path to the archive file.
-    std::filesystem::path _pathname;
+    static bool equal_icase(std::string_view a, std::string_view b);
 
     struct DirItem {
         char name[12];
@@ -98,6 +97,11 @@ protected:
         }
         void set_name(std::string_view new_name);
     };
+
+protected:
+    /// Path to the archive file.
+    std::filesystem::path _pathname;
+
 
     struct DirItemGroup : DirItem{
         uint32_t group;

@@ -21,14 +21,14 @@ import { apply_array_diff, create_array_diff } from '@/utils/madiff';
 import MapSelectDlg from '@/components/MapSelectDlg.vue';
 import { map_load_stringtable, map_save_stringtable } from '@/core/string_table';
 import MapSettingsDlg from '@/components/MapSettingsDlg.vue';
-import { ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
+import {ItemHive, ItemDef, itemsFromArrayBuffer } from '@/core/items_struct';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
-import { enemyFromArrayBuffer, type EnemyDef } from '@/core/enemy_struct';
+import { enemyFromArrayBuffer, type EnemyDef, Enemies } from '@/core/enemy_struct';
 import ItemList from '@/components/ItemList.vue';
 import { mapEditorControl } from '@/core/services';
 const list_assets = ref<string[]>([]);
-const item_list = ref<ItemDef[]>([]);
-const enemy_list = ref<EnemyDef[]>([]);
+const item_list = ref(new ItemHive);
+const enemy_list = ref(new Enemies);
 
 const EditMode = {
     Edit:0,
@@ -130,7 +130,7 @@ const curNiche = ref<NicheDef|null>(null);
 const goto_sector_n = ref(1);
 const goto_sector_dlg = ref(false);
 const goto_sector_input = ref<HTMLInputElement>();
-const map_settings = ref<MAPGLOBAL>();
+const map_settings = ref<{mapinfo:MAPGLOBAL, strings: string[]}>();
 const action_ui = ref(false);
 const wall_props = ref(false);
 const active_enemy = ref(-1);
@@ -681,10 +681,10 @@ function init_save_state() {
 function reload_all_lists() {
     server.getDDLFiles(AssetGroup.WALLS, null).then(f=>list_assets.value = f.files.map(x=>x.name));
     getDDLFileWithImport(server, "ITEMS.DAT", AssetGroup.MAPS)
-               .then(x=>x?itemsFromArrayBuffer(x):[],x=>[])
+               .then(x=>x?itemsFromArrayBuffer(x):new ItemHive,x=>new ItemHive)
                .then(x=>item_list.value = x);
     getDDLFileWithImport(server, "ENEMY.DAT", AssetGroup.MAPS)
-               .then(x=>x?enemyFromArrayBuffer(x):[],x=>[])
+               .then(x=>x?enemyFromArrayBuffer(x):new Enemies(),x=>new Enemies)
                .then(x=>enemy_list.value = x);
     redraw();
     updateControls();
@@ -937,20 +937,22 @@ function goto_sector_find() {
 }
 
 function open_map_settings() {
-    map_settings.value = curmap.value.info;
-    queueMicrotask(()=>{
-        const w = watch(map_settings,()=>{
-            if (map_settings.value) {
-                const map = begin_edit();
-                map.info = map_settings.value;
-                end_edit(map);
-                queueMicrotask(()=>{
-                    map_settings.value = undefined;
-                });
-            }
-            w.stop();
+    map_settings.value = {
+        mapinfo: curmap.value.info,
+        strings: curmap.value.strtable.slice()
+    };
+}
+function map_settings_ok() {
+    const ms = map_settings.value;
+    if (ms) {
+        const map = begin_edit();
+        map.info = ms.mapinfo;
+        map.strtable = ms.strings;
+        end_edit(map);
+        queueMicrotask(()=>{
+            map_settings.value = undefined;
         });
-    });
+    }
 }
 
 watch(goto_sector_input,()=>{
@@ -1312,7 +1314,7 @@ watch(selection,()=>{
 </template>
 </x-workspace>
 <MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
-<MapSettingsDlg v-model="map_settings"></MapSettingsDlg>
+<MapSettingsDlg v-model="map_settings" @ok="map_settings_ok" @cancel="map_settings = undefined"></MapSettingsDlg>
 <NicheEditor v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus?.side_def || null"></NicheEditor>
 </template>
 

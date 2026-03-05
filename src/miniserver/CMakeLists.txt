@@ -29,7 +29,9 @@ add_executable(mapedit_server
     mgifcomp.cpp
     wsrpc.cpp
     publisher.cpp
+    langfiles.cpp
     publish_helper.cpp
+    runsteam.cpp
     utils/mgifmem.c
     utils/mgifcreate.cpp
     utils/lzw.c

@@ -55,6 +55,15 @@ export interface SchemaObject {
 
 export type Schema = SchemaType| SchemaArray | SchemaBitmap | SchemaObject;
 
+        function demask(v:number, m:number) : number|boolean{
+            if (m >= 0x80000000) return demask(v>>>1, m>>>1);
+            const shift = Math.log2(m & -m);
+            const vv = (v & m) >> shift;;
+            if ((m & -m) == m) return  (vv != 0);
+            return vv;
+        }
+
+
 
 export class BinaryIterator {
 
@@ -86,14 +95,19 @@ export class BinaryIterator {
 
     parse_bitmap(v: number, bitmap: Record<string, number> ) {
         const out : Record<string, number|boolean> = {};
+
         for (const k in bitmap) {
-            const m = bitmap[k];
-            const shift = Math.log2(m & -m);
-            const vv = (v & m) >> shift;;
-            if ((m & -m) == m) out[k] = (vv != 0);
-            else out[k] = vv;
+            out[k] = demask( v, bitmap[k]);
         }
         return out;
+    }
+
+    tell() {
+        return this.position;
+    }
+
+    seek_rel(x:number) {
+        this.position = this.position+x;
     }
 
     parse(schema: Schema) : any{
@@ -147,36 +161,36 @@ export class BinaryIterator {
         } else {
             switch (schema) {
                 case 'int8':
-                    result = this.dataView.getInt8(this.position);
                     this.position += 1;
+                    result = this.dataView.getInt8(this.position-1);
                     break;
                 case 'uint8':
-                    result = this.dataView.getUint8(this.position);
                     this.position += 1;
+                    result = this.dataView.getUint8(this.position-1);
                     break;
                 case 'int16':
-                    result = this.dataView.getInt16(this.position, true);
                     this.position += 2;
+                    result = this.dataView.getInt16(this.position-2, true);
                     break;
                 case 'uint16':
-                    result = this.dataView.getUint16(this.position, true);
                     this.position += 2;
+                    result = this.dataView.getUint16(this.position-2, true);
                     break;
                 case 'int32':
-                    result = this.dataView.getInt32(this.position, true);
                     this.position += 4;
+                    result = this.dataView.getInt32(this.position-4, true);
                     break;
                 case 'uint32':
-                    result = this.dataView.getUint32(this.position, true);
                     this.position += 4;
+                    result = this.dataView.getUint32(this.position-4, true);
                     break;
                 case 'float32':
-                    result = this.dataView.getFloat32(this.position, true);
                     this.position += 4;
+                    result = this.dataView.getFloat32(this.position-4, true);
                     break;
                 case 'float64':
-                    result = this.dataView.getFloat64(this.position, true);
                     this.position += 8;
+                    result = this.dataView.getFloat64(this.position-8, true);
                     break;
                 default:
                     throw new Error(`Unsupported type: ${schema}`);
@@ -249,6 +263,8 @@ export class BinaryBuilder {
     toUint8Array(): Uint8Array {
         return this.#buf.subarray(0, this.#length);
     }
+
+    length() {return this.#length;}
 }
 
 export class BinaryWriter {
@@ -276,6 +292,10 @@ export class BinaryWriter {
                 }
             }
         }
+    }
+
+    length() {
+        return this.buffer.length();
     }
 
     write(schema:Schema, value:any)  {
@@ -364,9 +384,8 @@ export class BinaryWriter {
     }
 
     write_stringz(text : string) : void{
-        const encoder = new TextEncoder();
-        const encodedText = encoder.encode(text);
-        this.buffer.write(encodedText);
+        const bin = new Uint8Array(string2keybcs(text));
+        this.buffer.write(bin);
         this.buffer.write(0); // Append the encoded text followed by a null terminator
     }
 

@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import { server, type FileItem } from '@/core/api';
+import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import {  nextTick, onMounted, onUnmounted, ref, watch, computed } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar.ts'
-import { findFreeShopSlot, ProductFlags, shopsFromArrayBuffer, shopsToArrayBuffer, TProduct, TShop } from '@/core/shop_structs';
-import { itemsFromArrayBuffer, ItemTypeName, type ItemDef } from '@/core/items_struct';
+import { ProductFlags, shopsFromArrayBuffer, shopsToArrayBuffer, TProduct, TShop, ShopHive} from '@/core/shop_structs';
+import { itemsFromArrayBuffer, ItemTypeName, ItemHive } from '@/core/items_struct';
 import HIFormat from '@/core/hiformat'
 import { PCX, PCXProfile } from '@/core/pcx';
 import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
 import { getDDLFileWithImport } from '@/components/tools/missingFiles';
+import { create_datalist, type DataListItem } from '@/utils/datalist';
+import globalGetItems from '@/utils/global_item_list';
 
 
 
-const shop_list = ref<TShop[]>([]);
-const item_list = ref<ItemDef[]>([]);
-const current_shop_index = ref<number>();
-const current_shop =  ref<TShop>();
-const img_list = ref<string[]>([]);
+const shop_list = ref(new ShopHive);
+const item_list = ref(new ItemHive);
+const current_shop_index = ref<number|null>(null);
 
 const picture_cache = new Map<string, Promise<HIFormat | PCX> >();
 const pic_preview = ref<HTMLElement>();
@@ -25,9 +25,10 @@ const add_product_input = ref<string>("");
 const add_kind_input = ref<string>("");
 let save_state : SaveRevertControl;
 
-watch(current_shop_index,(nw)=>{
-    current_shop.value = (nw!==undefined && shop_list.value && shop_list.value[nw]) || undefined
-});
+const current_shop = computed(()=>
+    current_shop_index.value !== null?shop_list.value.get(current_shop_index.value):null
+);
+
 
 watch(shop_list, ()=>{
     save_state.set_changed(true);
@@ -69,9 +70,9 @@ function init() {
     function reload() {
         getDDLFileWithImport(server,"SHOPS.DAT",AssetGroup.MAPS).then(buff=>{
             if (buff) {
-                shop_list.value = shopsFromArrayBuffer(buff);
+                shop_list.value = shopsFromArrayBuffer(buff,true);
             } else {
-                shop_list.value = [];   
+                shop_list.value = new ShopHive;   
             }
             nextTick(()=>{
                 save_state.set_changed(false);
@@ -79,32 +80,17 @@ function init() {
         })
         getDDLFileWithImport(server,"ITEMS.DAT", AssetGroup.MAPS).then(buff=>{
             if (buff) item_list.value = itemsFromArrayBuffer(buff);            
-            else item_list.value = [];
+            else item_list.value = new ItemHive;
         });
     }
     reload();
-
-    server.getDDLFiles(AssetGroup.DIALOGS,null).then(async resp=>{
-        const lst = resp.files.map(x=>x.name).filter(x=>x.toUpperCase().match(/\.PCX$|\.HI$/));
-        img_list.value = lst;
-        for (let i = 0; i < lst.length; ++i) {
-            const name = lst[i];
-            const f = await server.getDDLFile(name);
-            const z =  name.toUpperCase().endsWith(".HI")?HIFormat.fromArrayBuffer(f):PCX.fromArrayBuffer(f);
-            if (z.width != 264 || z.height != 180) {
-                img_list.value = [];                
-                delete lst[i];
-                lst.forEach(x=>img_list.value.push(x));
-            }
-        }
-    });
 
     StatusBar.register_save_control().then(st=>{
         save_state = st;
         st.on_save(async ()=>{
             if (shop_list.value) {
-                const shp:TShop[] = [];
-                shop_list.value.forEach(v=>{
+                const shp = new ShopHive;
+                shop_list.value.forEach((v, idx)=>{
                     const new_plist = v.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) == 0);
                     const types : TProduct[] = [];
                     const add_plist : TProduct[] = []
@@ -112,7 +98,7 @@ function init() {
                         .forEach(t=>{
                             const type = t.item 
                             if (item_list.value) {
-                                const itms = item_list.value.filter(x=>x.druh == type && x.jmeno);
+                                const itms = item_list.value.filter(x=>x.druh == type);
                                 itms.forEach((v, idx)=>{
                                     const p = new TProduct();
                                     p.item = idx;
@@ -131,9 +117,9 @@ function init() {
                     new_plist.push(...types,...add_plist);
                     nw.products = new_plist.length;
                     nw.product_list = new_plist;
-                    shp.push(nw);
+                    shp.set(idx, nw);
                 });
-                const buff = shopsToArrayBuffer(shp);
+                const buff = shopsToArrayBuffer(shp as ShopHive);
                 return await server.putDDLFile("SHOPS.DAT", buff, AssetGroup.MAPS);
             }
             return true;
@@ -163,7 +149,7 @@ function add_product() {
         const idx = item_list.value.findIndex(v=>v.jmeno.trim() == s.trim());
         if (idx != -1) {
             const prod = new TProduct();
-            prod.cena = item_list.value[idx].cena;
+            prod.cena = item_list.value.get(idx).cena;
             prod.item = idx;            
             current_shop.value.product_list.push(prod);
         }
@@ -183,46 +169,74 @@ function add_kind() {
 
 function createKeeper() {
     if (shop_list.value) {
-        const n:number = findFreeShopSlot(shop_list.value);
-        shop_list.value[n] = new TShop();
-        shop_list.value[n].shop_id = n;
+        const nw = new TShop;
+        const n:number = shop_list.value.add(nw);
+        nw.shop_id = n;
         current_shop_index.value = n;
     }
 }
 
 async function deleteKeeper() {    
-    if (current_shop.value && current_shop_index.value !== undefined 
+    if (current_shop.value && current_shop_index.value !== null 
                 && await messageBoxConfirm("Confirm you want to delete shop: "+current_shop.value.keeper)) {
-        delete shop_list.value[current_shop_index.value];
-        current_shop_index.value = undefined;
+        shop_list.value.remove(current_shop_index.value);
+        current_shop_index.value = null;
     }
 }
 
 onUnmounted(()=>save_state.unmount());
 
+const filtered_list = computed(()=>{
+    const srch = list_filter.value.toLocaleLowerCase();
+    return shop_list.value.map((x,idx)=>[x,idx] as [TShop,number])
+        .filter(x=>srch.length == 0 || x[0].keeper.toLocaleLowerCase().indexOf(srch) != -1)
+        .sort((a,b)=>a[0].keeper.localeCompare(b[0].keeper));
+});
+
+const item_datalist = create_datalist(async ()=>{
+    const items = await globalGetItems();
+    return items.map((x,idx)=>({
+        label: `${idx}`,
+        value: x.jmeno} as DataListItem));
+})
+
+const image_datalist = create_datalist(async ()=>{
+    const resp = await server.getDDLFiles(AssetGroup.DIALOGS,null);
+    const lst = resp.files.map(x=>x.name).filter(x=>x.toUpperCase().match(/\.PCX$|\.HI$/));
+    const out : DataListItem[] = [];
+    
+    for (let i = 0; i < lst.length; ++i) {
+        const name = lst[i];
+        const f = await server.getDDLFile(name);
+        const z =  name.toUpperCase().endsWith(".HI")?HIFormat.fromArrayBuffer(f):PCX.fromArrayBuffer(f);
+        if (z.width == 264 && z.height == 180) {
+            out.push({value:name});;
+        }
+    }
+    return out;
+})
+
 </script>
 <template>
 
 <x-workspace>
-    <datalist id="editorShop112"><option v-for="v of img_list" :key="v" :value="v"></option></datalist>
-    <datalist id="editorShopItems171"><option v-for="(v,idx) of item_list" :key="idx" :value="v.jmeno"></option></datalist>
     <div class="shop-list" >
         <input type="search" v-model="list_filter">
         <select v-model="current_shop_index" size="10">
-            <option v-for="v of shop_list.filter(v=>v).filter(v=>-1 != v.keeper.toLocaleLowerCase().indexOf(list_filter.toLocaleLowerCase()))" :key="v.shop_id" :value="v.shop_id" > {{  v.keeper }}</option>
+            <option v-for="v of filtered_list" :key="v[1]" :value="v[1]" > {{  v[0].keeper }}</option>
         </select>        
         <div class="buttons">
             <button @click="createKeeper">Create</button>
             <button @click="deleteKeeper">Delete</button>
         </div>
     </div>
-    <div class="main-panel" v-if="current_shop !== undefined">
+    <div class="main-panel" v-if="current_shop">
         <div>
             <x-section>
-                <x-section-title>Basic information</x-section-title>
+                <x-section-title>Basic information (ID: {{ current_shop_index }})</x-section-title>
                 <x-form>
                     <label><span>Keeper name</span><input type="text" v-model="current_shop.keeper" maxlength="15"></label>
-                    <label><span>Picture</span><input type="text" v-model="current_shop.picture" maxlength="12" list="editorShop112"></label>
+                    <label><span>Picture</span><input type="text" v-model="current_shop.picture" maxlength="12" :list="image_datalist.id"></label>
                     <label><span>Price spread</span><input type="number" v-model="current_shop.koef" v-watch-range min="0" max="100"></label>
                     <label><span>Max spec items [%]</span><input type="number" v-model="current_shop.spec_max" v-watch-range min="0" max="32767"></label>
                 </x-form>
@@ -238,7 +252,7 @@ onUnmounted(()=>save_state.unmount());
                     </thead>
                     <tbody>
                         <tr v-for="(v,idx) of current_shop.product_list.filter(x=>(x.trade_flags & ProductFlags.SHP_TYPE) == 0)">
-                            <td>{{ item_list[v.item].jmeno }}</td>
+                            <td>{{ item_list.get(v.item)?.jmeno || `#${v.item} (deleted)` }}</td>
                             <td><input type="number" v-model="v.pocet" v-watch-range min="0" max="999999"></td>                                                        
                             <td><input type="number" v-model="v.max_pocet"  v-watch-range min="0" max="999999"></td>
                             <td><input type="number" v-model="v.cena"  v-watch-range min="0" max="999999"></td>
@@ -252,7 +266,7 @@ onUnmounted(()=>save_state.unmount());
                 </table>
             </div>
             <div class="add">
-                <input type="text" v-model="add_product_input" list="editorShopItems171"><button @click="add_product">Add</button>
+                <input type="text" v-model="add_product_input" :list="item_datalist.id"><button @click="add_product">Add</button>
             </div>
   
             </x-section>

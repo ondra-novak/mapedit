@@ -18,6 +18,9 @@ import AssetsFontsViewer from '@/components/AssetsFontsViewer.vue';
 import TextsEditor from '@/components/TextsEditor.vue';
 import FileHistory from '@/components/FileHistory.vue';
 import { EditorID, mainMenuControl, mapEditorControl, type EditorRef } from '@/core/services';
+import DialogDecompiler from '@/components/DialogDecompiler.vue';
+import FactEditor from '@/components/FactEditor.vue';
+import EncDecomp from '@/components/EncDecomp.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -52,11 +55,10 @@ const listOfEditors : Record<string,(s:string)=>void>= {
     "ENEMY.DAT":()=>mainMenuControl.open_editor(EditorID.ENEMIES),
     "SOUND.DAT":()=>mainMenuControl.open_editor(EditorID.ENEMIES),
     "ITEMS.DAT":()=>mainMenuControl.open_editor(EditorID.ITEMS),
+    "SHOPS.DAT":()=>mainMenuControl.open_editor(EditorID.SHOPS),
     "KOUZLA.DAT":()=>mainMenuControl.open_editor(EditorID.SPELLS),
-    "KNIHA.TXT":()=>{},
     "POSTAVY.DAT":()=>mainMenuControl.open_editor(EditorID.CHARACTERS),
-    "DIALOGY.DAT":()=>{},
-    "DIALOGY.JSON":()=>{},
+    "DIALOGY.JSON":()=>{mainMenuControl.open_editor(EditorID.DIALOGS)},
     ".MAP":(s:string)=>{
         mainMenuControl.open_editor(EditorID.MAP);
         mapEditorControl.open_map(s);
@@ -90,6 +92,9 @@ function select_tool() : string | null {
     for (let v in listOfEditors) {
         if (cur_file_model.value.name.endsWith(v)) return "editor_exists";
     }
+    if (cur_file_model.value.name.toUpperCase() == "DIALOGY.DAT") return "dialog_decompiler";
+    if (cur_file_model.value.name.toUpperCase() == "FACTS.JSON") return "fact_editor";
+    if (cur_file_model.value.name.endsWith(".ENC")) return "enc";        
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
     if (cur_file_model.value.name.endsWith(".TXT")) return "strings";
     switch (cur_file_model.value.group) {
@@ -182,9 +187,12 @@ function open_editor() {
                     <AssetsToolUpload v-if="selected_tool == 'upload'" v-model:file="selected_file" v-model:group="selected_group" />
                     <HexView v-if="selected_tool == 'hexview'" v-model="selected_file" />
                     <AssetsFontsViewer v-if="selected_tool == 'fonts'" v-model="selected_file" />
-                    <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" />
-                    <FileHistory v-if="selected_tool == 'history'" v-model="selected_file" />
+                    <TextsEditor v-if="selected_tool == 'strings'" v-model="selected_file" :group="selected_group"/>
+                    <FileHistory v-if="selected_tool == 'history'" v-model="selected_file" :group="selected_group"/>
                     <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" />
+                    <EncDecomp v-if="selected_tool == 'enc'" v-model="selected_file" :group="selected_group"/>
+                    <DialogDecompiler v-if="selected_tool == 'dialog_decompiler'" />
+                    <FactEditor v-if="selected_tool == 'fact_editor'" />
                     <div v-if="selected_tool == 'editor_exists'" class="goto-tool">
                         <button @click="open_editor">Open editor</button>
                     </div>

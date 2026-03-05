@@ -2,6 +2,8 @@ import ItemsEditor from "@/views/ItemsEditor.vue";
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, make1DArray, make2DArray, parseSection, splitArrayBuffer, writeSection, type Schema, type SectionInfo } from "./binary";
 import { StringList1, StringList3 } from "./common_defs";
 import { string2keybcs } from "./keybcs2";
+import Hive from "@/utils/hive";
+import type { TranslateTable } from "./translate";
 
 
 export const ItemSchema : Schema =  {
@@ -93,7 +95,10 @@ function parseItems(iter: BinaryIterator) : ItemDef[] {
 
 }
 
-export function itemsFromArrayBuffer(buffer: ArrayBuffer) : ItemDef[]{
+export  class ItemHive extends Hive<ItemDef> {};
+
+
+export function itemsFromArrayBuffer(buffer: ArrayBuffer) : ItemHive{
 	const iter = new BinaryIterator(buffer);
 	let items: ItemDef[] = [];
 	let on_ground:string[] = [];
@@ -146,34 +151,46 @@ export function itemsFromArrayBuffer(buffer: ArrayBuffer) : ItemDef[]{
 	on_male.unshift("");
 	on_female.unshift("");
 
-	items.forEach((x:ItemDef)=>{
+	const out = new ItemHive();
+
+	items.forEach((x,idx)=>{
 	  x.vzhled_on_ground = on_ground[x.vzhled];
 	  x.vzhled_on_male = on_male[x.vzhled];
 	  x.vzhled_on_female = on_female[x.vzhled];
 	  x.v_letu_files = x.v_letu.map(y=>in_fly[y]);
 	  x.weapon_animation_file = animation[x.weapon_animation];
 	  x.sound_file = sounds[x.sound];
+	  out.add(x);
 	});
 
-	return items;
+	out.forEach((x,idx)=>{
+		if (x.jmeno.length == 0) out.remove(idx);
+	})
+
+	return out;
 }
 
 
 
-export function itemsToArrayBuffers(items : ItemDef[]) : ArrayBuffer {
+export function itemsToArrayBuffers(items : ItemHive) : ArrayBuffer {
     const vzhled = new StringList3();
     const v_letu = new StringList1();
     const weapon_animation = new StringList1();
     const sound = new StringList1();
 
-    items.forEach(itm=>{
-        itm.vzhled = vzhled.add(itm.vzhled_on_ground || "", itm.vzhled_on_male || "", itm.vzhled_on_female || "");
-        itm.v_letu = (itm.v_letu_files || new Array(16).fill("")).map((s:string)=>v_letu.add(s));
-        itm.weapon_animation = weapon_animation.add(itm.weapon_animation_file || "");
-        itm.sound = sound.add(itm.sound_file || "");
+    const out_wr = items.get_raw().map(itm=>{
+		if (itm) {
+			itm.vzhled = vzhled.add(itm.vzhled_on_ground || "", itm.vzhled_on_male || "", itm.vzhled_on_female || "");
+			itm.v_letu = (itm.v_letu_files || new Array(16).fill("")).map((s:string)=>v_letu.add(s));
+			itm.weapon_animation = weapon_animation.add(itm.weapon_animation_file || "");
+			itm.sound = sound.add(itm.sound_file || "");
+			return itm;
+		} else {
+			return new ItemDef;
+		}
     })
     const wr_items = new BinaryWriter();
-    items.forEach(itm=>wr_items.write(ItemSchema,itm));
+    out_wr.forEach(itm=>wr_items.write(ItemSchema,itm));
     const wr = new BinaryWriter();
     writeSection(wr,SV_ITLIST, wr_items.getBuffer());
 
@@ -210,6 +227,8 @@ TYP_PENIZE: 11,
 TYP_SVITXT: 12,
 TYP_PRACH: 13,
 TYP_OTHER: 14,
+TYP_DLGPICK: 15,
+TYP_DLGUSE: 16,
 } as const;
 
 export const ItemTypeName: string[] = [
@@ -227,7 +246,9 @@ export const ItemTypeName: string[] = [
 	[ItemType.TYP_PENIZE, "Money"],
 	[ItemType.TYP_SVITXT, "Book Page"],
 	[ItemType.TYP_PRACH, "Dust"],
-	[ItemType.TYP_OTHER, "Other"]
+	[ItemType.TYP_OTHER, "Other"],
+    [ItemType.TYP_DLGPICK, "Dialog on pick"],
+    [ItemType.TYP_DLGUSE, "Dialog on use"]
 ].reduce<string[]>((a, b) => {
 	a[b[0] as number] = b[1] as string;
 	return a;
@@ -282,3 +303,17 @@ export const WeaponTypeName = [
 ]
 
 
+export function items_generate_translation(e: ItemHive, tbl: TranslateTable) {
+    const target = tbl.openFile("item")
+    e.forEach((x, idx)=>{
+        target.store(`${idx}:n`, x.jmeno);
+        target.store(`${idx}:d`, x.popis)
+    });
+}
+export function items_translate(e: ItemHive, tbl: TranslateTable) {
+    const target = tbl.openFile("item")
+    e.forEach((x, idx)=>{
+        x.jmeno = target.translate(`${idx}:n`, x.jmeno);
+        x.popis = target.translate(`${idx}:d`, x.popis);    
+    });
+}
