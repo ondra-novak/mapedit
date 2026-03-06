@@ -249,6 +249,7 @@ export class DialogDef {
         204: ["send_current_enemy",1],
         205: ["teleport_enemies", 3],
         206: ["teleport_current_enemy", 3],
+        207: ["add_choice_w_icon", 3],
         518: ["set_flag",1],
         519: ["reset_flag",1],
         255: ["exit_dialog",0]
@@ -386,6 +387,8 @@ export interface DialogBranch {
     target: number|null;
     ///if true, condition is inverted
     invert_condition?: boolean;
+    ///add speaker's icon to choice
+    speaker_icon?: boolean
 };
 
 export interface DialogAction {
@@ -892,9 +895,16 @@ class DialogCompiler {
                     }
                     break;
                 case DialogBranchType.choice:
-                    brnch.push({value:142}); //add choice
-                    brnch.push({value:target})
-                    brnch.push({text:text});
+                    if (b.speaker_icon) {
+                        brnch.push({value:207}); //add choice with icon
+                        brnch.push({value:target})
+                        brnch.push({value:b.speaker})
+                        brnch.push({text:text});
+                    } else {
+                        brnch.push({value:142}); //add choice
+                        brnch.push({value:target})
+                        brnch.push({text:text});
+                    }
                     ++choices;
                     break;
                 case DialogBranchType.jump_to_node:
@@ -1336,4 +1346,61 @@ export function translate_original_dialogy_dat(trn: TranslateTable, dlgdata: Arr
 
 
 
+}
+
+export function RGB555(r:number,g:number,b:number,a:number=0) {
+    return (r & 0x1F)<<10 | (g & 0x1F)<<5 | b & 0x1F | ((a?1:0)<<15);
+}
+export function RGB888(r:number,g:number,b:number,a:number=1) {
+    return ((r >> 3) & 0x1F)<<10 | ((g >> 3) & 0x1F)<<5 | (b >> 3) & 0x1F | ((a?0:1)<<15);
+}
+
+export function extractRGB555(c: number) {
+    return {
+        r: ((c>>10) & 0x1F) << 3,
+        g: ((c>>5) & 0x1F) << 3,
+        b: (c & 0x1F) << 3,
+        a: 1-((c>>15) & 1)
+    }
+}
+
+
+export class DialogLayout {
+    txt_window_x: number = 17;
+    txt_window_y: number = 270;
+    txt_window_xs: number = 606;
+    txt_window_ys: number = 94;
+    txt_window_line_height: number = 11;
+    txt_desc_width: number = 225;
+    txt_desc_x: number =382;
+    txt_desc_y: number = 34;    
+    desc_color: number = RGB555(28,28,21);
+    text_color: number = 0x8000
+    choice_color: number = 42115;    
+    sel_choice_color: number = 49252;
+    pic_x: number = 17;
+    pic_y: number = 17;
+    icon_padding: number = 25;
+    icon_height: number = 25;
+    
+    getSchema() : Schema {
+        return {
+            txt_window_x:"int32",
+            txt_window_y:"int32",
+            txt_window_xs:"int32",
+            txt_window_ys:"int32",
+            txt_window_line_height:"int32",
+            txt_desc_width:"int32",
+            txt_desc_x:"int32",
+            txt_desc_y:"int32",
+            desc_color:"int32",
+            text_color:"int32",
+            choice_color:"int32",
+            sel_choice_color:"int32",
+            pic_x:"int32",
+            pic_y:"int32",
+            icon_padding:"int32",
+            icon_height:"int32"
+        };
+    };
 }

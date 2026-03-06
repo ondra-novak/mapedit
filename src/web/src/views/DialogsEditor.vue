@@ -972,7 +972,9 @@ async function delete_condition() {
                                 <option v-for="(v,idx) in cur_story.speakers" :value="idx+1" :key="idx"> {{ v.name }} </option>
                             </select>                            
                             <button @click="edit_speakers">Edit speakers</button>
-                            
+                            <template  v-if="selected_branch.type == 2"">
+                                <input type="checkbox" v-model="selected_branch.speaker_icon"><span>Show speaker's icon</span>
+                            </template>                            
                         </div></div>
                         <label v-if="selected_branch.type != 0">
                                 <span class="text-help">Text<span>
