@@ -3,7 +3,7 @@ set(GENERATED_H ${CMAKE_BINARY_DIR}/webpage_content.hpp)
 
 add_custom_command(
     OUTPUT ${GENERATED_H}
-    COMMAND web2cpp ${CMAKE_BINARY_DIR}/web > ${GENERATED_H}
+    COMMAND web2cpp ${CMAKE_BINARY_DIR}/web ${CMAKE_CURRENT_LIST_DIR}/../web/public > ${GENERATED_H}
     DEPENDS frontend web2cpp
     COMMENT "Generating webpage"
 )

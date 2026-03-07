@@ -266,8 +266,28 @@ function flags_to_string(spl: TKouzlo) {
     if (spl.flags.trace) out.push("E");
     if (spl.flags.teleport) out.push("T");
     if (spl.flags.hidden) out.push("H");
+    if (spl.flags.nodispel) out.push("!D");
     return out.join(",");
 }
+
+const group_num = computed({
+    get:()=>Math.abs(current_spell.value?.accnum || 0),
+    set:(v:number)=>{
+        if (current_spell.value) current_spell.value.accnum = current_spell.value.accnum < 0?-v:v;
+    }
+});
+const replace_in_group = computed({
+    get:()=>{
+        if (!current_spell.value) return false;
+        return current_spell.value.accnum > 0;
+    },
+    set:(v:boolean)=>{
+        if (current_spell.value) {
+            const g = Math.abs(current_spell.value.accnum);
+            current_spell.value.accnum = v?g:-g;
+        }
+    }
+});
 
 </script>
 
@@ -347,15 +367,16 @@ function flags_to_string(spl: TKouzlo) {
                                             <option v-for="(v, id) of TargetType" :key="id" :value="id">{{ v }}</option>
                                         </select></div>
                                 </label>
-                                <label><span>Spell group</span><input type="number"
-                                        v-model="current_spell.accnum"></label>
+                                <label><span>Spell group</span><input type="number" v-model="group_num"></label>
+                                <label><input type="checkbox" v-model="replace_in_group"><span>Replace all spells in this group (fails otherwise)</span></label>
                                 <label><input type="checkbox" v-model="current_spell.povaha" :true-value="1"
-                                        :false-value="0"><span>Harmful</span></label>
+                                        :false-value="0"><span>Spell is harmful</span></label>
                                 <label v-if="cur_spell_index < 105"><input type="checkbox"
-                                        v-model="current_spell.flags.trace"><span>Need enemy in front</span></label>
+                                        v-model="current_spell.flags.trace"><span>Skip cast if there is enemy in front</span></label>
                                 <label v-if="cur_spell_index < 105"><input type="checkbox"
-                                        v-model="current_spell.flags.teleport"><span>Open map for teleport</span></label>
-                                <label><input type="checkbox" v-model="current_spell.flags.hidden"><span>Hide icon</span></label>
+                                        v-model="current_spell.flags.teleport"><span>Open map for teleport target</span></label>
+                                <label><input type="checkbox" v-model="current_spell.flags.hidden"><span>Hide spell active icon</span></label>
+                                <label><input type="checkbox" v-model="current_spell.flags.nodispel"><span>Cannot be dispelled by dispel magic spell</span></label>
                             </x-form>
                         </x-section>
                         <x-section>

@@ -49,7 +49,7 @@ Additive
   / Multiplicative
 
 Multiplicative
-  = left:Primary _ op:("*" / "/") _ right:Multiplicative {
+  = left:Primary _ op:("*" / "/" / "%") _ right:Multiplicative {
       return node( op,left, right);
     }
   / Primary

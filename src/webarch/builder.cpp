@@ -80,7 +80,7 @@ void process_directory(std::ostream &out, const std::filesystem::path &path, std
 
 int main(int argc, char **argv) {
 
-    if (argc != 2) {
+    if (argc < 2) {
         std::cerr << "Missing arguments :  <path> \n"
             "\n"
             "<path>   path to directory to put into archive\n";
@@ -88,14 +88,19 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    std::filesystem::path path = std::filesystem::canonical(argv[1]);
 
     std::vector<std::pair<std::string, std::string> > mapping;
     std::cout << "#include <array>\n";
     std::cout << "#include <string_view>\n";
     std::cout << "#include <span>\n";
 
-    process_directory(std::cout, path, mapping);
+    for (int i = 1; i < argc; ++i) {
+
+        std::filesystem::path path = std::filesystem::canonical(argv[i]);
+
+
+        process_directory(std::cout, path, mapping);
+    }
 
     std::cout << "constexpr std::pair<std::string_view,std::span<const std::string_view> > webarch_dir[] = {\n";
 

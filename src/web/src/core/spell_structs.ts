@@ -20,7 +20,9 @@ const TKouzloSchema : Schema= {
     flags:["bitmap","uint8",{
         trace: 0x1,
         teleport: 0x2,
-        hidden: 0x4
+        hidden: 0x4,
+        noanim: 0x8,    
+        nodispel: 0x10
     }],
     spellname:"char[28]", //name of spell
     teleport_target:"uint16", //zero
@@ -102,7 +104,8 @@ const SpellSpecialAction = {
     SP_VZPLANUTI3: 25,
     SP_PHASEDOOR: 26,
     SP_TELEPORT_SECT: 27,
-    SP_RADIATION: 29
+    SP_RADIATION: 29,
+    SD_DISPEL: 30
 } as const;
 
 export const SpellArgument = {
@@ -183,33 +186,34 @@ const SpellCommands : Record<string, SpellCommandDesc> = {
     createWeapon: {instr:[SpellInstruction.create_weapon]},
  
     //specials
-    spec_automap4: {instr:[],action: SpellSpecialAction.SP_AUTOMAP4},
-    spec_automap8: {instr:[],action: SpellSpecialAction.SP_AUTOMAP8},
-    spec_automap15: {instr:[],action: SpellSpecialAction.SP_AUTOMAP15},
-    spec_gather1: {instr:[],action: SpellSpecialAction.SP_PRIPOJENI1},
-    spec_gather3: {instr:[],action: SpellSpecialAction.SP_PRIPOJENI3},
-    spec_gatherAll: {instr:[],action: SpellSpecialAction.SP_PRIPOJENIA},
-    spec_earthquake: {instr:[],action: SpellSpecialAction.SP_CHVENI},
-    spec_portraitSpellEffect: {instr:[],action: SpellSpecialAction.SP_DEFAULT_EFFEKT},
-    spec_TrueSeeing: {instr:[],action: SpellSpecialAction.SP_TRUE_SEEING},
-    spec_ShowHP: {instr:[],action: SpellSpecialAction.SP_SCORE},
-    spec_Halucinacion: {instr:[],action: SpellSpecialAction.SP_HALUCINACE},
-    spec_teleport: {instr:[],action: SpellSpecialAction.SP_TELEPORT},
-    spec_summon: {instr:[],action: SpellSpecialAction.SP_SUMMON},
-    spec_abyss: {instr:[],action: SpellSpecialAction.SP_HLUBINA1},
-    spec_abyss2: {instr:[],action: SpellSpecialAction.SP_HLUBINA2},
-    spec_manabattery: {instr:[],action: SpellSpecialAction.SP_MANABAT},
-    spec_scalesOfFate: {instr:[], action:SpellSpecialAction.SP_VAHY},
-    spec_adjustSpeed: {instr:[], action:SpellSpecialAction.SP_RYCHLOST},
-    spec_whirlpool: {instr:[], action:SpellSpecialAction.SP_VIR},
-    spec_summonDemon1: {instr:[], action:SpellSpecialAction.SP_DEMON1},
-    spec_summonDemon2: {instr:[], action:SpellSpecialAction.SP_DEMON2},
-    spec_summonDemon3: {instr:[], action:SpellSpecialAction.SP_DEMON3},
-    spec_radiation: {instr:[], action:SpellSpecialAction.SP_RADIATION},
-    spec_incineration1:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI1},
-    spec_incineration2:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI2},
-    spec_incineration3:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI3},
-    spec_phasedoor:{instr:[], action:SpellSpecialAction.SP_PHASEDOOR},
+    automap4: {instr:[],action: SpellSpecialAction.SP_AUTOMAP4},
+    automap8: {instr:[],action: SpellSpecialAction.SP_AUTOMAP8},
+    automap15: {instr:[],action: SpellSpecialAction.SP_AUTOMAP15},
+    gather1: {instr:[],action: SpellSpecialAction.SP_PRIPOJENI1},
+    gather3: {instr:[],action: SpellSpecialAction.SP_PRIPOJENI3},
+    gatherAll: {instr:[],action: SpellSpecialAction.SP_PRIPOJENIA},
+    earthquake: {instr:[],action: SpellSpecialAction.SP_CHVENI},
+    portraitSpellEffect: {instr:[],action: SpellSpecialAction.SP_DEFAULT_EFFEKT},
+    TrueSeeing: {instr:[],action: SpellSpecialAction.SP_TRUE_SEEING},
+    ShowHP: {instr:[],action: SpellSpecialAction.SP_SCORE},
+    Halucinacion: {instr:[],action: SpellSpecialAction.SP_HALUCINACE},
+    teleport: {instr:[],action: SpellSpecialAction.SP_TELEPORT},
+    summon: {instr:[],action: SpellSpecialAction.SP_SUMMON},
+    abyss: {instr:[],action: SpellSpecialAction.SP_HLUBINA1},
+    abyss2: {instr:[],action: SpellSpecialAction.SP_HLUBINA2},
+    manabattery: {instr:[],action: SpellSpecialAction.SP_MANABAT},
+    scalesOfFate: {instr:[], action:SpellSpecialAction.SP_VAHY},
+    adjustSpeed: {instr:[], action:SpellSpecialAction.SP_RYCHLOST},
+    whirlpool: {instr:[], action:SpellSpecialAction.SP_VIR},
+    summonDemon1: {instr:[], action:SpellSpecialAction.SP_DEMON1},
+    summonDemon2: {instr:[], action:SpellSpecialAction.SP_DEMON2},
+    summonDemon3: {instr:[], action:SpellSpecialAction.SP_DEMON3},
+    radiation: {instr:[], action:SpellSpecialAction.SP_RADIATION},
+    incineration1:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI1},
+    incineration2:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI2},
+    incineration3:{instr:[SpellInstruction.rand_min,SpellInstruction.rand_max], action:SpellSpecialAction.SP_VZPLANUTI3},
+    phasedoor:{instr:[], action:SpellSpecialAction.SP_PHASEDOOR},
+    dispelMagic:{instr:[], action:SpellSpecialAction.SD_DISPEL}
 }
 
 export const SpellCommandsArgs = Object.entries(SpellCommands)
@@ -288,7 +292,9 @@ function createScriptFromCmdList(lst: SpellSimpleCmd[]) {
 interface SpellFlags {
     trace: boolean,
     teleport: boolean,
-    hidden: boolean
+    hidden: boolean,
+    noanim: boolean,
+    nodispel: boolean
 }
 
 export class TKouzlo {
@@ -302,7 +308,7 @@ export class TKouzlo {
     start:number = 0;   //script start address
     cil:number = 0;      //type of target
     povaha:number = 0;   //attack spell or benefical spell
-    flags : SpellFlags= {trace:false, teleport: false, hidden: false};
+    flags : SpellFlags= {trace:false, teleport: false, hidden: false, nodispel: false, noanim: false};
     backfire:number = 0; //spell for backfire
     wait:number = 0;     //zero
     delay:number = 0;    //zero

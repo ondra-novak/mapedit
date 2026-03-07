@@ -1,6 +1,8 @@
-# Skeldal Dialog script
+# Skeldal Dialog Script
 
-## formát
+## Format
+
+Dialog scripts consist of expressions separated by semicolons:
 
 ```
 expression;
@@ -8,56 +10,60 @@ expression;
 expression;
 ```
 
-## Přiřazení
+## Variable Assignment
+
+Assign values to variables using the `:=` operator:
 
 ```
-var:=expression;
+var := expression;
 ```
 
-## Funkce
+## Function Calls
+
+Call functions with arguments in parentheses:
 
 ```
-function_name(arg1,arg2,arg3)
+function_name(arg1, arg2, arg3)
 ```
 
-### Expression
+## Expressions
+
+Expressions support standard arithmetic operators with proper precedence:
 
 ```
 a + b * 2 * (c + d)
 ```
 
-### conditions and branching
+**Important:** All variables are **16-bit signed integers** with range -32768 to 32767. Overflow causes wrap-around. However, expressions are calculated using 64-bit arithmetic internally, allowing safe intermediate calculations.
 
-Condition is just expression consists from && and ||. You can use comparison operators ==, !=, >=, <=, < , >
+## Conditions and Branching
 
-This can be condition
+Conditions use logical operators (`&&`, `||`) and comparison operators (`==`, `!=`, `>=`, `<=`, `<`, `>`):
+
 ```
 a == b
 ```
 
-There is no `if` command. If you need branch, you can use sequence as expression
+There is no `if` statement. Instead, use code blocks as expressions:
 
-if (cond) { command; command }
-
+**If-then pattern:**
 ```
-cond && {
+condition && {
     command1;
     command2;
 }
 ```
 
-
-if (cond) command1; else command2
-
-
+**If-then-else pattern:**
 ```
-cond && {
+condition && {
     command1;
-    true 
+    true
 } || {
-    command2
+    command2;
 }
 ```
+
 
 ### Predefined variables
 
@@ -85,6 +91,7 @@ cond && {
 - **position.direction** - contains current direction
 - **battle** - contains true, if currently in battle
 - **held_item** - contains id of item held before dialog started. This item is no longer held, it was put into inventory. -1 for none
+- **game_time** - containe game time (1 tick per 10 sec). Note this number is probably larger than 32768, so you will need to perform some adjustment before can be stored
 
 ### Functions
 
@@ -113,7 +120,6 @@ cond && {
  - **have_rune(nm)** - check rune nm, for example 15 - type water, 5th rune
  - **set_rune(nm)**
  - **sleep(hours)** - perform party rest for hours
- - **practice_to(stat.%, value)** - sets stat to given value
  - **timepass(seconds, game_hours)** - dark screen for given seconds, game time passes game_hours
  - **eat(price)** - add food and water to all characters in given dialog, price for each
  - **change_music(str)** - change music - changes current music. When music finished, continues in playlist
@@ -133,5 +139,9 @@ cond && {
  - **set_speaker_by_face(slot, face_id)** - set speaker's slot by face (variable can be used) 
  - **printf(s,...)** - output text to window, where s is pattern and arguments are variable count depend on pattern: printf("chance is {} of {}", a, b)
  - **str(n)** - function can be used instead of string, where n is refers to global string table. n must be constant. Invalid use causes crash
-
+ - **exit()** - exit current dialog regardless on where it is
+ - **goto_node(n)** - directly continue to specified node (must be constant)
+ - **goto_story(n)** - directly continue to specified story (must be constant)
+ - **has_spell_group(n)** - returns true if current speaker has active a spell from given spell group. 
+ - **end_spell_group(n)** - end any spell of specified group.
 

@@ -132,7 +132,7 @@ function mapFloorOrCeil(source: ImageDataResult, target: ImageDataResult, trap: 
 
 export function createFloorCeil(source1: ImageDataResult, source2: ImageDataResult, target: ImageDataResult, type:"floor"|"ceil") {
     const c = type == "ceil";
-    const top =c?0:360-target.height;
+    const top =c?-2:362-target.height;
     const b = c?1:0;
     for (let z = 0; z < VIEW3D_Z; ++z) {
         const trpz1 = {

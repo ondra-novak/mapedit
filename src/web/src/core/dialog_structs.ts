@@ -123,7 +123,7 @@ export class DialogDef {
         2: ["stk_pop_var",1],
         3: ["stk_del",0],
         4: ["stk_copy",0],
-        5: ["stk_swap",0],
+        5: ["%",0],
         6: ["+",0],
         7: ["-",0],
         8: ["*",0],
@@ -172,6 +172,9 @@ export class DialogDef {
         52: ["kill_current_enemy",0],
         53: ["speaker_by_slot",2],
         54: ["printf",2],
+        55: ["has_spell_group",1],
+        56: ["end_spell_group",1],
+        57: ["stk_push game_time",0],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -572,7 +575,7 @@ export class DialogManager {
 
 
 // name, param type - n=number,s=string,r=node ref, code
-type FunctionList = Record<string,[ ('n'|'s'|'r'|'va')[], number]>;
+type FunctionList = Record<string,[ ('n'|'s'|'r'|'d')[], number]>;
 
 const functionList: FunctionList = 
 {
@@ -617,9 +620,13 @@ const functionList: FunctionList =
     "send_enemy":[['n','n'],203],
     "send_current_enemy":[['n'],204],
     "visited":[['r'],145],
+    "goto_node":[['r'],139],
+    "goto_story":[['d'],139],
     "kill_current_enemy":[[],52],
     "set_speaker_by_face(slot, face_id":[['n','n'],29],
     "exit":[[],255],
+    "has_spell_group":[['n'],55],
+    "end_spell_group":[['n'],56],
 };
 
 export class DialogCompileError extends Error {
@@ -1049,7 +1056,7 @@ class DialogCompiler {
                             break;
                             case 'r': {
                                 const dirconst = this.compile_likely_constant(a, out);
-                                if (dirconst) {
+                                if (dirconst && ("value" in dirconst)) {
                                     const nd = dirconst.value!;    
                                     try {
                                         const ndid = this.node_id_from_target(this.cur_node!, nd);
@@ -1061,8 +1068,19 @@ class DialogCompiler {
                                     this.compile_error(`Argument of "${n}()" must be number: id of node. Expression is not allowed`)
                                 }
                             }
-                            case 'va': {
-                                
+                            case 'd': {
+                                const dirconst = this.compile_likely_constant(a, out);
+                                if (dirconst && ("value" in dirconst)) {
+                                    const nd = dirconst.value!;    
+                                    try {
+                                        const ndid = (this.compat?128:1)*nd;
+                                        arginstr.unshift({value:ndid});
+                                    } catch (e) {
+                                        this.compile_error(`Function "${n}()" - node not found`);
+                                    }
+                                } else {
+                                    this.compile_error(`Argument of "${n}()" must be number: id of node. Expression is not allowed`)
+                                }
                             }
                             break;
                         }
@@ -1141,6 +1159,7 @@ class DialogCompiler {
                     "-":[7,true],
                     "*":[8,true],
                     "/":[9,true],
+                    "%":[5,true],
                     "--":[18,true]                    
                 };
                 const op = ops[s];
@@ -1245,6 +1264,7 @@ class DialogCompiler {
             case "position.direction": out.push({value:48});return true;
             case "random": out.push({value: 49});return true;
             case "held_item": out.push({value: 50});return true;
+            case "game_time:": out.push({value: 57});return true;
             default :
                 if (s in this.consts) {
                     out.push({value:1}) //push;
