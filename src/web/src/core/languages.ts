@@ -95,3 +95,4 @@ export const ascii_languages = {
   "rot": "Rotokas",
   "qu": "Runa Simi"  
 };
+
