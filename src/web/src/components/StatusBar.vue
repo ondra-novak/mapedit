@@ -160,16 +160,16 @@ function register_save_control() : SaveRevertControl{
 }
 
 
-function save_clicked() {
+async function save_clicked() {
     can_save.value = false;
     can_revert.value = false;
-    save_state_stack.do_save();
+    await save_state_stack.do_save();
 }
 
-function revert_clicked() {
+async function revert_clicked() {
     can_save.value = false;
     can_revert.value = false;
-    save_state_stack.do_revert();
+    await save_state_stack.do_revert();
 }
 
 function set_project_switch (name: string, on_click: ()=>void) {
@@ -243,21 +243,20 @@ function stop_client() {
     }
 }
 
-function reload_client() {
+async function reload_client() {
     const gcc = game_client_cntr.value;
+    if (!gcc) return;
     const lc = location.value;
-    if (gcc) {
-        if (lc) {
-            lc.map_save_cb().then(cont=>{
-                if (cont) {
-                    gcc.reload();
-                }
-            });
-        } else {
-            gcc.reload();
-        }
+    if (lc) {
+        const cont = await lc.map_save_cb();
+        if (!cont) return;
     }
+    if (can_save.value) {
+        save_clicked();
+    }
+    gcc.reload();
 }
+
 
 async function start_client() {
     if (game_client_cntr.value) {

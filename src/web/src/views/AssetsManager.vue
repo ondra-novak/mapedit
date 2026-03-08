@@ -21,6 +21,7 @@ import { EditorID, mainMenuControl, mapEditorControl, type EditorRef } from '@/c
 import DialogDecompiler from '@/components/DialogDecompiler.vue';
 import FactEditor from '@/components/FactEditor.vue';
 import EncDecomp from '@/components/EncDecomp.vue';
+import DlgLayoutEditor from '@/components/DlgLayoutEditor.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -93,10 +94,12 @@ function select_tool() : string | null {
         if (cur_file_model.value.name.endsWith(v)) return "editor_exists";
     }
     if (cur_file_model.value.name.toUpperCase() == "DIALOGY.DAT") return "dialog_decompiler";
+    if (cur_file_model.value.name.toUpperCase() == "DIALOGY.LAY") return "dialog_layout";
     if (cur_file_model.value.name.toUpperCase() == "FACTS.JSON") return "fact_editor";
     if (cur_file_model.value.name.endsWith(".ENC")) return "enc";        
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
     if (cur_file_model.value.name.endsWith(".TXT")) return "strings";
+    
     switch (cur_file_model.value.group) {
         case AssetGroup.WALLS: return "walls";
         case AssetGroup.ENEMIES:if (cur_file_model.value.name.endsWith(".SEQ") )
@@ -192,6 +195,7 @@ function open_editor() {
                     <AssetsToolMGF v-if="selected_tool == 'mgf'" v-model="selected_file" />
                     <EncDecomp v-if="selected_tool == 'enc'" v-model="selected_file" :group="selected_group"/>
                     <DialogDecompiler v-if="selected_tool == 'dialog_decompiler'" />
+                    <DlgLayoutEditor v-if="selected_tool == 'dialog_layout'" />
                     <FactEditor v-if="selected_tool == 'fact_editor'" />
                     <div v-if="selected_tool == 'editor_exists'" class="goto-tool">
                         <button @click="open_editor">Open editor</button>

@@ -123,7 +123,7 @@ export class DialogDef {
         2: ["stk_pop_var",1],
         3: ["stk_del",0],
         4: ["stk_copy",0],
-        5: ["stk_swap",0],
+        5: ["%",0],
         6: ["+",0],
         7: ["-",0],
         8: ["*",0],
@@ -172,6 +172,9 @@ export class DialogDef {
         52: ["kill_current_enemy",0],
         53: ["speaker_by_slot",2],
         54: ["printf",2],
+        55: ["has_spell_group",1],
+        56: ["end_spell_group",1],
+        57: ["stk_push game_time",0],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -249,6 +252,7 @@ export class DialogDef {
         204: ["send_current_enemy",1],
         205: ["teleport_enemies", 3],
         206: ["teleport_current_enemy", 3],
+        207: ["add_choice_w_icon", 3],
         518: ["set_flag",1],
         519: ["reset_flag",1],
         255: ["exit_dialog",0]
@@ -386,6 +390,8 @@ export interface DialogBranch {
     target: number|null;
     ///if true, condition is inverted
     invert_condition?: boolean;
+    ///add speaker's icon to choice
+    speaker_icon?: boolean
 };
 
 export interface DialogAction {
@@ -569,7 +575,7 @@ export class DialogManager {
 
 
 // name, param type - n=number,s=string,r=node ref, code
-type FunctionList = Record<string,[ ('n'|'s'|'r'|'va')[], number]>;
+type FunctionList = Record<string,[ ('n'|'s'|'r'|'d')[], number]>;
 
 const functionList: FunctionList = 
 {
@@ -614,9 +620,13 @@ const functionList: FunctionList =
     "send_enemy":[['n','n'],203],
     "send_current_enemy":[['n'],204],
     "visited":[['r'],145],
+    "goto_node":[['r'],139],
+    "goto_story":[['d'],139],
     "kill_current_enemy":[[],52],
     "set_speaker_by_face(slot, face_id":[['n','n'],29],
     "exit":[[],255],
+    "has_spell_group":[['n'],55],
+    "end_spell_group":[['n'],56],
 };
 
 export class DialogCompileError extends Error {
@@ -892,9 +902,16 @@ class DialogCompiler {
                     }
                     break;
                 case DialogBranchType.choice:
-                    brnch.push({value:142}); //add choice
-                    brnch.push({value:target})
-                    brnch.push({text:text});
+                    if (b.speaker_icon) {
+                        brnch.push({value:207}); //add choice with icon
+                        brnch.push({value:target})
+                        brnch.push({value:b.speaker})
+                        brnch.push({text:text});
+                    } else {
+                        brnch.push({value:142}); //add choice
+                        brnch.push({value:target})
+                        brnch.push({text:text});
+                    }
                     ++choices;
                     break;
                 case DialogBranchType.jump_to_node:
@@ -1039,7 +1056,7 @@ class DialogCompiler {
                             break;
                             case 'r': {
                                 const dirconst = this.compile_likely_constant(a, out);
-                                if (dirconst) {
+                                if (dirconst && ("value" in dirconst)) {
                                     const nd = dirconst.value!;    
                                     try {
                                         const ndid = this.node_id_from_target(this.cur_node!, nd);
@@ -1051,8 +1068,19 @@ class DialogCompiler {
                                     this.compile_error(`Argument of "${n}()" must be number: id of node. Expression is not allowed`)
                                 }
                             }
-                            case 'va': {
-                                
+                            case 'd': {
+                                const dirconst = this.compile_likely_constant(a, out);
+                                if (dirconst && ("value" in dirconst)) {
+                                    const nd = dirconst.value!;    
+                                    try {
+                                        const ndid = (this.compat?128:1)*nd;
+                                        arginstr.unshift({value:ndid});
+                                    } catch (e) {
+                                        this.compile_error(`Function "${n}()" - node not found`);
+                                    }
+                                } else {
+                                    this.compile_error(`Argument of "${n}()" must be number: id of node. Expression is not allowed`)
+                                }
                             }
                             break;
                         }
@@ -1131,6 +1159,7 @@ class DialogCompiler {
                     "-":[7,true],
                     "*":[8,true],
                     "/":[9,true],
+                    "%":[5,true],
                     "--":[18,true]                    
                 };
                 const op = ops[s];
@@ -1235,6 +1264,7 @@ class DialogCompiler {
             case "position.direction": out.push({value:48});return true;
             case "random": out.push({value: 49});return true;
             case "held_item": out.push({value: 50});return true;
+            case "game_time:": out.push({value: 57});return true;
             default :
                 if (s in this.consts) {
                     out.push({value:1}) //push;
@@ -1336,4 +1366,61 @@ export function translate_original_dialogy_dat(trn: TranslateTable, dlgdata: Arr
 
 
 
+}
+
+export function RGB555(r:number,g:number,b:number,a:number=0) {
+    return (r & 0x1F)<<10 | (g & 0x1F)<<5 | b & 0x1F | ((a?1:0)<<15);
+}
+export function RGB888(r:number,g:number,b:number,a:number=1) {
+    return ((r >> 3) & 0x1F)<<10 | ((g >> 3) & 0x1F)<<5 | (b >> 3) & 0x1F | ((a?0:1)<<15);
+}
+
+export function extractRGB555(c: number) {
+    return {
+        r: ((c>>10) & 0x1F) << 3,
+        g: ((c>>5) & 0x1F) << 3,
+        b: (c & 0x1F) << 3,
+        a: 1-((c>>15) & 1)
+    }
+}
+
+
+export class DialogLayout {
+    txt_window_x: number = 17;
+    txt_window_y: number = 270;
+    txt_window_xs: number = 606;
+    txt_window_ys: number = 94;
+    txt_window_line_height: number = 11;
+    txt_desc_width: number = 225;
+    txt_desc_x: number =382;
+    txt_desc_y: number = 34;    
+    desc_color: number = RGB555(28,28,21);
+    text_color: number = 0x8000
+    choice_color: number = 42115;    
+    sel_choice_color: number = 49252;
+    pic_x: number = 17;
+    pic_y: number = 17;
+    icon_padding: number = 25;
+    icon_height: number = 25;
+    
+    getSchema() : Schema {
+        return {
+            txt_window_x:"int32",
+            txt_window_y:"int32",
+            txt_window_xs:"int32",
+            txt_window_ys:"int32",
+            txt_window_line_height:"int32",
+            txt_desc_width:"int32",
+            txt_desc_x:"int32",
+            txt_desc_y:"int32",
+            desc_color:"int32",
+            text_color:"int32",
+            choice_color:"int32",
+            sel_choice_color:"int32",
+            pic_x:"int32",
+            pic_y:"int32",
+            icon_padding:"int32",
+            icon_height:"int32"
+        };
+    };
 }

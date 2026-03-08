@@ -20,6 +20,7 @@ import HIFormat from '@/core/hiformat';
 class BasicInfoData {
     name:string = "My new adventure";
     desc:string = "some description of adventure";
+    author:string = "Your Name";
     characters_min:number = 3;
     characters_max:number = 3;
     start_map: string = "START.MAP";
@@ -88,7 +89,7 @@ async function save() {
         content_lang: cl?cl[3]:"en",
         title: basic_info.value.name,
         description: basic_info.value.desc,
-        author: ""
+        author: basic_info.value.author
     }
     await server.set_publish_content_data(content_data);
     if (publish_steam_data.value) await server.set_publish_steam_data(publish_steam_data.value);
@@ -115,7 +116,7 @@ onUnmounted(()=>{
     clearInterval(publish_state_checker);
 });
 
-watch([basic_info, runes], ()=>save_state.set_changed(true),{deep:true});
+watch([basic_info, runes, publish_steam_data], ()=>save_state.set_changed(true),{deep:true});
 
 const lang_list = computed(()=>{
     return supported_languages.sort((a,b)=>a[0].localeCompare(b[0]));
@@ -257,11 +258,12 @@ const publish_dialog = ref<HTMLDialogElement>();
         <x-form>
             <label><span>Name</span><input type="text" v-model="basic_info.name"></label>
             <label><span>Description [BBCodes allowed]<br>(ctrl+b bold, ctrl+i italic) </span><w-y-s-i-w-y-gedit class="descedit" v-model="basic_info.desc" format="BBCode"></w-y-s-i-w-y-gedit></label>
+            <label><span>Author</span><input type="text" v-model="basic_info.author"></label>            
             <label><span>Language</span><select v-model="basic_info.language">
                 <option v-for="v of lang_list" :key="v[0]" :value="v[2]"> {{ v[0] }} </option>
             </select></label>
             <label><span>Game UI language</span><select v-model="basic_info.langddl">
-                <option value="CZ">Brány Skeldalu (česká verze) - default</option>
+                <option value="CS">Brány Skeldalu (česká verze) - default</option>
                 <option value="EN">Gates of Skeldal (english version)</option>
             </select></label>
             <label><span>Start map</span><input type="text" maxlength="12" v-model="basic_info.start_map" @input="basic_info.start_map=dosname_sanitize(basic_info.start_map)"></label>
