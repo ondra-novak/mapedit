@@ -39,7 +39,9 @@ WebInterface::WebInterface(Config cfg, std::stop_source stp)
     ,_addrport(cfg.addr_port)
     ,_stop(std::move(stp))
     ,_check_active(cfg.check_active)    
+    ,_overlay_mode(cfg.overlay_mode)
     ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
+    
     
 //    ,_game_control(cfg.game_folder, cfg.game_ini, cfg.addr_port,[this](std::string_view cmd){this->control(cmd);})
 {
@@ -179,7 +181,8 @@ Json WebInterface::create_state() {
     return Json({
         {"game_instances",stream_count},
         {"current_ddl", _current_ddl},
-        {"need_configure", !_game}
+        {"need_configure", !_game},
+        {"overlay_mode", _overlay_mode}
     });
 }
 void WebInterface::send_state_update(WsRpc &rpc) {
@@ -855,8 +858,12 @@ void WebInterface::ws_publish_prepare(const WsRpc::Request &req) {
 void WebInterface::ws_publish_prepared(const WsRpc::Request &req) {
     auto path = getUserDDL().get_path();
     path.replace_extension(".pak");
-    std::array<std::string,2> args = {"-P",path.string()};
-    steam_applaunch(app_id, args);
+    if (_overlay_mode) {
+        std::cout << "PUB:" << path.string() << std::endl;
+    } else {
+        std::array<std::string,2> args = {"-P",path.string()};
+        steam_applaunch(app_id, args);
+    }
     req.send_response(true);    
 }
 
@@ -1021,8 +1028,10 @@ void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
 
 }
 
-
-
+void WebInterface::ws_is_overlay_mode(const WsRpc::Request &req)
+{
+    req.send_response(_overlay_mode);
+}
 }
 
 

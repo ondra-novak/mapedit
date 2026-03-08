@@ -40,7 +40,7 @@ export interface KeepAliveData {
     need_configure:boolean;
     game_instances: number;
     current_ddl: string;
-
+    overlay_mode: boolean;
 }
 
 export interface DDLFileHistory {
@@ -243,6 +243,9 @@ export class ApiClient extends WsRpcClient{
     }
     async publish_prepared() : Promise<number> {
         return (await this.call("publish.publish_prepared",[],[])).data;
+    }
+    async is_overlay_mode(): Promise<boolean> {
+        return (await this.call("is_overlay_mode",[],[])).data;
     }
 
     async lang_list() : Promise<string[]>{

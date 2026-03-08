@@ -41,6 +41,7 @@ protected:
     Json _config;
     WsPublisher _publisher;
     bool _check_active = false;
+    bool _overlay_mode = false;
 
     WsRpc::MethodMap _methods;
 
@@ -130,6 +131,7 @@ protected:
     void ws_lang_put(const WsRpc::Request &req);
     void ws_lang_delete(const WsRpc::Request &req);
     void ws_lang_copyddl(const WsRpc::Request &req);
+    void ws_is_overlay_mode(const WsRpc::Request &req);
 
     void send_state_update(WsRpc &rpc);
 
@@ -173,7 +175,8 @@ protected:
         {"lang.get", &WebInterface::ws_lang_get},
         {"lang.put", &WebInterface::ws_lang_put},
         {"lang.delete", &WebInterface::ws_lang_delete},
-        {"lang.copyddl", &WebInterface::ws_lang_copyddl}
+        {"lang.copyddl", &WebInterface::ws_lang_copyddl},
+        {"is_overlay_mode", &WebInterface::ws_is_overlay_mode}
     };
 
 

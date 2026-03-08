@@ -4,6 +4,7 @@
 #include <string>
 #include <system_error>
 #include <vector>
+#include <filesystem>
 #ifdef _WIN32
 #include <sstream>
 #define WIN32_LEAN_AND_MEAN
@@ -79,6 +80,41 @@ void steam_applaunch(unsigned long long appid, std::span<const std::string> args
     #else 
     std::string appidstr = std::to_string(appid);    
     std::vector<std::string> finargs = {"steam", "-applaunch"};
+    finargs.push_back(appidstr);
+    finargs.insert(finargs.end(), args.begin(), args.end());
+
+    auto cargs = to_execve_args(finargs);
+
+    int fr =  fork();
+    if (fr < 0) throw std::system_error(errno, std::system_category(), "fork failed");
+    if (!fr) {
+        setsid();
+        execvp(cargs.pointers[0],cargs.pointers.data());
+    }   
+
+    #endif
+}
+
+void skeldal_direct_publish(std::filesystem::path root_dir, std::filesystem::path pakfile) {
+    #ifdef _WIN32
+        
+        std::wostringstream argbld;
+        std::wstring path = (root_dir/"SKELDAL.EXE").wstring();
+        argbld << L'"' << path << L'"' << L" -P \"" << pakfile << L"\"";
+
+        auto str_args = std::move(argbld).str();
+        STARTUPINFOW si = { sizeof(si) };
+        PROCESS_INFORMATION pi;
+        if (!CreateProcessW(nullptr, str_args.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+            throw std::system_error(GetLastError(), std::system_category(), "CreateProcessW failed");
+        }
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);   
+
+
+    #else 
+    std::string path = (root_dir/"skeldal_bin").string();
+    std::vector<std::string> finargs = {path, "-P", pakfile.string()};
     finargs.push_back(appidstr);
     finargs.insert(finargs.end(), args.begin(), args.end());
 

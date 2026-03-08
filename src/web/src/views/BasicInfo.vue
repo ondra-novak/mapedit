@@ -13,7 +13,6 @@ import { create_datalist } from '@/utils/datalist';
 import { publish_tags } from '@/core/publis_tags';
 import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
 import { readFileToArrayBuffer } from '@/core/read_file';
-import type { WsRpcResult } from '@/core/wsrpc';
 import HIFormat from '@/core/hiformat';
 
 
@@ -34,6 +33,7 @@ const basic_info = ref<BasicInfoData>(new BasicInfoData);
 const publish_state = ref<PublishState>();
 const publish_steam_data = ref<PublishSteamData>();
 
+const overlay_mode =ref(false);
 
 const postavy_dat = ref<THumanData>()
 const runes = ref<Runes>(new Runes());
@@ -227,6 +227,7 @@ const dlc = computed({
 })
 
 async function publish_publish() {
+    overlay_mode.value = await server.is_overlay_mode();
     publish_dialog.value?.showModal();
     StatusBar.stop_game();
 }
@@ -313,8 +314,13 @@ const publish_dialog = ref<HTMLDialogElement>();
 </div>
 <dialog ref="publish_dialog" class="pubdlg">
     <header>Publish on Steam<button class="close" @click="publish_dialog?.close()"></button></header>
+    <template v-if="overlay_mode">
+    <p>You going to publish the content to the Steam Workshop. The editor and the game will be restarted</p>
+    </template>
+    <template v-else>
     <p>To publish this content, the editor will start the game via <strong>Steam</strong> and use it to upload the prepared package. If nothing happens, check the Steam client for any error messages</p>
     <p><strong>The game must not be running before publishing.</strong></p>
+    </template>
     <p>By submitting this item, you agree to the <a href="http://steamcommunity.com/sharedfiles/workshoplegalagreement" @click="ev=>open_link_new_window(ev)">workshop terms of service</a>⧉</p>
     <p>Do you want to continue?</p>
     <footer>
