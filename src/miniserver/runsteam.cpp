@@ -1,6 +1,6 @@
 #include "runsteam.hpp"
+#include "utils/process.hpp"
 #include <iterator>
-#include <numeric>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -39,7 +39,7 @@ ArgList to_execve_args(std::span<const std::string> args) {
 }
 
 #ifdef WIN32
-std::wstring get_steam_path() {
+std::u8string get_steam_path() {
     wchar_t steamPath[MAX_PATH];
     DWORD pathSize = sizeof(steamPath);
     if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\Valve\\Steam", L"SteamExe", 
@@ -49,8 +49,9 @@ std::wstring get_steam_path() {
         throw std::runtime_error("Failed to retrieve Steam path from registry");
     }
 }
-
-#endif
+#else 
+std::u8string get_steam_path() {return "steam";}
+#else
 
 void steam_applaunch(unsigned long long appid, std::span<const std::string> args) {
     #ifdef _WIN32

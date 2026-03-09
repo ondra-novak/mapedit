@@ -1,5 +1,13 @@
 #include "skeldal_exe.hpp"
-#include "utils/fast_copy_file.h"
+#include "utils/process.hpp"
+#include <chrono>
+#include <exception>
+#include <initializer_list>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+
 #ifdef _WIN32
 #include <windows.h>
 #else 
@@ -11,10 +19,16 @@ extern char **environ;
 #include <cstring>
 #include <format>
 
+#ifdef _WIN32
+#define SKELDAL_BIN "SKELDAL.EXE"
+#else
+#define SKELDAL_BIN "skeldal.sh"
+#endif
+
 
 SkeldalExeInstance::~SkeldalExeInstance()
 {
-    stop();
+    wait_stop(std::chrono::seconds(2));
 }
 
 std::wstring EscapeArgument(const std::wstring& arg) {
@@ -91,100 +105,19 @@ protected:
 };
 
 
-static void start_game(std::filesystem::path root_dir, std::filesystem::path cfgpath, std::string addr_port, std::filesystem::path ddlpath, std::atomic<long> *status) {
-    
 
-#ifdef _WIN32
-    auto exe_path = root_dir / "SKELDAL.EXE";
-    std::vector<wchar_t> cmdline;
-    std::format_to(std::back_inserter(cmdline), L"{} -f  {} -p {} -c {}", 
-        EscapeArgument(exe_path.wstring()), 
-        EscapeArgument(cfgpath.wstring()), 
-        EscapeArgument(ddlpath.wstring()),
-        EscapeArgument(ansiiToUnicode(addr_port)));
-    cmdline.push_back(0);
-
-    STARTUPINFOW si = { sizeof(si) };
-    PROCESS_INFORMATION pi = {};
-    
-
-    BOOL success = CreateProcessW(nullptr,cmdline.data(),nullptr,nullptr,FALSE,                                // bInheritHandles
-        0,nullptr,root_dir.c_str(),&si,&pi);
-
-    if (success) {
-        
-        status->store(0);
-        status->notify_all();
-        WaitForSingleObject(pi.hProcess, INFINITE);
-
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-        
-    } else {
-        status->store(static_cast<long>(GetLastError()));
-        status->notify_all();
-    }
-#else
-
-    auto ntf_error = [&]{
-        long e = errno;
-        if (e == 0) e = EFAULT;
-        status->store(e);
-        status->notify_all();
-    };
-
-    auto exe_path = root_dir / "skeldal.sh";
-    PosixArgs args({exe_path.c_str(), "-f", cfgpath.c_str(), "-p", ddlpath.c_str(), "-c", addr_port.c_str()});
-    int fds[2];
-    if (::pipe2(fds, O_CLOEXEC) != 0) {
-        ntf_error();return;
-    }   
-    pid_t pid = fork();
-    if (pid < 0) {
-        ntf_error();return;
-    }
-
-    if (pid == 0) {//child
-        std::filesystem::current_path(root_dir);
-        execve(exe_path.c_str(), args, environ);
-        long e = errno;
-        write(fds[1], &e, sizeof(e));
-        _exit(0);    
-    } else {    //parent
-        close(fds[1]);
-        long e = 0;
-        int r = read(fds[0], &e, sizeof(e));
-        if (r < 0) {
-            ntf_error(); return;
-        } else if (r > 0) {
-            if (e == 0) e = EFAULT;
-            status->store(e);
-            status->notify_all();
-        } else {
-            status->store(0);
-            status->notify_all();
-        }        
-        waitpid(pid,  &r, 0);
-    }
-
-#endif
+void SkeldalExeInstance::start_publish(std::filesystem::path root_dir, std::filesystem::path packfile) {
+    auto packfile_str = packfile.u8string();
+    _proc = Process(root_dir/SKELDAL_BIN, {u8"-P", packfile_str});
 
 }
 
-std::stop_token SkeldalExeInstance::start(std::filesystem::path root_dir, std::filesystem::path cfgpath, std::string port, std::filesystem::path ddlpath)
+void SkeldalExeInstance::start_preview(std::filesystem::path root_dir, std::filesystem::path cfgpath, std::string port, std::filesystem::path ddlpath)
 {
-    if (is_running()) {
-        return _stop_src.get_token();
-    }
-    std::atomic<long> status(-1);
-    _instance = std::async(start_game, root_dir, cfgpath, port, ddlpath, &status);
-    status.wait(-1);
-    if (status.load() != 0) {
-        _instance.wait();
-        throw std::runtime_error(std::format("Failed to start game:  root dir: {} - error: {}", root_dir.string(), status.load() ));
-    }
-    _stop_src = std::stop_source();
-    return _stop_src.get_token();
+    auto u8cfgpath = cfgpath.u8string();
+    auto u8ddlpath = ddlpath.u8string();
+    auto u8port = std::u8string(port.begin(), port.end());
+    _proc = Process(root_dir/SKELDAL_BIN, {u8"-f",u8cfgpath,u8"-p",u8ddlpath,u8"-c",u8port});
 }
 
 SkeldalExeControl::SkeldalExeControl(std::filesystem::path root_dir, std::filesystem::path cfgpath, std::string addr_port, std::function<void(std::string_view)> command_callback)
@@ -198,11 +131,8 @@ SkeldalExeControl::SkeldalExeControl(std::filesystem::path root_dir, std::filesy
 
 void SkeldalExeControl::start(std::filesystem::path ddlpath)
 {
-    stop();
-    _curddl_path = ddlpath;    
-    auto ddlpath2 = /*SwapAndCopy(_curddl_path);*/ std::move(ddlpath);
-    auto token = _instance.start(_root_dir, _cfgpath, _addr_port, ddlpath2);
-    _stop_cb.emplace(token, Stopper{this});
+    stop();    
+    _instance.start_preview(_root_dir, _cfgpath, _addr_port, ddlpath);    
 }
 
 std::filesystem::path SkeldalExeControl::get_current_ddlpath() const
@@ -211,7 +141,8 @@ std::filesystem::path SkeldalExeControl::get_current_ddlpath() const
 }
 
 bool SkeldalExeControl::stop() {
-    return _instance.stop();
+    stop_requested();
+    _instance.wait_stop(std::chrono::seconds(2));
 }
 
 void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir , int ghost_form_flag)
@@ -241,33 +172,22 @@ void SkeldalExeControl::stop_requested()
     _command_callback("STOP");
 }
 
-bool SkeldalExeInstance::stop()
+bool SkeldalExeInstance::wait_stop(std::chrono::steady_clock::duration dur)
 {
-    if (!_instance.valid()) return true;
-    _stop_src.request_stop();
-    auto status = _instance.wait_for(std::chrono::milliseconds(stop_timeout));
-    return (status == std::future_status::ready);
+    if (_proc.joinable()) {
+        if (!_proc.join(dur)) {
+            _proc.terminate();
+            _proc.join();
+        }
+    }
 }
 
 bool SkeldalExeInstance::is_running() const
 {
-    return _instance.valid() && _instance.wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout;
+    return _proc.joinable() && !_proc.join(std::chrono::seconds(0));
 }
 
-SwapAndCopy::SwapAndCopy(std::filesystem::path orig_ddl)
-    :_orig_ddl(std::move(orig_ddl))
-{
-_mapped_ddl = _orig_ddl;
-_mapped_ddl.replace_extension(".tmp");
-std::filesystem::rename(_orig_ddl, _mapped_ddl);
-}
-
-SwapAndCopy::operator const std::filesystem::path &() const
-{
-    return _mapped_ddl;
-}
-
-SwapAndCopy::~SwapAndCopy()
-{
-    fast_copy_file(_mapped_ddl, _orig_ddl);
+void SkeldalExeControl::publish(std::filesystem::path ddlpath) {
+    stop();
+    _instance.start_publish(_root_dir, ddlpath);
 }

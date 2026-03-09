@@ -1,8 +1,12 @@
 #pragma once
+#include "utils/process.hpp"
+#include <chrono>
 #include <future>
+#include <span>
 #include <stop_token>
 #include <optional>
 #include <filesystem>
+#include <string_view>
 
 
 class SkeldalExeInstance {
@@ -13,15 +17,20 @@ public:
 
     ~SkeldalExeInstance();
 
-    std::stop_token start(std::filesystem::path root_dir, std::filesystem::path cfgpath, std::string addr_port, std::filesystem::path ddlpath);
-    bool stop();
+    void start_preview(std::filesystem::path root_dir, std::filesystem::path cfgpath, std::string addr_port, std::filesystem::path ddlpath);
+    void start_publish(std::filesystem::path root_dir, std::filesystem::path packfile);
+
+    bool wait_stop(std::chrono::steady_clock::duration dur);
 
     bool is_running() const;
 
-protected:
 
-    std::future<void> _instance;
-    std::stop_source _stop_src;
+
+
+protected:
+    mutable Process  _proc;
+
+    
 
 };
 
@@ -33,6 +42,7 @@ public:
 
     
     void start(std::filesystem::path ddlpath);
+    void publish(std::filesystem::path ddlpath);
     std::filesystem::path get_current_ddlpath() const;
     bool stop();
     void teleport_to(std::string_view map, int sector, int dir, int ghost_form_flag);
@@ -61,16 +71,3 @@ protected:
     SkeldalExeInstance _instance;
 };
 
-class SwapAndCopy {
-public:
-
-    SwapAndCopy(std::filesystem::path orig_ddl);
-    SwapAndCopy(const SwapAndCopy &) = delete;
-    SwapAndCopy &operator=(const SwapAndCopy &) = delete;
-    operator const std::filesystem::path &() const;
-    ~SwapAndCopy();
-
-protected:
-    std::filesystem::path _orig_ddl;
-    std::filesystem::path _mapped_ddl;
-};
