@@ -1,6 +1,9 @@
 
+
 #include <span>
 #include <string>
-void steam_applaunch(unsigned long long appid, std::span<const std::string> params);
 
-void zombie_reaper();
+class Process;
+
+Process steam_applaunch(unsigned long long appid, std::span<const std::u8string_view> params);
+

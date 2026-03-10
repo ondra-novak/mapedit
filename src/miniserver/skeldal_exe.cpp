@@ -133,6 +133,7 @@ void SkeldalExeControl::start(std::filesystem::path ddlpath)
 {
     stop();    
     _instance.start_preview(_root_dir, _cfgpath, _addr_port, ddlpath);    
+    this->_curddl_path = ddlpath;
 }
 
 std::filesystem::path SkeldalExeControl::get_current_ddlpath() const
@@ -143,6 +144,7 @@ std::filesystem::path SkeldalExeControl::get_current_ddlpath() const
 bool SkeldalExeControl::stop() {
     stop_requested();
     _instance.wait_stop(std::chrono::seconds(2));
+    return true;
 }
 
 void SkeldalExeControl::teleport_to(std::string_view map, int sector, int dir , int ghost_form_flag)
@@ -180,6 +182,7 @@ bool SkeldalExeInstance::wait_stop(std::chrono::steady_clock::duration dur)
             _proc.join();
         }
     }
+    return true;
 }
 
 bool SkeldalExeInstance::is_running() const

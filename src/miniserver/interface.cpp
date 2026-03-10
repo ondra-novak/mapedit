@@ -50,6 +50,12 @@ WebInterface::WebInterface(Config cfg, std::stop_source stp)
 }
 
 
+WebInterface::~WebInterface() {
+    if (_publish_process) {
+        _publish_process->join(std::chrono::seconds(2));
+    }
+}
+
 std::function<bool( BasicRequest &)> WebInterface::get_handler() {
 
 
@@ -328,8 +334,7 @@ void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
     broadcast("\r\n\r\n");   
-    zombie_reaper();
- 
+    
 }   
 
 
@@ -855,14 +860,37 @@ void WebInterface::ws_publish_prepare(const WsRpc::Request &req) {
     req.send_response(true);    
 }
 
+
+static void listen_stdin(const WsRpc::Request &req) {
+    req.send_notify("publish", Json{{"running",true},{"message","Connecting..."}});
+    std::string line;
+    bool running;
+    do {
+        std::getline(std::cin, line);
+        Json msg = Json::from_string(line);
+        running = msg["running"].as_bool();
+        req.send_notify("publish", msg);
+    } while (running);    
+    
+}
+
 void WebInterface::ws_publish_prepared(const WsRpc::Request &req) {
     auto path = getUserDDL().get_path();
     path.replace_extension(".pak");
     if (_overlay_mode) {
-        std::cout << "PUB:" << path.string() << std::endl;
+        std::cout << "PUB:" << path.string() << "\n";
+        listen_stdin(req);
+        req.send_response(true);        
     } else {
-        std::array<std::string,2> args = {"-P",path.string()};
-        steam_applaunch(app_id, args);
+        if (_publish_process) {
+            if (_publish_process->join(std::chrono::seconds(0))) {
+                req.send_error(409,"Still in progress");
+                return;
+            }
+        }
+        auto strpath = path.u8string();
+        std::array<std::u8string_view,2> args = {u8"-P",strpath};
+        _publish_process = std::make_unique<Process>(steam_applaunch(app_id, args));
     }
     req.send_response(true);    
 }

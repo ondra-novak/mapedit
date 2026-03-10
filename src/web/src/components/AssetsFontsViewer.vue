@@ -96,7 +96,7 @@ async function loadFont() {
                         y+=h;
                     }
                     drawChar(img, data, x, y, i);
-                    x = x + cw+1;                    
+                    x = x + cw+10;                    
                 }
                 ctx.putImageData(img,0,0);
             }

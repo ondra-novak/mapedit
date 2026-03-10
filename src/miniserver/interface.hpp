@@ -13,6 +13,7 @@
 #include <shared_mutex>
 #include <thread>
 
+class Process;
 
 namespace server {
 
@@ -27,6 +28,7 @@ public:
     static constexpr auto keepalive_interval = std::chrono::seconds(5);
 
     WebInterface(Config cfg, std::stop_source stop);
+    ~WebInterface();
     
     std::function<bool( BasicRequest &)> get_handler();
 
@@ -48,8 +50,7 @@ protected:
     std::mutex _mgfcomp_mx;
     MGifComp _mgfcomp;
 
-    std::atomic<bool> _publish_running = {};
-    std::jthread _publish_process;
+    std::atomic<bool> _publish_running = {};    
 
 
     bool webserver(Request &req);
@@ -80,6 +81,7 @@ protected:
     std::jthread _basic_timer;
 
     std::unique_ptr<SkeldalExeControl> _game_control;
+    std::unique_ptr<Process> _publish_process;
  
     DDLManager getUserDDL() const;
 

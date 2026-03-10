@@ -12,26 +12,67 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <array>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 
 class ProcessBase {
 public:
     using ProcHandle = HANDLE;
     static constexpr auto null_handle = ProcHandle(nullptr);
-protected:
-        std::optional<std::intptr_t> close_handle(ProcHandle h, std::chrono::steady_clock::time_point wait_until = std::chrono::steady_clock::time_point::max()) {
-            if (!h) return 0;
-            auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(wait_until - std::chrono::steady_clock::now());
-            if (timeout > std::numeric_limits<DWORD>::max()) timeout = std::numeric_limits<DWORD>::max();
-            DWORD out = WaitForSingleObject(h, timeout);
-            if (out == WAIT_TIMEOUT) return std::nullopt;
-            DWORD r;
-            GetExitCodeProcess(h, &r);
-            CloseHandle(h);
-            return r;
+
+    class FileHandle {
+    public:
+        FileHandle(HANDLE h = INVALID_HANDLE_VALUE):_h(h) {};
+        ~FileHandle() {if (_h != INVALID_HANDLE_VALUE) CloseHandle(_h);}
+        FileHandle(FileHandle &&other): _h(other._h) {other._h = 0;}
+        FileHandle &operator=(FileHandle &&other) {
+            if (_h != other._h) {
+                close();
+                _h = other._h;
+                other._h = INVALID_HANDLE_VALUE;
+            }
+            return *this;
         }
+        
+        explicit operator bool() const {return _h != INVALID_HANDLE_VALUE;}
+        operator HANDLE() {return _h;}
+        HANDLE release() {auto x = _h; _h = INVALID_HANDLE_VALUE; return x;}
+        void close() {
+            if (_h != INVALID_HANDLE_VALUE) {
+                CloseHandle(_h);
+                _h = INVALID_HANDLE_VALUE;
+            }
+        }
+        HANDLE *ref() {return &_h;}
+    protected:
+        HANDLE _h;
+    };
+
+
+protected:
+    std::optional<std::intptr_t> close_handle(ProcHandle h, std::chrono::steady_clock::time_point wait_until = std::chrono::steady_clock::time_point::max()) {
+        if (!h) return 0;
+        auto timeout = std::max<int64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(wait_until - std::chrono::steady_clock::now()).count(),
+                std::numeric_limits<DWORD>::max());
+        DWORD out = WaitForSingleObject(h, static_cast<DWORD>(timeout));
+        if (out == WAIT_TIMEOUT) return std::nullopt;
+        DWORD r;
+        GetExitCodeProcess(h, &r);
+        CloseHandle(h);
+        return r;
+    }
+
+    void terminate_process(HANDLE h) {
+        if (h == INVALID_HANDLE_VALUE) return;
+        TerminateProcess(h,255);
+    }
+
 };
 
 #else
@@ -46,12 +87,12 @@ public:
     using ProcHandle = pid_t;
     static constexpr auto null_handle = ProcHandle(0);
 
-    class PipeHandle {
+    class FileHandle {
     public:
-        PipeHandle(int h = -1):_h(h) {};
-        ~PipeHandle() {close();}
-        PipeHandle(PipeHandle &&other): _h(other._h) {other._h = 0;}
-        PipeHandle &operator=(PipeHandle &&other) {
+        FileHandle(int h = -1):_h(h) {};
+        ~FileHandle() {close();}
+        FileHandle(FileHandle &&other): _h(other._h) {other._h = 0;}
+        FileHandle &operator=(FileHandle &&other) {
             if (_h != other._h) {
                 close();
                 _h = other._h;
@@ -60,7 +101,7 @@ public:
             return *this;
         }
         
-        explicit operator bool() const {return _h>=9;};
+        explicit operator bool() const {return _h>=0;};
         operator int() {return _h;}
         int release() {int x = _h; _h = -1; return x;}
         void close() {
@@ -144,23 +185,52 @@ public:
     */
     Process(std::filesystem::path process_path, std::span<const std::u8string_view> arguments, Pipes pipes = Pipes{nullptr,nullptr, nullptr}) {
 #ifdef _WIN32
-        std::wostringstream argbld;
-        std::wstring path = process_path.wstring();
-        argbld << L'"' << path << L'"';
-        for (const auto &arg : arguments) {
-            std::string z(arg);
-            size_t sp = z.find_first_of(" \t\n\v\f\r");
-            std::wstring tmp;
-            auto need = MultiByteToWideChar(CP_UTF8, 0, z.data(),static_cast<int>(z.size()),0,0);
-            tmp.resize(need);
-            MultiByteToWideChar(CP_UTF8, 0, z.data(),static_cast<int>(z.size()),tmp.data(),static_cast<int>(tmp.size()));
-            argbld << " ";
-            if (sp == z.npos) argbld << tmp; else argbld << '"' << tmp << '"';
+        std::basic_ostringstream<char8_t, std::char_traits<char8_t>, std::allocator<char8_t>> argbld;
+        std::wstring path = L"\"" + process_path.wstring() + L"\"";
+        for (const auto &arg : arguments) {            
+            size_t sp = arg.find_first_of(u8" \t\n\v\f\r");
+            argbld << u8" ";
+            if (sp == arg.npos) argbld << arg; else argbld << '"' << arg  << '"';
         }
-        auto str_args = std::move(argbld).str();
+        auto cmdline = path + to_unicode(std::move(argbld).str());
+
         STARTUPINFOW si = { sizeof(si) };
+        DWORD pflags = 0;
+        
+
+        if (pipes.error || pipes.input || pipes.output) {
+            pflags = CREATE_NO_WINDOW;
+            FileHandle h_input, h_output, h_error;
+            if (pipes.input) {
+                auto p = make_pipes();
+                DuplicateHandle(GetCurrentProcess(), p[0], GetCurrentProcess(), h_input.ref(), 0, TRUE, DUPLICATE_SAME_ACCESS);
+                *pipes.input = handle2file(p[1].release());
+            } else {
+                h_input = createNulDevice();
+            }
+            if (pipes.output) {
+                auto p = make_pipes();
+                DuplicateHandle(GetCurrentProcess(), p[1], GetCurrentProcess(), h_output.ref(), 0, TRUE, DUPLICATE_SAME_ACCESS);
+                *pipes.output = handle2file(p[0].release());
+            } else {
+                h_output = createNulDevice();
+            }
+            if (pipes.error) {
+                auto p = make_pipes();
+                DuplicateHandle(GetCurrentProcess(), p[1], GetCurrentProcess(), h_error.ref(), 0, TRUE, DUPLICATE_SAME_ACCESS);
+                *pipes.error = handle2file(p[0].release());
+            } else {
+                h_error = createNulDevice();
+            }
+            si.dwFlags = STARTF_USESTDHANDLES;
+            si.hStdInput = h_input;
+            si.hStdOutput = h_output;
+            si.hStdError = h_error;
+        }
+
         PROCESS_INFORMATION pi;
-        if (!CreateProcessW(nullptr, str_args.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+
+        if (!CreateProcessW(nullptr, cmdline.data(), nullptr, nullptr, TRUE, pflags, nullptr, nullptr, &si, &pi)) {
             throw std::system_error(GetLastError(), std::system_category(), "CreateProcessW failed");
         }
         CloseHandle(pi.hThread);
@@ -172,7 +242,7 @@ public:
             throw std::system_error(errno, std::system_category(), "fork failed");        
         }
 
-        std::array<PipeHandle,2> p_stdin, p_stdout, p_stderr;
+        std::array<FileHandle,2> p_stdin, p_stdout, p_stderr;
         if (pipes.input) {
             p_stdin = make_pipes();
             *pipes.input = fdopen(p_stdin[1].release(), "w");            
@@ -267,9 +337,47 @@ protected:
     ProcHandle _handle = null_handle;
  
 #ifdef _WIN32
-#error not implemented yet
+    std::array<FileHandle, 2> make_pipes() {
+        HANDLE read, write;        
+        if (!CreatePipe(&read, &write, NULL, 0)) {
+            throw std::system_error(GetLastError(),std::system_category(), "Create pipe failed");
+        }
+        return {FileHandle(read), FileHandle(write)};
+    }
+
+    std::wstring to_unicode(std::u8string_view data ) {
+        std::wstring result;
+        int need = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char *>(data.data()), static_cast<int>(data.size()), nullptr, 0);
+        if (need <= 0) throw std::system_error(GetLastError(), std::system_category(), "MultiByteToWideChar failed");
+        result.resize(need);
+        if (!MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char *>(data.data()), static_cast<int>(data.size()), result.data(), static_cast<int>(result.size()))) {
+            throw std::system_error(GetLastError(), std::system_category(), "MultiByteToWideChar failed");
+        }
+        return result;
+    }
+
+    FILE *handle2file(HANDLE f) {
+        int fd = _open_osfhandle((intptr_t)f, 0);
+        if (fd < 0) throw std::system_error(errno, std::system_category(), "_open_osfhandle failed");
+        FILE *res = _fdopen(fd, "r+");
+        if (!res) {
+            int e = errno;
+            _close(fd);
+            throw std::system_error(e, std::system_category(), "_fdopen failed");
+        }
+        return res;
+    }
+
+    HANDLE createNulDevice() {
+        HANDLE h = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (h == INVALID_HANDLE_VALUE) {
+            throw std::system_error(GetLastError(), std::system_category(), "Failed to open NUL device");
+        }
+        return h;
+    }
+
 #else 
-    std::array<PipeHandle, 2> make_pipes() {
+    std::array<FileHandle, 2> make_pipes() {
         int pp[2];
         if (::pipe2(pp,O_CLOEXEC)) throw std::system_error(errno, std::system_category(), "failed pipe2");
         return {pp[0],pp[1]};
