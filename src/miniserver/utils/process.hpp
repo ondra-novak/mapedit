@@ -15,7 +15,6 @@
 #include <array>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <windows.h>
 #include <io.h>
 #include <fcntl.h>
@@ -168,6 +167,12 @@ public:
         FILE **output = nullptr;
         /// set to pointer to existing FILE pointer to initialize stderr of the process, The file is opened for input!
         FILE **error = nullptr;
+        ///enforce binary stream (windows only)
+        bool input_binary = false;
+        ///enforce binary stream (windows only)
+        bool output_binary = false;
+        ///enforce binary stream (windows only)
+        bool error_binary = false;
     };
 
     
@@ -183,7 +188,7 @@ public:
                          output and vice versa) because they are used by the parent process to write to child's stdin
                          and read from child's stdout/stderr.
     */
-    Process(std::filesystem::path process_path, std::span<const std::u8string_view> arguments, Pipes pipes = Pipes{nullptr,nullptr, nullptr}) {
+    Process(std::filesystem::path process_path, std::span<const std::u8string_view> arguments, Pipes pipes = Pipes{nullptr,nullptr, nullptr,false,false,false}) {
 #ifdef _WIN32
         std::basic_ostringstream<char8_t, std::char_traits<char8_t>, std::allocator<char8_t>> argbld;
         std::wstring path = L"\"" + process_path.wstring() + L"\"";
@@ -196,29 +201,29 @@ public:
 
         STARTUPINFOW si = { sizeof(si) };
         DWORD pflags = 0;
+        FileHandle h_input, h_output, h_error;
         
 
         if (pipes.error || pipes.input || pipes.output) {
             pflags = CREATE_NO_WINDOW;
-            FileHandle h_input, h_output, h_error;
             if (pipes.input) {
                 auto p = make_pipes();
                 DuplicateHandle(GetCurrentProcess(), p[0], GetCurrentProcess(), h_input.ref(), 0, TRUE, DUPLICATE_SAME_ACCESS);
-                *pipes.input = handle2file(p[1].release());
+                *pipes.input = handle2file(p[1].release(), pipes.input_binary);
             } else {
                 h_input = createNulDevice();
             }
             if (pipes.output) {
                 auto p = make_pipes();
                 DuplicateHandle(GetCurrentProcess(), p[1], GetCurrentProcess(), h_output.ref(), 0, TRUE, DUPLICATE_SAME_ACCESS);
-                *pipes.output = handle2file(p[0].release());
+                *pipes.output = handle2file(p[0].release(), pipes.output_binary);
             } else {
                 h_output = createNulDevice();
             }
             if (pipes.error) {
                 auto p = make_pipes();
                 DuplicateHandle(GetCurrentProcess(), p[1], GetCurrentProcess(), h_error.ref(), 0, TRUE, DUPLICATE_SAME_ACCESS);
-                *pipes.error = handle2file(p[0].release());
+                *pipes.error = handle2file(p[0].release(), pipes.error_binary);
             } else {
                 h_error = createNulDevice();
             }
@@ -356,10 +361,10 @@ protected:
         return result;
     }
 
-    FILE *handle2file(HANDLE f) {
+    FILE *handle2file(HANDLE f, bool binary) {
         int fd = _open_osfhandle((intptr_t)f, 0);
         if (fd < 0) throw std::system_error(errno, std::system_category(), "_open_osfhandle failed");
-        FILE *res = _fdopen(fd, "r+");
+        FILE *res = _fdopen(fd,binary?"rb+":"rt+");
         if (!res) {
             int e = errno;
             _close(fd);
@@ -369,7 +374,10 @@ protected:
     }
 
     HANDLE createNulDevice() {
-        HANDLE h = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        SECURITY_ATTRIBUTES attrs = {0};
+        attrs.nLength = sizeof(attrs);
+        attrs.bInheritHandle = TRUE;
+        HANDLE h = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,&attrs, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (h == INVALID_HANDLE_VALUE) {
             throw std::system_error(GetLastError(), std::system_category(), "Failed to open NUL device");
         }
