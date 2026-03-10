@@ -84,7 +84,8 @@ const ActionName = [
 [39,"Play music",true,"Play specified music. When music is finished, continues by current playlist"],
 [40,"End game",true,"Display game over screen with the specified text message"],
 [41,"Finish game ext.",true,"Finish the game - show end credits - you can specify epilog file"],
-[43,"Swap sectors (advanced)",true,"Swap definition of two sectors - advanced options"]
+[43,"Swap sectors (advanced)",true,"Swap definition of two sectors - advanced options"],
+[44,"Autosave",true,"Trigger autosave"]
 ].sort((x,y)=>(x[1] as string).localeCompare(y[1] as string));
 
 const ActionNameMap = ActionName.reduce((a,b)=>{

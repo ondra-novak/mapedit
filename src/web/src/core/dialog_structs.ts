@@ -627,6 +627,7 @@ const functionList: FunctionList =
     "exit":[[],255],
     "has_spell_group":[['n'],55],
     "end_spell_group":[['n'],56],
+    "autosave":[[],58],
 };
 
 export class DialogCompileError extends Error {

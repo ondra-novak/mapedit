@@ -722,7 +722,7 @@ const action_to_schema = [
    TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_GEN,
    TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_CHANGELIGHT,
    TMA_TEXT, TMA_TEXT, TMA_LOADLEV, TMA_OVERLAY, 
-   TMA_SWAPS
+   TMA_SWAPS,TMA_GEN
 ]
 
 export const ActionType = {
@@ -770,6 +770,7 @@ export const ActionType = {
     ENDG2: 41,
     OVRLY: 42,
     SWPS2: 43,
+    AUTOS: 44
 }
 
 export function create_action_instance(type: typeof ActionType[keyof typeof ActionType], event: number) {
