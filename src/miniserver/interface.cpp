@@ -253,7 +253,12 @@ bool WebInterface::init_game_dir(std::filesystem::path game_dir, const Json &ske
                 txt << v.as<std::string>();
             }
             txt << "\n";            
-        }        
+        }      
+        
+        txt << "[paths]\n"
+               "root=" << game_dir.string() << "\n"
+               "\n";
+        
     }
     _game_folder = full_dir;
     _game = std::make_unique<DDLManager>(full_dir);

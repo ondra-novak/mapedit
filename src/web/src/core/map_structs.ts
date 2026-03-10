@@ -500,13 +500,29 @@ export class TMA_CANCELACTION extends TMA_GEN {
 
 export class TMA_SWAPS extends TMA_GEN {
 
-    pflags: number = 0;
+    pflags: {
+        north?: boolean,
+        west?: boolean,
+        south?: boolean,
+        east?: boolean
+        links?:boolean,
+        floor_ceil?: boolean
+        config?: boolean
+    } = {};
     sector1: number = 0;
     sector2: number = 0;
 
     getSchema() : Schema { 
         return Object.assign(super.getSchema(),{
-            pflags: "uint8",
+            pflags: ["bitmap","uint8",{
+                north: 0x1,
+                west: 0x2,
+                south: 0x4,
+                east: 0x8,
+                config: 0x20,
+                floor_ceil: 0x40,
+                links: 0x80
+            }],
             sector1: "int16",
             sector2: "int16"
         })
@@ -642,6 +658,35 @@ export class TMA_IFSEC extends TMA_GEN {
     };
 };
 
+export class TMA_OVERLAY extends TMA_GEN {
+    blocking: (0|1) = 0;
+    text_index: number = 0;
+    x: number = 0;
+    y: number = 0;
+    max_width: number = 0;
+    align_x: number = 0;
+    align_y: number = 0;
+    face: number = 0;
+    picture: (0|1) = 0;
+    display_time: number = 0;
+    color15: number = 0;
+    getSchema() : Schema {
+        return Object.assign(super.getSchema(),{
+            blocking: "uint8",
+            text_index: "int16",
+            x: "int16",
+            y: "int16",
+            max_width: "int16",
+            align_x: "int8",
+            align_y: "int8",
+            face: "int8",
+            picture: "int8",
+            display_time: "int16",
+            color15: "uint16"
+        });
+    }
+}
+
 type ConstructorWithSchema<T extends WithSchema> = { new(): T };
 
 function deserialize<T extends WithSchema>(cls: ConstructorWithSchema<T>, data: BinaryIterator): T {
@@ -676,7 +721,8 @@ const action_to_schema = [
    TMA_IFJMP,TMA_TWOP,TMA_UNIQUE,TMA_TWOP,TMA_UNIQUE,
    TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_GEN,
    TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_CHANGELIGHT,
-   TMA_TEXT, TMA_TEXT, TMA_LOADLEV
+   TMA_TEXT, TMA_TEXT, TMA_LOADLEV, TMA_OVERLAY, 
+   TMA_SWAPS
 ]
 
 export const ActionType = {
@@ -721,7 +767,9 @@ export const ActionType = {
     CHGLG: 38,
     PLMUS: 39,
     FAILG: 40,
-    ENDG2: 41
+    ENDG2: 41,
+    OVRLY: 42,
+    SWPS2: 43,
 }
 
 export function create_action_instance(type: typeof ActionType[keyof typeof ActionType], event: number) {

@@ -241,12 +241,14 @@ public:
         CloseHandle(pi.hThread);
         _handle = pi.hProcess;
 #else 
+        
         auto control = make_pipes();
         int fsta = fork();
         if (fsta < 0) {            
             throw std::system_error(errno, std::system_category(), "fork failed");        
         }
 
+        
         std::array<FileHandle,2> p_stdin, p_stdout, p_stderr;
         if (pipes.input) {
             p_stdin = make_pipes();
@@ -289,10 +291,12 @@ public:
             _exit(0);
         }
         int res;
+        control[1].close();
         int cnt = read(control[0],&res, sizeof(res));
         if (cnt == res) {
             throw std::system_error(res, std::system_category(), "exec failed");
         }
+        control[0].close();
         _handle = fsta;
 #endif
     }
@@ -335,7 +339,7 @@ public:
 
     }
 
-    Process(std::filesystem::path process_path, std::initializer_list<std::u8string_view> arguments, Pipes pipes = Pipes{nullptr,nullptr, nullptr})
+    Process(std::filesystem::path process_path, std::initializer_list<std::u8string_view> arguments, Pipes pipes = Pipes{nullptr,nullptr, nullptr, false,false,false})
         :Process(std::move(process_path), std::span<const std::u8string_view>(arguments.begin(), arguments.size()),pipes) {}
 
 protected:

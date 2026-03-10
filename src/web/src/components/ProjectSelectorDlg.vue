@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router';
 import { parse_stringtable } from '@/core/string_table.ts';
 import { ElementTypeName } from '@/core/common_defs.ts';
 import { keybcs2string } from '@/core/keybcs2.ts';
+import MaskedInput from './MaskedInput.vue';
 
 const dlg = ref<HTMLDialogElement>();
 const list_of_projects = ref<DDLEntry[]>();
@@ -110,6 +111,14 @@ async function delete_projects() {
     }
 }
 
+function on_key_down(ev: KeyboardEvent) {
+    if (ev.key == "Enter" && is_valid_name.value) {
+        project_selected(entered_name.value)
+        ev.preventDefault();
+        ev.stopPropagation();
+    }
+}
+
 onMounted(init);
 
 </script>
@@ -131,7 +140,7 @@ onMounted(init);
     </div>
     <hr />
     <x-form>
-        <label><span>Create new project</span><input type="text" v-model="entered_name" @keydown="ev=>is_valid_name && ev.key =='enter'?project_selected(entered_name):null"></input></label>
+        <label><span>Create new project</span><masked-input v-model="entered_name" type="text" @keydown="on_key_down":mask="/^[a-zA-Z0-9._\-]+$/" /></label>
     </x-form>
     <footer>
         <button :disabled="!is_valid_name" @click="project_selected(entered_name)">Create</button>

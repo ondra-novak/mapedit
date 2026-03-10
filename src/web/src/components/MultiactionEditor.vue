@@ -56,7 +56,7 @@ const ActionName = [
 [11,"Code lock",true,"Checks for code lock, cancels execution if code is not valid"],               //    CLOCK: 11,
 [12,"Cancel message",true,"Cancels currently delayed message. This is good way to break any loop"],              //    CACTN: 12,
 [13,"Lock",true,"Checks for key held in mouse cursor"],                //    LOCK:  13,
-[14,"Swap sectors",true,"Swap definition of two sectors"],                //    SWAPS: 14,
+[14,"Swap sectors (legacy)",true,"Swap definition of two sectors"],                //    SWAPS: 14,
 [15,"Cause injury",true,"Cause injury to all charactes on current sector"],                //    WOUND: 15,
 [16,"If cond",true,"Test some condition and jump when it is met"],             //    IFJMP: 16,
 [17,"Call specproc",false,""],               //    CALLS: 17,
@@ -83,7 +83,8 @@ const ActionName = [
 [38,"Change fog color",true,"Temporarily changes the color of the fog. The choice is not saved in the saved game, you must invoke the action again after reloading the saved game"],
 [39,"Play music",true,"Play specified music. When music is finished, continues by current playlist"],
 [40,"End game",true,"Display game over screen with the specified text message"],
-[41,"Finish game ext.",true,"Finish the game - show end credits - you can specify epilog file"]
+[41,"Finish game ext.",true,"Finish the game - show end credits - you can specify epilog file"],
+[43,"Swap sectors (advanced)",true,"Swap definition of two sectors - advanced options"]
 ].sort((x,y)=>(x[1] as string).localeCompare(y[1] as string));
 
 const ActionNameMap = ActionName.reduce((a,b)=>{
@@ -841,6 +842,15 @@ const suitable_texts = computed(()=>{
             <label><input type="checkbox" v-model="focused_item.change_bits.block_sound"><span>Toggle sound barrier</span></label>
         </template>
         <template v-else-if="(focused_item instanceof TMA_SWAPS)">       
+            <template v-if="focused_item.header.action == ActionType.SWPS2">
+                <label><input type="checkbox" v-model="focused_item.pflags.north"><span>Swap north side</span></label>
+                <label><input type="checkbox" v-model="focused_item.pflags.west"><span>Swap west side</span></label>
+                <label><input type="checkbox" v-model="focused_item.pflags.south"><span>Swap south side</span></label>
+                <label><input type="checkbox" v-model="focused_item.pflags.east"><span>Swap east side</span></label>
+                <label><input type="checkbox" v-model="focused_item.pflags.floor_ceil"><span>Floor and ceil</span></label>
+                <label><input type="checkbox" v-model="focused_item.pflags.config"><span>Sectory type and action</span></label>
+                <label><input type="checkbox" v-model="focused_item.pflags.links"><span>Exit to neighbor sectors</span></label>
+            </template>
             <label><span>Sector1</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector1"></input></label>
             <label><span>Sector2</span><input type="number" v-watch-range min="0" max="65535" v-model="focused_item.sector2"></input></label>
         </template>
