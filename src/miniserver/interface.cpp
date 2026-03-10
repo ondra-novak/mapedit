@@ -39,7 +39,9 @@ WebInterface::WebInterface(Config cfg, std::stop_source stp)
     ,_addrport(cfg.addr_port)
     ,_stop(std::move(stp))
     ,_check_active(cfg.check_active)    
+    ,_overlay_mode(cfg.overlay_mode)
     ,_basic_timer([this](std::stop_token tkn){basic_timer_worker(std::move(tkn));})
+    
     
 //    ,_game_control(cfg.game_folder, cfg.game_ini, cfg.addr_port,[this](std::string_view cmd){this->control(cmd);})
 {
@@ -47,6 +49,12 @@ WebInterface::WebInterface(Config cfg, std::stop_source stp)
     load_config();
 }
 
+
+WebInterface::~WebInterface() {
+    if (_publish_process) {
+        _publish_process->join(std::chrono::seconds(2));
+    }
+}
 
 std::function<bool( BasicRequest &)> WebInterface::get_handler() {
 
@@ -179,7 +187,8 @@ Json WebInterface::create_state() {
     return Json({
         {"game_instances",stream_count},
         {"current_ddl", _current_ddl},
-        {"need_configure", !_game}
+        {"need_configure", !_game},
+        {"overlay_mode", _overlay_mode}
     });
 }
 void WebInterface::send_state_update(WsRpc &rpc) {
@@ -325,8 +334,7 @@ void WebInterface::on_timer_tick()
 {
     broadcast(":ping");
     broadcast("\r\n\r\n");   
-    zombie_reaper();
- 
+    
 }   
 
 
@@ -852,11 +860,38 @@ void WebInterface::ws_publish_prepare(const WsRpc::Request &req) {
     req.send_response(true);    
 }
 
+
+static void listen_stdin(const WsRpc::Request &req) {
+    req.send_notify("publish", Json{{"running",true},{"message","Connecting..."}});
+    std::string line;
+    bool running;
+    do {
+        std::getline(std::cin, line);
+        Json msg = Json::from_string(line);
+        running = msg["running"].as_bool();
+        req.send_notify("publish", msg);
+    } while (running);    
+    
+}
+
 void WebInterface::ws_publish_prepared(const WsRpc::Request &req) {
     auto path = getUserDDL().get_path();
     path.replace_extension(".pak");
-    std::array<std::string,2> args = {"-P",path.string()};
-    steam_applaunch(app_id, args);
+    if (_overlay_mode) {
+        std::cout << "PUB:" << path.string() << "\n";
+        listen_stdin(req);
+        req.send_response(true);        
+    } else {
+        if (_publish_process) {
+            if (_publish_process->join(std::chrono::seconds(0))) {
+                req.send_error(409,"Still in progress");
+                return;
+            }
+        }
+        auto strpath = path.u8string();
+        std::array<std::u8string_view,2> args = {u8"-P",strpath};
+        _publish_process = std::make_unique<Process>(steam_applaunch(app_id, args));
+    }
     req.send_response(true);    
 }
 
@@ -1021,8 +1056,10 @@ void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
 
 }
 
-
-
+void WebInterface::ws_is_overlay_mode(const WsRpc::Request &req)
+{
+    req.send_response(_overlay_mode);
+}
 }
 
 

@@ -53,11 +53,14 @@ void open_url(std::string url) {
 }
 
 void show_help() {
-    std::puts("mapedit_server [-p port][-b][-x][-w path][-u path][-h]\n\n"
+    std::puts("mapedit_server [-p port][-b|-o][-x][-w path][-u path][-h]\n\n"
     "-p port     specify port (default: random port)\n"
     "-b          do not open browser\n"
     "-x          do not exit if no browser ping\n"
     "-u path     specify user profile path (default: platform user profile)\n"
+    "-o          overlay mode  - editor running in game steam overlay\n"
+    "               - doesn't run game for publish - sends command to stdout\n"
+    "               - includes -b\n"
     );    
 }
 
@@ -67,8 +70,9 @@ int main(int argc, char ** argv) {
     unsigned int port = 0;    
     bool no_browser = false;
     bool no_exit = false;
+    bool overlay_mode = false;
     std::filesystem::path user_dir = getUserDocumentsPath()/"Skeldal_Mapedit";
-    while ((c = opts(argc, argv, "p:w:u:bxh")) != -1) {
+    while ((c = opts(argc, argv, "p:w:u:obxh")) != -1) {
         switch (c) {
             case 'p': port = static_cast<unsigned int>(std::strtoul(opts.optarg,nullptr,10));
                       break;
@@ -79,7 +83,10 @@ int main(int argc, char ** argv) {
             case 'u': user_dir = std::filesystem::current_path() / opts.optarg;
                       break;
             case 'h': show_help(); return 0;
-            default: std::fprintf(stderr, "Unknown switch -%c", c);return -1;
+            case 'o': no_browser = true;
+                      overlay_mode = true;
+                      break;
+            default: std::fprintf(stderr, "Unknown switch -%c", opts.optopt);return -1;
         }
     }   
 
@@ -99,6 +106,7 @@ int main(int argc, char ** argv) {
     cfg.addr_port = srv.get_listen_addr();
     cfg.check_active = !no_exit;
     cfg.user_folder = user_dir;
+    cfg.overlay_mode = overlay_mode;
 
     std::stop_source stp;
     std::stop_token tkn = stp.get_token();

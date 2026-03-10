@@ -30,6 +30,9 @@ public:
         void send_error(int code, std::string_view message ) const {
             owner.send_error(id, code, message);
         }
+        void send_notify(std::string_view channel, const Json &data,const std::span<const Attachment> &attach = {}) const {
+            owner.send_response(true, channel, true, data, attach);
+        }
     };
 
 

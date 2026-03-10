@@ -13,8 +13,8 @@ import { create_datalist } from '@/utils/datalist';
 import { publish_tags } from '@/core/publis_tags';
 import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
 import { readFileToArrayBuffer } from '@/core/read_file';
-import type { WsRpcResult } from '@/core/wsrpc';
 import HIFormat from '@/core/hiformat';
+import type { WsRpcResult } from '@/core/wsrpc';
 
 
 class BasicInfoData {
@@ -34,6 +34,7 @@ const basic_info = ref<BasicInfoData>(new BasicInfoData);
 const publish_state = ref<PublishState>();
 const publish_steam_data = ref<PublishSteamData>();
 
+const overlay_mode =ref(false);
 
 const postavy_dat = ref<THumanData>()
 const runes = ref<Runes>(new Runes());
@@ -105,6 +106,7 @@ async function init() {
     publish_state_checker = setInterval(async ()=>{
         publish_state.value =  await server.get_publish_status();
     },5000);
+    server.on("publish",update_publish_state)
 }
 
 
@@ -114,6 +116,7 @@ onUnmounted(()=>{
     if (image_url.value) URL.revokeObjectURL(image_url.value);
     save_state.unmount()
     clearInterval(publish_state_checker);
+    server.off("publish",update_publish_state)
 });
 
 watch([basic_info, runes, publish_steam_data], ()=>save_state.set_changed(true),{deep:true});
@@ -227,6 +230,7 @@ const dlc = computed({
 })
 
 async function publish_publish() {
+    overlay_mode.value = await server.is_overlay_mode();
     publish_dialog.value?.showModal();
     StatusBar.stop_game();
 }
@@ -245,6 +249,23 @@ function open_link_new_window(ev: Event) {
 }
 
 const publish_dialog = ref<HTMLDialogElement>();
+const publish_progress = ref<HTMLDialogElement>();
+
+interface PublishProgressStatus {
+    running: boolean;
+    sent: number;
+    total: number;
+    message: string;
+    error?: boolean;
+}
+
+const publish_progress_status = ref<PublishProgressStatus>();
+
+function update_publish_state(req: WsRpcResult) {
+    publish_progress.value?.showModal();
+    publish_progress_status.value = req.data;
+    publish_progress.value?.classList.toggle("error", publish_progress_status.value?.error ?? false);
+}
 
 
 </script>
@@ -315,12 +336,25 @@ const publish_dialog = ref<HTMLDialogElement>();
 </div>
 <dialog ref="publish_dialog" class="pubdlg">
     <header>Publish on Steam<button class="close" @click="publish_dialog?.close()"></button></header>
+    <template v-if="overlay_mode">
+    <p>You going to publish the content to the Steam Workshop.</p>
+    </template>
+    <template v-else>
     <p>To publish this content, the editor will start the game via <strong>Steam</strong> and use it to upload the prepared package. If nothing happens, check the Steam client for any error messages</p>
     <p><strong>The game must not be running before publishing.</strong></p>
+    </template>
     <p>By submitting this item, you agree to the <a href="http://steamcommunity.com/sharedfiles/workshoplegalagreement" @click="ev=>open_link_new_window(ev)">workshop terms of service</a>⧉</p>
     <p>Do you want to continue?</p>
     <footer>
         <button @click="publish_publish_2">Publish</button><button @click="publish_dialog?.close()">Cancel</button>
+    </footer>
+</dialog>
+<dialog ref="publish_progress" class="pubdlg progress">
+    <header> {{ publish_progress_status?.error?"Publish failed":publish_progress_status?.running?"Publish in progress":"Publish complete" }} </header>
+    <div class="temp"><div :style="{width: `${100*(publish_progress_status?.sent ?? 0)/Math.max(1,publish_progress_status?.total ?? 1)}%`}"></div></div>
+    <div> {{ publish_progress_status?.message }}</div>        
+    <footer>
+        <button :disabled="publish_progress_status?.running" @click="publish_progress?.close()">Close</button>
     </footer>
 </dialog>
 </x-workspace>
@@ -425,9 +459,6 @@ p.note  {
     font-size: 1.2rem;
 }
 
-.progress-dlg {
-    width: 50%;
-}
 .temp {
     border: 1px solid;
     margin: 0.5rem 0;
@@ -441,6 +472,13 @@ p.note  {
 }
 .pubdlg {
     max-width: 35rem;
+}
+.pubdlg.progress {
+    width: 35rem;
+}
+
+.pubdlg.progress.error {
+    color: red;
 }
 
 </style>
