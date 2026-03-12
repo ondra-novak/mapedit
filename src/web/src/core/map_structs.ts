@@ -1009,6 +1009,7 @@ export class WallConfiguration extends AssetConfiguration{
     offset_x:number = 250;
     offset_y:number = 160;
     lclip: number = 0;    
+    was_hidden: boolean = false;
     
 
 
@@ -1024,6 +1025,7 @@ export class WallConfiguration extends AssetConfiguration{
         r.ping_pong = sec?((side.flags & SideFlag.SEC_GAB) != 0):((side.flags & SideFlag.PRIM_GAB) != 0);
         r.repeat_anim = sec?((side.flags & SideFlag.SEC_ANIM) != 0):((side.flags & SideFlag.PRIM_ANIM) != 0);
         r.position = sec?0:((side.oblouk & 0x60)>>5);
+        r.was_hidden = sec?((side.flags & SideFlag.SEC_VIS) == 0):((side.flags & SideFlag.PRIM_VIS) == 0);
         const count_graphics = r.anim_frames*(r.alternate?2:1);
         r.graphics = [];
         for (let l = 0; l < count_graphics; ++l) {
@@ -1384,7 +1386,39 @@ export class MapFile {
         p.ceil_palette = c;
         q.sectors = r;        
         q.info = m.info;
+
+        MapFile.remove_transparent_walls(p.wall_palette,r)
+
         return {map:q,palette:p};
+    }
+
+    //some non-transparent walls are market as transpared because they are hidden between sectors
+    //find these walls and remove them from pallete, if non-transparent version exists
+    static remove_transparent_walls(p: ConfigurationPalette<WallConfiguration>, sect: MapSector[]) {
+        const replacement = new Map<WallConfiguration, WallConfiguration>();
+        for (const id in p.map) {
+            const w = p.map[id];
+            if (w.was_hidden && w.transparent) {
+                const altw = new WallConfiguration;
+                Object.assign(altw, w);
+                w.transparent = false;
+                const new_id = altw.get_key();
+                if (p.map[new_id]) {
+                    replacement.set(w, p.map[new_id]);
+                    delete p.map[id];
+                }
+            }
+        }
+        if (replacement.size) {
+            sect.forEach(sec=>sec.side.forEach(sid=>{
+                const p = sid.primary;
+                const s = sid.secondary;
+                const rp = p?replacement.get(p):null;
+                const rs = s?replacement.get(s):null;
+                if (rp) sid.primary = rp;
+                if (rs) sid.secondary = rs;
+            }))
+        }
     }
 
     saveToArrayBuffer() : ArrayBuffer {
