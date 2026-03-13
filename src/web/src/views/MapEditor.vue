@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from '@/components/statusBar'
 import { server } from '@/core/api';
-import { ArcConfiguration, EnemyOnSector, FloorCeilConfiguration, GlobalMapPalettes, MapFile, MAPGLOBAL, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, EnemyOnSector, FloorCeilConfiguration, GlobalMapPalettes, GlobalPaletteConfiguration, MapFile, MAPGLOBAL, MapPalettes, MapSector, MapSide, SectorFlags2, SectorType, SectorTypeName, SideFlag, SimpleActionType, SimpleActionTypeName, TMA_GEN, WallConfiguration, type NicheDef } from '@/core/map_structs';
 import { AssetGroup } from '@/core/asset_groups';
 import {findSectorAtPos, makeSectorSelection, MapContainer, MapDraw } from '@/core/map_draw';
 import { shallowClone, Document } from '@/utils/document';
@@ -11,7 +11,6 @@ import svg_pointer from '@/assets/toolbar/pointer.svg'
 import svg_pencil from '@/assets/toolbar/pencil.svg'
 import svg_eraser from '@/assets/toolbar/eraser.svg'
 import svg_chest_enemy from '@/assets/toolbar/chest_enemy.svg'
-import PalleteEditor from '@/components/PalleteEditor.vue';
 import { messageBox } from '@/utils/messageBox';
 import { create_datalist } from '@/utils/datalist';
 import NicheEditor from './NicheEditor.vue';
@@ -26,9 +25,13 @@ import { getDDLFileWithImport } from '@/components/tools/missingFiles';
 import { enemyFromArrayBuffer, type EnemyDef, Enemies } from '@/core/enemy_struct';
 import ItemList from '@/components/ItemList.vue';
 import { mapEditorControl } from '@/core/services';
+import PaletteItemList from '@/components/PaletteItemList.vue';
+import PaletteEditDlg from '@/components/PaletteEditDlg.vue';
 const list_assets = ref<string[]>([]);
 const item_list = ref(new ItemHive);
 const enemy_list = ref(new Enemies);
+const palette_edit_dlg = ref<InstanceType<typeof PaletteEditDlg> >();
+const map_select_dlg = ref<InstanceType<typeof MapSelectDlg> >();
 
 const EditMode = {
     Edit:0,
@@ -646,7 +649,7 @@ async function loadMap(mapname: string)   {
 async function reloadMap()  {
     const name = map_filename.value;
     if (name) {
-        return await loadMap(name);
+        return await loadMapUI(name);
     }
 }
 
@@ -690,17 +693,27 @@ function reload_all_lists() {
     updateControls();
 }
 
+async function loadMapStatusBarClick() {    
+    const m = await map_select_dlg.value?.doModal();
+    if (m) {
+        loadMapUI(m);
+    }        
+}
+
+async function loadMapUI(s:string) {
+    StatusBar.set_map_switch(s,loadMapStatusBarClick);
+    return await loadMap(s);
+}
+
 function open_map_prompt() {
-        if (!map_filename.value) {
-        StatusBar.set_map_switch("<click here>",()=>{
-            open_map_dlg.value = true;
-        });        
+    if (!map_filename.value) {
+        StatusBar.set_map_switch("<click here>",loadMapStatusBarClick);        
     }
 }
 
 async function init() {        
     open_map_prompt();
-    mapEditorControl.set_instance({open_map:(s:string)=>loadMap(s)})
+    mapEditorControl.set_instance({open_map:(s:string)=>loadMapUI(s)})
 }
 
 function resetFloor() {
@@ -871,7 +884,7 @@ function applyChanges() {
             if (any_change) {
                 end_edit(m);
                 updateFocusData(focus.value.sector, focus.value.side);
-                StatusBar.invoke_teleport();
+                StatusBar.invoke_reload();
                 last_apply_mode[getSelectionShape()] = applyMode.value;
             }
         }
@@ -979,14 +992,6 @@ watch(goto_sector_input,()=>{
 
 const ds_wallassets = create_datalist();
 watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
-watch(map_filename, (nw)=>{
-    if (nw) {
-        StatusBar.set_map_switch(nw,()=>{
-            open_map_dlg.value = true;
-        });
-        loadMap(nw)        
-    }
-});
 watch(()=>props.active, ()=>{
     const a = props.active;
     if (a) {
@@ -1095,6 +1100,213 @@ watch(selection,()=>{
     }    
 },{deep:true})
 
+function add_replace_in_palette(pal :GlobalPaletteConfiguration<AssetConfiguration>, old_item: AssetConfiguration|null, new_item:AssetConfiguration) {    
+    if (old_item) {
+        let idx = pal.list.indexOf(old_item);
+        if (idx != -1) {
+            pal.list[idx] = new_item;
+            return idx;
+        }
+    }
+    pal.list.unshift(new_item);
+    return pal.list.length-1;
+}
+
+function replace_wall_in_map(old_item: AssetConfiguration, new_item:AssetConfiguration) {
+    const map = begin_edit();
+    const nwsc = (()=>{
+        let retval :MapSector[]|null = null;
+        map.sectors.forEach((x,idx)=>{
+            let nwsc  = (()=>{
+                let retval : MapSector|null =null;
+                x.side.forEach((y,idx)=>{
+                    let nwsd = (() => {
+                            let retval : MapSide|null = null;
+                            
+                            if (y.primary && y.primary.get_key() == old_item.get_key()) {
+                                retval = shallowClone(y);;
+                                retval.primary = new_item as WallConfiguration;
+                            } 
+
+                            if  (y.secondary && y.secondary.get_key() == old_item.get_key()) {
+                                if (!retval) retval = shallowClone(y);
+                                retval.secondary = new_item as WallConfiguration;
+                            }
+                            return retval;
+                        })();
+                    if (nwsd) {
+                        if (!retval) {
+                            retval = shallowClone(x);
+                            retval.side  = shallowClone(retval.side);
+                        }
+                        retval.side[idx] = nwsd;
+                    }
+                });
+                return retval;
+            })();
+            if (nwsc) {
+                if (!retval) retval = shallowClone(map.sectors);
+                retval[idx] = nwsc;
+            }   
+        });
+        return retval;
+    })();
+    if (nwsc) {
+        const nwmap = shallowClone(map);
+        nwmap.sectors = nwsc;
+        end_edit(nwmap);
+    }
+}
+
+function replace_arc_in_map(old_item: AssetConfiguration, new_item:AssetConfiguration) {
+    const map = begin_edit();
+    const nwsc = (()=>{
+        let retval :MapSector[]|null = null;
+        map.sectors.forEach((x,idx)=>{
+            let nwsc  = (()=>{
+                let retval : MapSector|null =null;
+                x.side.forEach((y,idx)=>{
+                    let nwsd = (() => {
+                            let retval : MapSide|null = null;                            
+                            if (y.arc && y.arc.get_key() == old_item.get_key()) {
+                                retval = shallowClone(y);;
+                                retval.arc = new_item as ArcConfiguration;
+                            } 
+                            return retval;
+                        })();
+                    if (nwsd) {
+                        if (!retval) {
+                            retval = shallowClone(x);
+                            retval.side  = shallowClone(retval.side);
+                        }
+                        retval.side[idx] = nwsd;
+                    }
+                });
+                return retval;
+            })();
+            if (nwsc) {
+                if (!retval) retval = shallowClone(map.sectors);
+                retval[idx] = nwsc;
+            }   
+        });
+        return retval;
+    })();
+    if (nwsc) {
+        const nwmap = shallowClone(map);
+        nwmap.sectors = nwsc;
+        end_edit(nwmap);
+    }
+    
+}
+function replace_floor_in_map(old_item: AssetConfiguration, new_item:AssetConfiguration) {
+    const map = begin_edit();
+    const nwsc = (()=>{
+        let retval :MapSector[]|null = null;
+        map.sectors.forEach((x,idx)=>{
+            if (x.floor && x.floor.get_key() == old_item.get_key()) {
+                if (!retval) {
+                    retval = shallowClone(map.sectors);
+                }                    
+                retval[idx] = shallowClone(x);
+                retval[idx].floor = new_item as FloorCeilConfiguration;
+            }
+        });
+        return retval;
+    })();
+    if (nwsc) {
+        const nwmap = shallowClone(map);
+        nwmap.sectors = nwsc;
+        end_edit(nwmap);
+    }
+    
+}
+function replace_ceil_in_map(old_item: AssetConfiguration, new_item:AssetConfiguration) {
+    const map = begin_edit();
+    const nwsc = (()=>{
+        let retval :MapSector[]|null = null;
+        map.sectors.forEach((x,idx)=>{
+            if (x.ceil && x.ceil.get_key() == old_item.get_key()) {
+                if (!retval) {
+                    retval = shallowClone(map.sectors);
+                }                    
+                retval[idx] = shallowClone(x);
+                retval[idx].ceil = new_item as FloorCeilConfiguration;
+            }
+        });
+        return retval;
+    })();
+    if (nwsc) {
+        const nwmap = shallowClone(map);
+        nwmap.sectors = nwsc;
+        end_edit(nwmap);
+    }
+    
+    
+}
+
+
+async function on_modify_wall(item: AssetConfiguration|null, index: number) {
+    if (palette_edit_dlg.value) {
+        const new_item = await palette_edit_dlg.value.doModal(item, 'wall');
+        if (new_item) {
+            add_replace_in_palette(mapLoadedPalettes.value.wall_palette, item, new_item);
+            settings.wall = new_item as WallConfiguration;
+            if (item) replace_wall_in_map(item, new_item);            
+
+            if (focus.value && focus.value.side_def.secondary?.get_key() === item?.get_key()) {
+                focus.value.side_def.secondary = settings.wall
+            }
+            if (focus.value && focus.value.side_def.primary?.get_key() === item?.get_key()) {
+                focus.value.side_def.primary = settings.wall
+            }
+        }
+    }
+    return null
+}
+async function on_modify_arc(item: AssetConfiguration|null, index: number) {
+    if (palette_edit_dlg.value) {
+        const new_item = await palette_edit_dlg.value.doModal(item, 'arc');
+        if (new_item) {
+            add_replace_in_palette(mapLoadedPalettes.value.arc_palette, item, new_item);
+            settings.arc = new_item as ArcConfiguration;
+            if (item) replace_arc_in_map(item, new_item);            
+            if (focus.value && focus.value.side_def.arc?.get_key() === item?.get_key()) {
+                focus.value.side_def.arc = settings.arc
+            }
+        }
+    }
+}
+
+async function on_modify_floor(item: AssetConfiguration|null, index: number) {
+    if (palette_edit_dlg.value) {
+        const new_item = await palette_edit_dlg.value.doModal(item, 'floor');
+        if (new_item) {
+            add_replace_in_palette(mapLoadedPalettes.value.floor_pallete, item, new_item);
+            settings.floor = new_item as FloorCeilConfiguration;
+            if (item) replace_floor_in_map(item, new_item);            
+            if (focus.value && focus.value.sector_def.floor?.get_key() === item?.get_key()) {
+                focus.value.sector_def.floor = settings.floor
+            }
+        }
+    }
+
+}
+async function on_modify_ceil(item: AssetConfiguration|null, index: number) {
+    if (palette_edit_dlg.value) {
+        const new_item = await palette_edit_dlg.value.doModal(item, 'ceil');
+        if (new_item) {
+            add_replace_in_palette(mapLoadedPalettes.value.ceil_palette, item, new_item);
+            settings.ceil = new_item as FloorCeilConfiguration;
+            if (item) replace_ceil_in_map(item, new_item);            
+            if (focus.value && focus.value.sector_def.ceil?.get_key() === item?.get_key()) {
+                focus.value.sector_def.ceil = settings.floor
+            }
+        }
+    }
+
+}
+
+
 </script>
 
 <template>
@@ -1155,10 +1367,10 @@ watch(selection,()=>{
                 <option :value="SideFlag.LEFT_ARC|SideFlag.RIGHT_ARC">Set arcs</option>                
             </select></label>
         </x-form></div>
-        <div class="h"><span class="title">Wall</span><PalleteEditor v-model:palette="mapLoadedPalettes.wall_palette" :listview="true" v-model:selection="settings.wall" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></div>
-        <div class="h"><span class="title">Arc</span><PalleteEditor v-model:palette="mapLoadedPalettes.arc_palette" :listview="true" v-model:selection="settings.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></div>
-        <div class="h"><span class="title">Floor</span><PalleteEditor v-model:palette="mapLoadedPalettes.floor_pallete" :listview="true" v-model:selection="settings.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></div>
-        <div class="h"><span class="title">Ceil</span><PalleteEditor v-model:palette="mapLoadedPalettes.ceil_palette" :listview="true" v-model:selection="settings.ceil"  type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></div>
+        <div class="h"><span class="title">Wall</span><PaletteItemList class="pal-expanded" :palette="mapLoadedPalettes.wall_palette" size="2" v-model="settings.wall" @addmodify="on_modify_wall"></PaletteItemList></div>
+        <div class="h"><span class="title">Arc</span><PaletteItemList class="pal-expanded" :palette="mapLoadedPalettes.arc_palette" size="2" v-model="settings.arc"  @addmodify="on_modify_arc"></PaletteItemList></div>
+        <div class="h"><span class="title">Floor</span><PaletteItemList class="pal-expanded" :palette="mapLoadedPalettes.floor_pallete" size="2" v-model="settings.floor" @addmodify="on_modify_floor"></PaletteItemList></div>
+        <div class="h"><span class="title">Ceil</span><PaletteItemList class="pal-expanded" :palette="mapLoadedPalettes.ceil_palette" size="2" v-model="settings.ceil" @addmodify="on_modify_ceil"></PaletteItemList></div>
     </div>
 </div>
 <div class="right side" v-if="settings.edit_mode == EditMode.Edit && focus && focus.sector > 0 && wall_props">
@@ -1207,8 +1419,8 @@ watch(selection,()=>{
             <label><span>Type</span><select v-model="focus.sector_def.type" size="1">
             <option v-for="v of SectorTypeName.map((x,idx)=>[x,idx]).filter(x=>x[1])" :key="v[1]" :value="v[1]">{{ v[0] }}</option>
             </select></label>
-            <label><span>Ceil</span><PalleteEditor v-model:palette="mapLoadedPalettes.ceil_palette" :listview="false" v-model:selection="focus.sector_def.ceil" type="ceil" :wall_assets="ds_wallassets"></PalleteEditor></label>
-            <label><span>Floor</span><PalleteEditor v-model:palette="mapLoadedPalettes.floor_pallete" :listview="false" v-model:selection="focus.sector_def.floor" type="floor" :wall_assets="ds_wallassets"></PalleteEditor></label>
+            <label><span>Ceil</span><PaletteItemList :palette="mapLoadedPalettes.ceil_palette" size="1" v-model="focus.sector_def.ceil"  @addmodify="on_modify_ceil"></PaletteItemList></label>
+            <label><span>Floor</span><PaletteItemList :palette="mapLoadedPalettes.floor_pallete" size="1" v-model="focus.sector_def.floor"  @addmodify="on_modify_floor"></PaletteItemList></label>
             <label v-for="(v,k) of SectorFlagsNames" :key="k">
                 <input type="checkbox" @change="focus.sector_def.flags^=SectorFlags2[k]" :checked="(focus.sector_def.flags & SectorFlags2[k])!=0">
                 <span> {{ v }}</span>
@@ -1224,9 +1436,9 @@ watch(selection,()=>{
         </div>
         <div><span class="title"><button class="link" @click="link = {sector: focus.sector, side: focus.side}"></button> Side {{ focus.sector }}:{{ focus.side }} [{{ focus.sector * 4 + focus.side }}]</span>
         <x-form>
-        <label><span>Primary</span><PalleteEditor v-model:palette="mapLoadedPalettes.wall_palette" :listview="false" v-model:selection="focus.side_def.primary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
-        <label><span>Secondary</span><PalleteEditor v-model:palette="mapLoadedPalettes.wall_palette" :listview="false" v-model:selection="focus.side_def.secondary" type="wall" :wall_assets="ds_wallassets"></PalleteEditor></label>
-        <label><span>Arc</span><PalleteEditor v-model:palette="mapLoadedPalettes.arc_palette" :listview="false" v-model:selection="focus.side_def.arc" type="arc" :wall_assets="ds_wallassets"></PalleteEditor></label>
+        <label><span>Primary</span><PaletteItemList v-model:palette="mapLoadedPalettes.wall_palette" size="1" v-model="focus.side_def.primary"  @addmodify="on_modify_wall"></PaletteItemList></label>
+        <label><span>Secondary</span><PaletteItemList v-model:palette="mapLoadedPalettes.wall_palette" size="1" v-model="focus.side_def.secondary" @addmodify="on_modify_wall"></PaletteItemList></label>
+        <label><span>Arc</span><PaletteItemList v-model:palette="mapLoadedPalettes.arc_palette" size="1" v-model="focus.side_def.arc" @addmodify="on_modify_arc"></PaletteItemList></label>
         <div class="label"><span>Exit</span><div>
             <button :disabled="!link" @click="focus.sector_def.exit[focus.side] = link?.sector || 0">Sector {{ focus.sector_def.exit[focus.side] }}</button>
             <button :disabled="focus.sector_def.exit[focus.side] == 0" @click="focus.sector_def.exit[focus.side] = 0">X</button>
@@ -1313,9 +1525,10 @@ watch(selection,()=>{
 <div class="open-map-hlp"><div></div></div>
 </template>
 </x-workspace>
-<MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
+<MapSelectDlg ref="map_select_dlg"></MapSelectDlg>
 <MapSettingsDlg v-model="map_settings" @ok="map_settings_ok" @cancel="map_settings = undefined"></MapSettingsDlg>
 <NicheEditor v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus?.side_def || null"></NicheEditor>
+<PaletteEditDlg ref="palette_edit_dlg"></PaletteEditDlg>
 </template>
 
 <style lang="css" scoped>
@@ -1660,6 +1873,9 @@ div > span.title {
     position: absolute;
     top: 0.2rem;
     right: 0.5rem;
+}
+.pal-expanded {
+    height: 100%;
 }
 
 </style>

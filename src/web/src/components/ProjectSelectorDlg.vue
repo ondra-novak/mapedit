@@ -7,11 +7,14 @@ import { useRouter } from 'vue-router';
 import { parse_stringtable } from '@/core/string_table.ts';
 import { ElementTypeName } from '@/core/common_defs.ts';
 import { keybcs2string } from '@/core/keybcs2.ts';
+import MaskedInput from './MaskedInput.vue';
+import { messageBoxAlert } from '@/utils/messageBox.ts';
 
 const dlg = ref<HTMLDialogElement>();
 const list_of_projects = ref<DDLEntry[]>();
 const force_switch = ref(false);
 const marked_projects = ref<Record<string, boolean> >({});
+const can_import = ref<boolean>(false);
 let cur_project = "";
 
 
@@ -25,6 +28,7 @@ function switch_project() {
             return a;
         }, {} as Record<string, boolean>);
     });
+    server.can_import_adventure().then(x=>can_import.value=x);
     dlg.value?.showModal();    
 }
 
@@ -67,9 +71,14 @@ async function init() {
     })
 }
 
-async function project_selected(name: string) {
+function adjust_name(name:string) {
     name = name.trim();
-    if (!name.endsWith(".ddl")) name = name+".ddl";
+    if (!name.toLowerCase().endsWith(".ddl"))  name = name + ".ddl";
+    return name;
+}
+
+async function project_selected(name: string) {
+    name = adjust_name(name);
     if (name == cur_project) {
         dlg.value?.close();
         return;
@@ -110,6 +119,24 @@ async function delete_projects() {
     }
 }
 
+function on_key_down(ev: KeyboardEvent) {
+    if (ev.key == "Enter" && is_valid_name.value) {
+        project_selected(entered_name.value)
+        ev.preventDefault();
+        ev.stopPropagation();
+    }
+}
+
+
+async function import_adventure(s:string) {
+    const name = adjust_name(s);
+    const r = await server.import_adventure_as(name);
+    if (r == false) {
+        messageBoxAlert("Failed to import adventure");
+        return;
+    }
+    project_selected(name);
+}
 onMounted(init);
 
 </script>
@@ -131,10 +158,12 @@ onMounted(init);
     </div>
     <hr />
     <x-form>
-        <label><span>Create new project</span><input type="text" v-model="entered_name" @keydown="ev=>is_valid_name && ev.key =='enter'?project_selected(entered_name):null"></input></label>
+        <label><span>Create new project</span><masked-input v-model="entered_name" type="text" @keydown="on_key_down":mask="/^[a-zA-Z0-9._\-]+$/" /></label>
     </x-form>
     <footer>
+        <button v-if="can_import" :disabled="!is_valid_name" @click="import_adventure(entered_name)">Import last played adventure</button>
         <button :disabled="!is_valid_name" @click="project_selected(entered_name)">Create</button>
+        
         <button class="left" :disabled="!any_marked" @click="delete_projects">Delete</button>
 
     </footer>

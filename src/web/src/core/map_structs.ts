@@ -1,6 +1,7 @@
+import { toRaw } from "vue";
 import { BinaryIterator, BinaryWriter, joinUint8Arrays, loadBinaryContent, parseSection, splitArrayBuffer, writeSection, type Schema } from "./binary"
 import { ItemDef, ItemSchema } from "./items_struct";
-
+import md5 from "blueimp-md5";
 
 const MapSections = {
     SIDEMAP: 0x8001,
@@ -380,7 +381,7 @@ export class TMA_SOUND extends TMA_GEN {
 export class TMA_TEXT extends TMA_GEN{
 
     pflags:number = 0;
-    textindex:number = 0;
+    textindex:number = 1;
 
     getSchema() : Schema {
         return Object.assign(super.getSchema(),{
@@ -500,13 +501,29 @@ export class TMA_CANCELACTION extends TMA_GEN {
 
 export class TMA_SWAPS extends TMA_GEN {
 
-    pflags: number = 0;
+    pflags: {
+        north?: boolean,
+        west?: boolean,
+        south?: boolean,
+        east?: boolean
+        links?:boolean,
+        floor_ceil?: boolean
+        config?: boolean
+    } = {};
     sector1: number = 0;
     sector2: number = 0;
 
     getSchema() : Schema { 
         return Object.assign(super.getSchema(),{
-            pflags: "uint8",
+            pflags: ["bitmap","uint8",{
+                north: 0x1,
+                west: 0x2,
+                south: 0x4,
+                east: 0x8,
+                config: 0x20,
+                floor_ceil: 0x40,
+                links: 0x80
+            }],
             sector1: "int16",
             sector2: "int16"
         })
@@ -642,6 +659,35 @@ export class TMA_IFSEC extends TMA_GEN {
     };
 };
 
+export class TMA_OVERLAY extends TMA_GEN {
+    blocking: (0|1) = 0;
+    text_index: number = 0;
+    x: number = 0;
+    y: number = 0;
+    max_width: number = 0;
+    align_x: number = 0;
+    align_y: number = 0;
+    face: number = 0;
+    picture: (0|1) = 0;
+    display_time: number = 0;
+    color15: number = 0;
+    getSchema() : Schema {
+        return Object.assign(super.getSchema(),{
+            blocking: "uint8",
+            text_index: "int16",
+            x: "int16",
+            y: "int16",
+            max_width: "int16",
+            align_x: "int8",
+            align_y: "int8",
+            face: "int8",
+            picture: "int8",
+            display_time: "int16",
+            color15: "uint16"
+        });
+    }
+}
+
 type ConstructorWithSchema<T extends WithSchema> = { new(): T };
 
 function deserialize<T extends WithSchema>(cls: ConstructorWithSchema<T>, data: BinaryIterator): T {
@@ -676,7 +722,8 @@ const action_to_schema = [
    TMA_IFJMP,TMA_TWOP,TMA_UNIQUE,TMA_TWOP,TMA_UNIQUE,
    TMA_IFJMP,TMA_LOADLEV,TMA_IFJMP,TMA_GEN,
    TMA_TWOP,TMA_TWOP,TMA_TEXT,TMA_GLOBE,TMA_CHANGELIGHT,
-   TMA_TEXT, TMA_TEXT, TMA_LOADLEV
+   TMA_TEXT, TMA_TEXT, TMA_LOADLEV, TMA_OVERLAY, 
+   TMA_SWAPS,TMA_GEN
 ]
 
 export const ActionType = {
@@ -721,7 +768,10 @@ export const ActionType = {
     CHGLG: 38,
     PLMUS: 39,
     FAILG: 40,
-    ENDG2: 41
+    ENDG2: 41,
+    OVRLY: 42,
+    SWPS2: 43,
+    AUTOS: 44
 }
 
 export function create_action_instance(type: typeof ActionType[keyof typeof ActionType], event: number) {
@@ -926,29 +976,66 @@ export class RawMapFile {
 }
 
 
+interface KeyAndName {
+    key?: string;
+    name?: string;
+}
+
 export abstract class AssetConfiguration {
-    name : string | null = null;
-    abstract get_key() : string 
+
+    static keyCache = new WeakMap<AssetConfiguration, KeyAndName>();
+    get_key() : string {
+        const me = toRaw(this);
+        let k = AssetConfiguration.keyCache.get(me);
+        if (!k) k = {};
+        if (!k.key) {
+            const s= Object.keys(me).sort((a,b)=>a.localeCompare(b))
+                .map(x=>JSON.stringify((me as Record<string,any>)[x]))
+                .join("|");
+            k.key = md5(s);
+            AssetConfiguration.keyCache.set(me, k);
+        }
+        return k.key;
+    }
+
     get_name() : string {
-        if (this.name) return this.name;
+        const me = toRaw(this);
+        let k = AssetConfiguration.keyCache.get(me);
+        let n = k?.name;
+        if (n) return n;;
+
         const pxms = this.get_pixmaps();
         const s = pxms.map(x=>x.find(y=>y && y.toUpperCase() != "EMPTY.PCX")).find(x=>x);
         if (s) {
             if (pxms.length == 1) return s;
             else return `${s} (${pxms.length})`;
         } else {
-            return this.name || this.get_key();
+            return `#${this.get_key().substring(0,8)}`;
         }
     }
+
+    has_name(): boolean {
+        let k = AssetConfiguration.keyCache.get(toRaw(this));
+        return !!(k?.name);
+    }
+
+    set_name(s:string) {
+        const me = toRaw(this);
+        let k = AssetConfiguration.keyCache.get(me);
+        if (!k) k = {};
+        k.name = s;
+        AssetConfiguration.keyCache.set(me, k);
+    }
+
     abstract get_pixmaps():string[][];
     abstract clone(): AssetConfiguration;
+    
 
 }
 
 
 export class WallConfiguration extends AssetConfiguration{
     graphics: string[][] = [["","",""]];
-    anim_frames: number = 0;
     position: number=0;
     transparent: boolean = false;
     alternate: boolean = false;
@@ -960,6 +1047,7 @@ export class WallConfiguration extends AssetConfiguration{
     offset_x:number = 250;
     offset_y:number = 160;
     lclip: number = 0;    
+    was_hidden: boolean = false;
     
 
 
@@ -970,48 +1058,35 @@ export class WallConfiguration extends AssetConfiguration{
 
         r.alternate = sec?false:((side.flags & SideFlag.DOUBLE_SIDE) != 0);
         r.transparent = (side.flags & SideFlag.NOT_TRANSPARENT) == 0;
-        r.anim_frames = ((sec?side.sec_anim:side.prim_anim) & 0xF)+1;
+        let anim_frames = ((sec?side.sec_anim:side.prim_anim) & 0xF)+1;
         r.forward_dir = sec?((side.flags & SideFlag.SEC_FORV) != 0):((side.flags & SideFlag.PRIM_FORV) != 0);
         r.ping_pong = sec?((side.flags & SideFlag.SEC_GAB) != 0):((side.flags & SideFlag.PRIM_GAB) != 0);
         r.repeat_anim = sec?((side.flags & SideFlag.SEC_ANIM) != 0):((side.flags & SideFlag.PRIM_ANIM) != 0);
         r.position = sec?0:((side.oblouk & 0x60)>>5);
-        const count_graphics = r.anim_frames*(r.alternate?2:1);
+        r.was_hidden = sec?((side.flags & SideFlag.SEC_VIS) == 0):((side.flags & SideFlag.PRIM_VIS) == 0);
+        const count_graphics = anim_frames*(r.alternate?2:1);
         r.graphics = [];
         for (let l = 0; l < count_graphics; ++l) {
             const idx = l+side_id-1;
             r.graphics.push([fronts[idx],lefts[idx],rights[idx]]);
         }
-        r.offset_x = side.xsec*2;
-        r.offset_y = side.ysec*2;
-        if ((side.flags & SideFlag.SPEC) == 0 && sec) {
-            r.allow_offset = true;
+        if (sec) {
+            r.offset_x = side.xsec*2;
+            r.offset_y = side.ysec*2;
+            if ((side.flags & SideFlag.SPEC) == 0 && sec) {
+                r.allow_offset = true;
+            }
+            r.secondary_front = (side.target_side & 0x80) != 0
+        } else {
+            r.offset_x = 250;
+            r.offset_y = 160;
+            r.allow_offset = false;
+            r.secondary_front = false;
         }
         r.lclip = side.lclip;
-        r.secondary_front = (side.target_side & 0x80) != 0
         return r;
     }
 
-    get_key(): string {
-        if (this.graphics.length == 0) return "";
-        const ln = [
-            this.graphics[0][0],
-            this.graphics[0][1],
-            this.graphics[0][2],
-            this.anim_frames.toString(36),
-            this.alternate?"X":"S",
-            this.repeat_anim?"R":"N",
-            this.ping_pong?"P":"N",
-            this.transparent?"T":"N",
-            this.allow_offset?"O":"S",                      
-            this.position,
-            this.secondary_front?"F":"B",
-            this.lclip.toString(36),
-        ]
-        if (this.allow_offset) {
-            ln.push(this.offset_x.toString(36),this.offset_y.toString(36));
-        }
-        return ln.join("");
-    }
 
     get_pixmaps(): string[][] {
         return this.graphics;
@@ -1034,6 +1109,11 @@ export class WallConfiguration extends AssetConfiguration{
         if (!this.transparent && (side.flags & SideFlag.SEC_VIS)) side.flags |=SideFlag.NOT_TRANSPARENT;
         return side.flags;
     }
+    get_frame_count() : number {
+        let anim_frames = this.graphics.length;
+        if (this.alternate) anim_frames = anim_frames/2;
+        return anim_frames;
+    }
     get_anim() : number {
         let anim_frames = this.graphics.length;
         if (this.alternate) anim_frames = anim_frames/2;
@@ -1050,6 +1130,7 @@ export class WallConfiguration extends AssetConfiguration{
         const nw = new WallConfiguration();
         Object.assign(nw, this);
         nw.graphics = nw.graphics.map(x=>x.slice());
+        if (this.has_name()) nw.set_name(this.get_name());
         return nw;
     }
 
@@ -1063,9 +1144,6 @@ export class ArcConfiguration extends AssetConfiguration {
         this.left =  left || "";
         this.right = right || this.left;
     }
-    get_key() : string{
-        return this.left+this.right;
-    }
     static from(sd:TSIDE, lefts: string[], rights: string[]) : ArcConfiguration | null{
         if (sd.oblouk == 0) return null;
         else return new ArcConfiguration(lefts[sd.oblouk-1], rights[sd.oblouk-1]);
@@ -1075,7 +1153,9 @@ export class ArcConfiguration extends AssetConfiguration {
     }
 
     clone(): AssetConfiguration {
-        return Object.assign(new ArcConfiguration(), this);
+        const nw =  Object.assign(new ArcConfiguration(), this);
+        if (this.has_name()) nw.set_name(this.get_name());
+        return nw;
     }
 }
 
@@ -1129,9 +1209,6 @@ export class FloorCeilConfiguration extends AssetConfiguration {
         return ret;
     }
 
-    get_key() {        
-        return [this.pixmaps[0],this.mode.toString(),this.pixmaps.length.toString(36),this.fog_to_black?"F":"N"].join("");
-    }
 
     get_pixmaps(): string[][] {
         return this.pixmaps.map(x=>[x]);
@@ -1146,6 +1223,7 @@ export class FloorCeilConfiguration extends AssetConfiguration {
     clone(): AssetConfiguration {
         const nw =  Object.assign(new FloorCeilConfiguration(), this);
         nw.pixmaps = nw.pixmaps.slice();
+        if (this.has_name()) nw.set_name(this.get_name());
         return nw;
     }
 
@@ -1174,17 +1252,10 @@ export class ConfigurationPalette<T extends AssetConfiguration> {
         }
     }
 
-    import_names(pfx: string, lst: Record<string,string>) {
+    import_names(lst: Record<string,string>) {
         for (const k in this.map) {
-            const n = lst[pfx+k];
-            if (n) this.map[k].name = n;
-        }
-    }
-    export_names(pfx: string, lst: Record<string,string>) {
-        for (const k in this.map) {
-            if (this.map[k].name) {                
-                lst[pfx+k] = this.map[k].name;
-            }
+            const n = lst[k];
+            if (n) this.map[k].set_name(n);
         }
     }
 
@@ -1238,7 +1309,9 @@ class ConfigurationSaveMap {
         const def2 = [pxms, this.next_id] as [ string[][], number ];
         this.map[key] = def2;
         this.next_id = def2[1]+ pxms.length;
-        if (conf.name) this.names[conf.get_key()] = conf.name;
+        if (conf.has_name()) {
+            this.names[conf.get_key()] = conf.get_name();
+        }
         return def2[1];
     }
 
@@ -1309,8 +1382,8 @@ export class MapFile {
             const ml = m.layout[idx];
             nw.target_sector = s.target_sector;
             nw.target_side = s.target_side;
-            nw.x = ml.x;
             nw.type = s.type;
+            nw.x = ml.x;
             nw.y = ml.y;
             nw.level = ml.layer;
             nw.exit = s.exit.slice();            
@@ -1321,10 +1394,10 @@ export class MapFile {
 
         if (m.user_palette.length) {
             const def = JSON.parse(m.user_palette);
-            w.import_names("w",def);
-            a.import_names("a",def);
-            f.import_names("f",def);
-            c.import_names("c",def);
+            w.import_names(def);
+            a.import_names(def);
+            f.import_names(def);
+            c.import_names(def);
         }
 
         const q = new MapFile;
@@ -1335,7 +1408,39 @@ export class MapFile {
         p.ceil_palette = c;
         q.sectors = r;        
         q.info = m.info;
+
+        MapFile.remove_transparent_walls(p.wall_palette,r)
+
         return {map:q,palette:p};
+    }
+
+    //some non-transparent walls are market as transpared because they are hidden between sectors
+    //find these walls and remove them from pallete, if non-transparent version exists
+    static remove_transparent_walls(p: ConfigurationPalette<WallConfiguration>, sect: MapSector[]) {
+        const replacement = new Map<WallConfiguration, WallConfiguration>();
+        for (const id in p.map) {
+            const w = p.map[id];
+            if (w.was_hidden && w.transparent) {
+                const altw = new WallConfiguration;
+                Object.assign(altw, w);
+                w.transparent = false;
+                const new_id = altw.get_key();
+                if (p.map[new_id]) {
+                    replacement.set(w, p.map[new_id]);
+                    delete p.map[id];
+                }
+            }
+        }
+        if (replacement.size) {
+            sect.forEach(sec=>sec.side.forEach(sid=>{
+                const p = sid.primary;
+                const s = sid.secondary;
+                const rp = p?replacement.get(p):null;
+                const rs = s?replacement.get(s):null;
+                if (rp) sid.primary = rp;
+                if (rs) sid.secondary = rs;
+            }))
+        }
     }
 
     saveToArrayBuffer() : ArrayBuffer {
@@ -1378,7 +1483,7 @@ export class MapFile {
                     out.lclip = s.primary.lclip;                    
                     if (out.flags & SideFlag.DOUBLE_SIDE) {
                         const alt = ((sect.x + sect.y + side) & 1) != 0;
-                        if (alt) out.prim+=(s.primary.anim_frames);
+                        if (alt) out.prim+=(s.primary.get_frame_count());
                     }
                 } 
                 if (s.secondary) {
@@ -1456,10 +1561,10 @@ export class MapFile {
 
 
         const userpal : Record<string, string> = {};
-        for (const k in walls.names) userpal["w"+k] = walls.names[k];
-        for (const k in arc.names) userpal["a"+k] = arc.names[k];
-        for (const k in floors.names) userpal["f"+k] = floors.names[k];
-        for (const k in ceils.names) userpal["c"+k] = ceils.names[k];
+        for (const k in walls.names) userpal[k] = walls.names[k];
+        for (const k in arc.names) userpal[k] = arc.names[k];
+        for (const k in floors.names) userpal[k] = floors.names[k];
+        for (const k in ceils.names) userpal[k] = ceils.names[k];
 
         const enc = new TextEncoder();
 

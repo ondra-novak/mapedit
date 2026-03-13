@@ -7,6 +7,7 @@
 #include "utils/json.hpp"
 #include "publish_helper.hpp"
 #include "runsteam.hpp"
+#include "utils/profile_path.hpp"
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -253,7 +254,12 @@ bool WebInterface::init_game_dir(std::filesystem::path game_dir, const Json &ske
                 txt << v.as<std::string>();
             }
             txt << "\n";            
-        }        
+        }      
+        
+        txt << "[paths]\n"
+               "root=" << game_dir.string() << "\n"
+               "\n";
+        
     }
     _game_folder = full_dir;
     _game = std::make_unique<DDLManager>(full_dir);
@@ -993,11 +999,6 @@ void WebInterface::ws_lang_delete(const WsRpc::Request &req) {
     return req.send_response(true);
 }
 
-constexpr auto copy_files = std::array<std::string_view, 10>({
-    "ITEMS.DAT","KOUZLA.DAT","DIALOGY.JSON",
-    "ENEMY.DAT","SHOPS.DAT","POSTAVY.DAT"
-});
-
 
 void WebInterface::ws_lang_copyddl(const WsRpc::Request &req) {
     auto new_ddl = req.params[0].as<std::u8string>();
@@ -1060,6 +1061,32 @@ void WebInterface::ws_is_overlay_mode(const WsRpc::Request &req)
 {
     req.send_response(_overlay_mode);
 }
+
+void WebInterface::ws_can_import_adventure(const WsRpc::Request &req) {
+    auto s = get_importable_adventure_path();
+    req.send_response(!s.empty());
+}
+void WebInterface::ws_import_adventure_as(const WsRpc::Request &req) {
+    auto s = get_importable_adventure_path();
+    if (s.empty()) {
+        req.send_response(false);
+        return;
+    }
+    auto name = req.params[0].as<std::u8string>();
+    if (!validate_ddl_name(name,req))  return;    
+    auto newname = _user_dir/name;
+    if (std::filesystem::is_regular_file(newname)) {
+        req.send_response(false);
+        return;
+    }
+    std::filesystem::copy(s, newname);
+    _current_ddl = name;
+    _config.set("project", _current_ddl);
+     save_config();        
+     publish_state();
+     req.send_response(true);
+}
+
 }
 
 

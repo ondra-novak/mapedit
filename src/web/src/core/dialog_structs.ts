@@ -591,6 +591,7 @@ const functionList: FunctionList =
     "is_fact":[['n'],30],
     "get_lever":[['n','n'],45],
     "send_action":[['n','n'],158],
+    "send_message":[['n','n'],158],
     "teleport_group":[['n','n'],160],
     "load_level":[['s','n','n'],46],
     "teleport_character":[['s','n','n'],33],
@@ -627,6 +628,7 @@ const functionList: FunctionList =
     "exit":[[],255],
     "has_spell_group":[['n'],55],
     "end_spell_group":[['n'],56],
+    "autosave":[[],58],
 };
 
 export class DialogCompileError extends Error {

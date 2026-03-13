@@ -98,7 +98,7 @@ namespace server {
 
         bool is_complete() const {return _ctx?_ctx->complete:false;}
 
-        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const char *body) {return this->operator()(code, hdr, std::string_view(body));}
+        [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const char *body) {return this->operator()(code, hdr, std::string_view(body?body:""));}
         [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow> hdr, const std::string &body) {return this->operator()(code, hdr, std::string_view(body));}
         [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::string_view body);
         [[nodiscard]] bool operator()(StatusCode code, std::initializer_list<HeaderRow>, std::size_t sz, function_view<std::string_view()> body_gen);
