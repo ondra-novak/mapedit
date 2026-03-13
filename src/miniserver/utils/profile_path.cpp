@@ -59,7 +59,6 @@ std::filesystem::path getUserDocumentsPath()
 std::filesystem::path get_default_savegame_dir() {
 
 #ifdef _WIN32
-std::string getSavedGamesDirectory() {
     PWSTR path = nullptr;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_SavedGames, 0, NULL, &path))) {
         std::filesystem::path savedGamesPath(path);
@@ -70,7 +69,7 @@ std::string getSavedGamesDirectory() {
     } else {
         return {};
     }
-}
+
 #else
        char* home = std::getenv("HOME");
        if (home) {
