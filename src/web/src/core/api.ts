@@ -263,6 +263,12 @@ export class ApiClient extends WsRpcClient{
     async lang_copyddl(target:string, ignore_files:string[]): Promise<void>{
         await this.call("lang.copyddl", [target, ignore_files],[]);
     }
+    async can_import_adventure() : Promise<boolean> {
+        return (await this.call("can_import_adventure", [],[])).data;
+    }
+    async import_adventure_as(s:string) : Promise<boolean> {
+        return (await this.call("import_adventure_as", [s],[])).data;
+    }
 
 }
 

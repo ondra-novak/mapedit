@@ -48,7 +48,7 @@ void open_url(std::string url) {
         system(command.c_str());
     #else
         std::string command = "xdg-open " + url + " >/dev/null 2>&1 &";
-        system(command.c_str());
+        std::ignore=system(command.c_str());
     #endif
 }
 

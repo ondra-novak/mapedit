@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { server } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
-import { ArcConfiguration, AssetConfiguration, FloorCeilConfiguration, WallConfiguration } from '@/core/map_structs';
+import { ArcConfiguration, AssetConfiguration, FloorCeilConfiguration, FloorCeilMode, FloorCeilModeRequiredFrames, WallConfiguration } from '@/core/map_structs';
 import { PCX, PCXProfile } from '@/core/pcx';
 import { create_datalist, type DataListHandle, type DataListItem } from '@/utils/datalist';
-import { toRaw, watch } from 'vue';
+import { messageBoxAlert } from '@/utils/messageBox';
+import { computed, toRaw, watch } from 'vue';
 import { ref } from 'vue';
 
 
@@ -18,6 +19,7 @@ const cur_type = ref<type_enum|null>(null);
 const cur_item = ref<AssetConfiguration>();
 const preview_place = ref<HTMLElement>();
 const cur_frame = ref<number>(0);
+const cur_item_name = ref<string>("");
 const assets = ref<DataListHandle>(create_datalist(()=>[] as DataListItem[]));
 
 async function getImage(image:string) {
@@ -89,11 +91,14 @@ function doModal(item: AssetConfiguration | null, type:type_enum) : Promise<Asse
     }
     return new Promise<AssetConfiguration|null>(ok=>{
         resolver = ok;
-        cur_type.value = type;
-        cur_item.value = constructors[type]();
+        cur_type.value = type;        
         if (item) {
-            Object.assign(cur_item.value, item);
-        } 
+            cur_item.value = item.clone();
+        }  else {
+            cur_item.value = constructors[type]();
+            cur_item.value.set_name("Unnamed");
+        }
+        cur_item_name.value = cur_item.value.get_name();
         dlgref.value?.showModal();      
         updateDataList();
     });
@@ -114,7 +119,21 @@ function accept(x: AssetConfiguration ) {
 }
 
 function save() {
-    if (cur_item.value) accept(cur_item.value);
+    if (cur_item.value) {
+        const itm = cur_item.value;
+        if (itm instanceof FloorCeilConfiguration
+            && itm.mode != FloorCeilMode.ANIMATED 
+            && itm.pixmaps.length != (itm.button?2:1)*FloorCeilModeRequiredFrames[itm.mode]) {
+                messageBoxAlert("Can't update item: Type of floor/ceil doesn't match to frame count");
+                return;
+            }       
+        itm.set_name(cur_item_name.value);
+        accept(itm);
+    }
+
+
+        
+    
 }
 
 
@@ -163,11 +182,11 @@ function delFrame() {
                     <x-section>
                         <x-section-title>Configuration</x-section-title>
                         <x-form>
-                            <label><span>Name:</span><input  type="text" v-model="cur_item.name"></label>
+                            <label><span>Name:</span><input  type="text" v-model="cur_item_name"></label>
                             <label><span>Front (main):</span><input  type="text" v-model="cur_item.graphics[cur_frame][0]" :list="assets.id"></label>
                             <label><span>Left :</span><input type="text" v-model="cur_item.graphics[cur_frame][1]" :list="assets.id"></label>
                             <label><span>Right :</span><input type="text" v-model="cur_item.graphics[cur_frame][2]" :list="assets.id"></label>
-                            <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input  type="text" v-model="cur_item.lclip" v-watch-range min="1" max="16"></label>
+                            <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input  type="number" v-model="cur_item.lclip" v-watch-range min="0" max="99"></label>
                             <label><input  type="checkbox" v-model="cur_item.transparent"><span>Transparent (can see through)</span></label>
                             <label><input  type="checkbox" v-model="cur_item.alternate"><span>Alternating</span></label>
                             <label><input  type="checkbox" v-model="cur_item.repeat_anim"><span>Repeat animation</span></label>
@@ -175,8 +194,8 @@ function delFrame() {
                             <label><input  type="checkbox" v-model="cur_item.forward_dir"><span>Animate forward</span></label>
                             <label><input  type="checkbox" v-model="cur_item.secondary_front"><span>If secondary, draw as sector's backdrop</span></label>
                             <label><span>Offset [X,Y]</span>
-                                <div><input type="number" :disabled="!cur_item.allow_offset" v-model="cur_item.offset_x" v-watch-range min="-255" max="+255">
-                                <input type="number" v-model="cur_item.offset_y" v-watch-range min="-255" max="+255"></div></label>
+                                <div><input type="number" v-model="cur_item.offset_x" v-watch-range min="-255" max="+255">
+                                <input type="number" v-model="cur_item.offset_y" v-watch-range min="-255" max="500"></div></label>
                             <label><input  type="checkbox" v-model="cur_item.allow_offset"><span>Use offset when viewed from the side (secondary)</span></label>
                             <label><span>Primary wall position</span><select v-model="cur_item.position">
                                 <option :value="0">Normal (default)</option>
@@ -191,7 +210,7 @@ function delFrame() {
                     <x-section>
                         <x-section-title>Configuration</x-section-title>
                         <x-form>
-                            <label><span>Name:</span><input  type="text" v-model="cur_item.name"></label>
+                            <label><span>Name:</span><input  type="text" v-model="cur_item_name"></label>
                             <label><span>Left :</span><input type="text" v-model="cur_item.left" :list="assets.id"></label>
                             <label><span>Right :</span><input type="text" v-model="cur_item.right" :list="assets.id"></label>
                         </x-form>
@@ -210,7 +229,7 @@ function delFrame() {
                     <x-section>
                         <x-section-title>Configuration</x-section-title>
                         <x-form>
-                            <label><span>Name:</span><input  type="text" v-model="cur_item.name"></label>
+                            <label><span>Name:</span><input  type="text" v-model="cur_item_name"></label>
                             <label><span>Bitmap :</span><input type="text" v-model="cur_item.pixmaps[cur_frame]" :list="assets.id"></label>
                             <label><span>Mode: </span><select v-model="cur_item.mode">
                                 <option :value="-1">Animated</option>

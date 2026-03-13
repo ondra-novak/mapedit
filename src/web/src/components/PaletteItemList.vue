@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AssetConfiguration, GlobalPaletteConfiguration } from '@/core/map_structs';
-import { watch } from 'vue';
+import { toRaw, watch } from 'vue';
 import { onMounted, ref } from 'vue';
 
 
@@ -18,12 +18,14 @@ const cur_index = ref<number>(-1);
 
 function updateModel() {
     if (model.value) {
-        const idx = props.palette.list.indexOf(model.value);
+        const idx = props.palette.list.findIndex(x=>model.value?.get_key() == x.get_key());
         if (idx < 0) {
             cur_index.value = 0;
         } else {
             cur_index.value = idx+2;
         }
+    } else {
+        cur_index.value = 0;
     }
 }
 onMounted(updateModel);

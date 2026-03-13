@@ -7,8 +7,9 @@ import { computed, ref, watch } from 'vue';
 
 const dlg = ref<HTMLDialogElement>();
 
-const filename = defineModel<string>("filename");
-const shown = defineModel<boolean>("show");
+
+
+let resolver : ((s:string|null)=>void) | null = null;
 
 const maplist = ref<Record<string,boolean> >({});
 
@@ -19,14 +20,6 @@ async function loadFiles() {
     maplist.value = maps;
 }
 
-watch(shown, (nw)=>{
-    if (nw) {
-        loadFiles();
-        dlg.value?.showModal();
-    } else {
-        dlg.value?.close();
-    }
-})
 
 async function import_map(ev: Event) {
     const finput = ev.target as HTMLInputElement;
@@ -37,8 +30,7 @@ async function import_map(ev: Event) {
                 const data = await readFileToArrayBuffer(f);
                 const n = dosname_sanitize(f.name);
                 if (await server.putDDLFile(dosname_sanitize(n), data, AssetGroup.MAPS, true)) {
-                    filename.value = n;
-                    shown.value = false;
+                    resolver?resolver(n):null;                   
                 }
             }
         }
@@ -46,8 +38,7 @@ async function import_map(ev: Event) {
 }
 
 function select_file(x:string) {
-    filename.value = x;
-    shown.value = false;
+    resolver?resolver(x):null;
     entered_fname.value="";
 }
 
@@ -105,10 +96,26 @@ async function copy_selected() {
     }
 }
 
+async function doModal() : Promise<string|null> {
+    return new Promise(ok=>{
+        resolver = (x:string|null)=>{
+            dlg.value?.close();
+            ok(x);
+        }
+        loadFiles();
+        dlg.value?.showModal();        
+    });
+}
+function cancel() {
+    resolver?resolver(null):null;
+}
+
+defineExpose({doModal});
+
 </script>
 <template>
     <dialog ref="dlg" class="white">
-        <header>Load map<button class="close" @click="shown = false"></button></header>
+        <header>Load map<button class="close" @click="cancel"></button></header>
         <div class="lst">
             <div v-for="(_,x) of maplist" :key="x">
                 <input type="checkbox" v-model="maplist[x]">

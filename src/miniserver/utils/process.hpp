@@ -287,7 +287,7 @@ public:
 
             execvp(path.c_str(), arglst);
             int e = errno;
-            write(control[1], &e, sizeof(e));
+            std::ignore=write(control[1], &e, sizeof(e));
             _exit(0);
         }
         int res;

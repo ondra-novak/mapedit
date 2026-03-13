@@ -562,7 +562,7 @@ protected:
                 if (!std::isxdigit(c)) throw ParseError();
                 hexbuf[m-1] = c;
                 if (m == 4) {
-                    std::uint16_t codepoint;
+                    std::uint16_t codepoint = 0;
                     std::from_chars(hexbuf,hexbuf+4, codepoint, 16);                    
                     data.push_back(codepoint);
                     m = 0;

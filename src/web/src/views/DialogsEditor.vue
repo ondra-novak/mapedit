@@ -518,7 +518,9 @@ watch(cur_story, ()=>{
 
 watch(current_index, ()=>{
     let s = current_index.value;
-    if (s !== null) s = s * 128;
+    if (s !== null) {
+        if (dialogs._compat) s = s * 128;
+    }
     StatusBar.set_current_dialog(s);
     edit_focus.value={};
 });

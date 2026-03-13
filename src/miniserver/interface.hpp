@@ -134,6 +134,8 @@ protected:
     void ws_lang_delete(const WsRpc::Request &req);
     void ws_lang_copyddl(const WsRpc::Request &req);
     void ws_is_overlay_mode(const WsRpc::Request &req);
+    void ws_can_import_adventure(const WsRpc::Request &req);
+    void ws_import_adventure_as(const WsRpc::Request &req);
 
     void send_state_update(WsRpc &rpc);
 
@@ -155,6 +157,8 @@ protected:
         {"mgf_put_image",&WebInterface::ws_ddl_mpg_put_image},
         {"mgf_close",&WebInterface::ws_ddl_mpg_close},
         {"project_set_active",&WebInterface::ws_ddl_active},
+        {"can_import_adventure", &WebInterface::ws_can_import_adventure},
+        {"import_adventure_as", &WebInterface::ws_import_adventure_as},
         {"config_get",&WebInterface::ws_config_get},
         {"config_put",&WebInterface::ws_config_put},
         {"preview_start",&WebInterface::ws_preview_start},

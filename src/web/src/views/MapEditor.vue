@@ -31,6 +31,7 @@ const list_assets = ref<string[]>([]);
 const item_list = ref(new ItemHive);
 const enemy_list = ref(new Enemies);
 const palette_edit_dlg = ref<InstanceType<typeof PaletteEditDlg> >();
+const map_select_dlg = ref<InstanceType<typeof MapSelectDlg> >();
 
 const EditMode = {
     Edit:0,
@@ -648,7 +649,7 @@ async function loadMap(mapname: string)   {
 async function reloadMap()  {
     const name = map_filename.value;
     if (name) {
-        return await loadMap(name);
+        return await loadMapUI(name);
     }
 }
 
@@ -692,17 +693,27 @@ function reload_all_lists() {
     updateControls();
 }
 
+async function loadMapStatusBarClick() {    
+    const m = await map_select_dlg.value?.doModal();
+    if (m) {
+        loadMapUI(m);
+    }        
+}
+
+async function loadMapUI(s:string) {
+    StatusBar.set_map_switch(s,loadMapStatusBarClick);
+    return await loadMap(s);
+}
+
 function open_map_prompt() {
-        if (!map_filename.value) {
-        StatusBar.set_map_switch("<click here>",()=>{
-            open_map_dlg.value = true;
-        });        
+    if (!map_filename.value) {
+        StatusBar.set_map_switch("<click here>",loadMapStatusBarClick);        
     }
 }
 
 async function init() {        
     open_map_prompt();
-    mapEditorControl.set_instance({open_map:(s:string)=>loadMap(s)})
+    mapEditorControl.set_instance({open_map:(s:string)=>loadMapUI(s)})
 }
 
 function resetFloor() {
@@ -873,7 +884,7 @@ function applyChanges() {
             if (any_change) {
                 end_edit(m);
                 updateFocusData(focus.value.sector, focus.value.side);
-                StatusBar.invoke_teleport();
+                StatusBar.invoke_reload();
                 last_apply_mode[getSelectionShape()] = applyMode.value;
             }
         }
@@ -981,14 +992,6 @@ watch(goto_sector_input,()=>{
 
 const ds_wallassets = create_datalist();
 watch(list_assets, (nw)=>ds_wallassets.update(()=>nw.map(k=>({value:k}))));
-watch(map_filename, (nw)=>{
-    if (nw) {
-        StatusBar.set_map_switch(nw,()=>{
-            open_map_dlg.value = true;
-        });
-        loadMap(nw)        
-    }
-});
 watch(()=>props.active, ()=>{
     const a = props.active;
     if (a) {
@@ -1522,7 +1525,7 @@ async function on_modify_ceil(item: AssetConfiguration|null, index: number) {
 <div class="open-map-hlp"><div></div></div>
 </template>
 </x-workspace>
-<MapSelectDlg v-model:filename="map_filename" v-model:show="open_map_dlg"></MapSelectDlg>
+<MapSelectDlg ref="map_select_dlg"></MapSelectDlg>
 <MapSettingsDlg v-model="map_settings" @ok="map_settings_ok" @cancel="map_settings = undefined"></MapSettingsDlg>
 <NicheEditor v-model="curNiche" @ok="save_cur_niche" @cancel="curNiche=null" @delete="delete_cur_niche" :side="focus?.side_def || null"></NicheEditor>
 <PaletteEditDlg ref="palette_edit_dlg"></PaletteEditDlg>

@@ -181,6 +181,7 @@ export type MultiactionModelDef = {
     stringTable: string[],   
 }
 
+const playlist_regex = /^\s*(FORWARD\s+|RANDOM\s+|FIRST\s+)?\s*([^.]+\.(MP3|MUS)\s+)*([^.]+\.(MP3|MUS))\s*$/i;
 const script = defineModel<MultiactionModelDef>();
 const show_raw_object = ref(false);
 const cur_event = ref<number>(0);
@@ -188,7 +189,6 @@ const list_of_sounds = ref<HTMLInputElement>();
 const list_of_keys = ref<HTMLInputElement>();
 const list_of_maps = ref<HTMLInputElement>();
 const list_of_books = ref<HTMLInputElement>();
-const stringtable_cur_text = ref<string>("");
 let cur_datalist:DataListHandle|null = null;
 
 watch(list_of_sounds,()=>{
@@ -276,19 +276,26 @@ function prepareList() {
     }
 }
 
-function stringtable_load_text() {
-    const f = focused_item.value as TMA_TEXT;
-    if (!f || !script.value) return;
-    let s = script.value.stringTable[f.textindex] || "";
-    stringtable_cur_text.value = s;
-}
+const [stringtable_cur_text,stringtable_cur_playlist] = [false,true].map(pl=>computed({
+    get:()=>{
+        const itm = focused_item.value;
+        const scr = script.value;
+        if (scr && itm && (itm instanceof TMA_TEXT) && (pl || itm.textindex)) {
+            const s = scr.stringTable[itm.textindex] ?? "";
+            if (pl &&  s && !s.match(playlist_regex)) return null;
+            return s;
+        } 
+        return null;
+    },
+    set:(x:string)=>{
+        const itm = focused_item.value;
+        const scr = script.value;
+        if (scr && itm && (itm instanceof TMA_TEXT) && (pl || itm.textindex)) {            
+            scr.stringTable[itm.textindex] = x;
+        }
+    }
+}));
 
-function stringtable_save_text() {
-    const f = focused_item.value as TMA_TEXT;
-    if (!f || !script.value) return;
-    let s = stringtable_cur_text.value;
-    script.value.stringTable[f.textindex] = s;
-}
 
 function stringtable_add_text() {
     const f = focused_item.value as TMA_TEXT;
@@ -298,7 +305,7 @@ function stringtable_add_text() {
     const found = st.find((_,idx2)=>idx2 && idx2 != ++idx);
     if (!found) idx = Math.max(1,st.length);
     f.textindex = idx;
-    stringtable_cur_text.value = "";
+    st[f.textindex] = "";
 }
 
 onMounted(()=>{
@@ -419,11 +426,7 @@ watch(focused_item, ()=>{
     const dlg = dialog_editor.value!;
     if (!focused_item.value) {
         dlg.close();
-    } else {
-        if (focused_item.value instanceof TMA_TEXT) {
-            stringtable_load_text();
-        }
-    }
+    } 
 })
 
 
@@ -579,7 +582,7 @@ const suitable_texts = computed(()=>{
     const txt = f as TMA_TEXT;
     const is_pls = txt.header.action == ActionType.MUSIC;
     const lst =  scr.stringTable.map((x,idx)=>[x.replaceAll('\n','|'),idx] as [string, number])
-        .filter(x=>(!!x[0].match(/^\s*(FORWARD\s+|RANDOM\s+|FIRST\s+)?\s*([^.]+\.(MP3|MUS)\s+)*([^.]+\.(MP3|MUS))\s*$/i)) == is_pls)
+        .filter(x=>(!!x[0].match(playlist_regex)) == is_pls)
     return lst;
 })
 
@@ -700,12 +703,12 @@ const suitable_texts = computed(()=>{
                     <DelayLoadedList v-model="focused_item.textindex" :list="getGlobalShops().then(x=>x.map(y=>({value:y[0],label:y[1]})))" /></label>
             </template>
             <template v-else>            
-                <label><span>Selected {{ focused_item.header.action == ActionType.MUSIC ?"playlist":"text" }} </span><select v-model="focused_item.textindex" @change="stringtable_load_text">
+                <label><span>Selected {{ focused_item.header.action == ActionType.MUSIC ?"playlist":"text" }} </span><select v-model="focused_item.textindex">
                     <option v-for="[t,idx] of suitable_texts" :key="idx" :value="idx"> {{ t }}</option>
                 </select></label>
                 <div>
-                    <textarea v-if="focused_item.header.action != ActionType.MUSIC" rows="5" cols="49" v-model="stringtable_cur_text" @change="stringtable_save_text"></textarea>
-                    <PlaylistEditor v-else v-model="stringtable_cur_text" @change="stringtable_save_text"></PlaylistEditor>
+                    <textarea v-if="focused_item.header.action != ActionType.MUSIC" :disabled="stringtable_cur_text === null" rows="5" cols="49" v-model="stringtable_cur_text"></textarea>
+                    <PlaylistEditor v-else-if="stringtable_cur_playlist!==null" v-model="stringtable_cur_playlist"></PlaylistEditor>
                 </div>
                 <div style="text-align: right;"><button @click="stringtable_add_text">Add new {{ focused_item.header.action == ActionType.MUSIC ?"playlist":"text" }}</button></div>
             </template>

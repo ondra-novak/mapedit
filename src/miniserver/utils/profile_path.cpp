@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <cstdlib>  // getenv
+#include <fstream>
 #include <string>
 #include <array>
 #include <system_error>
@@ -51,4 +52,44 @@ std::filesystem::path getUserDocumentsPath()
     return hpath / ".local" / "share";
     
 #endif
+}
+
+#define SAVEGAME_FOLDERNAME "Skeldal"
+
+std::filesystem::path get_default_savegame_dir() {
+
+#ifdef _WIN32
+std::string getSavedGamesDirectory() {
+    PWSTR path = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_SavedGames, 0, NULL, &path))) {
+        std::filesystem::path savedGamesPath(path);
+        CoTaskMemFree(path);
+
+        // Převod na UTF-8 std::string
+        return (savedGamesPath / SAVEGAME_FOLDERNAME);        
+    } else {
+        return {};
+    }
+}
+#else
+       char* home = std::getenv("HOME");
+       if (home) {
+           return std::filesystem::path(home) / ".local/share/" SAVEGAME_FOLDERNAME;
+       } else {
+           return {};
+       }
+#endif
+}
+
+
+std::filesystem::path get_importable_adventure_path() {
+    auto path = get_default_savegame_dir()/"last_save.nfo";
+    if (path.empty()) return path;
+    std::ifstream f(path);
+    if (!f) return {};
+    std::string ddl;
+    std::getline(f, ddl);
+    path = ddl;
+    if (!std::filesystem::is_regular_file(path)) return {};
+    return path;
 }
