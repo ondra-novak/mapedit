@@ -37,10 +37,11 @@ export class SeqFile {
     big: boolean = false;
     old_format: boolean = false;
     
-    constructor(a: AnimationSet, hit_pos?: number, big? : boolean) {
+    constructor(a: AnimationSet, hit_pos?: number, big? : boolean, old_format?:boolean) {
         this.animation = a;
         this.hit_pos = hit_pos || null;
         this.big = !!big;
+        this.old_format = !!old_format;
     };
 
     static NewHeader:Schema = {
@@ -95,10 +96,11 @@ export class SeqFile {
                     }
                 }
                 const cfg = configData.parse(SeqFile.Config);
-                return new SeqFile(a, cfg.hitpos, cfg.big != 0);
+                return new SeqFile(a, cfg.hitpos, cfg.big != 0,false);
             }
 
         }
+        
         
         const decoder = new TextDecoder('utf-8');
         const str = decoder.decode(buffer);
@@ -121,17 +123,18 @@ export class SeqFile {
         }
         
 
-        return new SeqFile(set, hit_pos, big);
+        return new SeqFile(set, hit_pos, big,true);
 
     };
 
     isOldFormat() {
-        return this.hit_pos === null;
+        return this.old_format;
     }
 
     toArrayBuffer() : ArrayBuffer{
         const strtable : Record<string, number>= {};
         let nxtidx = 0;
+        if (!this.hit_pos) this.hit_pos = 0;
         const animData = new BinaryWriter;
         const data = this.animation.forEach((x,idx)=>{
             animData.write(SeqFile.NewHeader, {row:idx, count: x.length});

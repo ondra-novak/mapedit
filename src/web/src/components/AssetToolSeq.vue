@@ -3,7 +3,6 @@ import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { AnimationTypeIndex, AnimationTypeLetter, AnimationTypeMirror, SeqFile, type AnimationTypeIndexType } from '@/core/seqfile';
 import { ref, watch, onMounted, computed,  shallowRef, onUnmounted } from 'vue';
-import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import CanvasView from './CanvasView.vue';
 import { PCXProfile, PCX } from '@/core/pcx';
 import StatusBar, {type SaveRevertControl} from '@/components/statusBar'
@@ -26,6 +25,7 @@ const cur_frame = ref<number>(0);
 const cur_face = ref<string>("");
 const cur_image = shallowRef<PCX>();
 const cur_offset = ref<number>(0);
+const cur_level = ref<number>(0);
 const list_files = ref<string[]>([]);
 const big=ref<boolean>(false);
 let play_anim = false;
@@ -101,7 +101,9 @@ async function onChangeFrame() {
         const sq = animations.value;
         const fr = cur_frame.value;
         const ph = cur_phase.value;
-        const frinfo = sq.animation[ph][fr];
+        let pharr = sq.animation[ph];
+        if (!pharr) pharr = sq.animation[ph] = [];
+        const frinfo = pharr[fr];
         let w = 0;
         if (frinfo) {
             cur_face.value = frinfo.name;
@@ -111,9 +113,11 @@ async function onChangeFrame() {
                 frinfo.offset_x = w/2;                
             }
             cur_offset.value = frinfo.offset_x;
+            cur_level.value = frinfo.offset_y;
         } else {
             cur_face.value = "";            
             cur_offset.value = 0;
+            cur_level.value = 0;
         }
     }
 
@@ -178,6 +182,13 @@ function setOffset(value: number) {
     cur_offset.value = Math.min(pmax,Math.max(pmin, value));
 }
 
+
+function setLevel(value: number) {
+    let pmin = 0;
+    let pmax = 320;
+    cur_level.value = Math.min(pmax,Math.max(pmin, value));
+}
+
 function onDragMove(e: MouseEvent | TouchEvent) {
     if (!dragging) return;
     let clientX = 0;
@@ -205,7 +216,7 @@ function onChangeFace () {
         animations.value.animation[cur_phase.value][cur_frame.value] = {
             name:cur_face.value,
             offset_x:cur_offset.value,
-            offset_y:0
+            offset_y:cur_level.value
         };
         save_control.set_changed(true);
         onChangeFrame();
@@ -241,6 +252,9 @@ function changeOffsetDelta(delta:number) {
     onChangeFace();
 }
 
+watch(cur_level, ()=>{
+    onChangeFace();
+})
 
 function onKeyPress(event: Event) {
     console.log(event);
@@ -268,6 +282,14 @@ watch([cur_frame], onChangeFrame);
 onMounted(onInit);
 onUnmounted(()=>save_control.unmount());
 
+
+const ground_level= computed(()=>{
+    const a = animations.value;
+    if (!a) return 0;
+    const ofs = a.animation[cur_phase.value][cur_frame.value].offset_y;
+    return (cur_image.value?.height ?? 0) - (ofs ?? 0);
+    
+})
 
 </script>
 <template>
@@ -304,10 +326,12 @@ onUnmounted(()=>save_control.unmount());
             </div>
             <div class="ruler r1"></div>
             <div class="ruler r2"></div>
-            <div class="ruler r3"></div>
+            <div class="ruler r3"></div>            
             <div class="hitpos" v-if="cur_phase==4" :class="{active: animations?.hit_pos == cur_frame}" @click="sethit">Hit</div>
         </div>
-        <div class="bottom-panel" ><button @click="changeOffsetDelta(1)">&lt;</button><button @click="changeOffsetDelta(-1)">&gt;</button>
+        <div class="bottom-panel" >
+            <button @click="changeOffsetDelta(1)">&lt;</button>
+            <button @click="changeOffsetDelta(-1)">&gt;</button>
             <div class="left"><input type="checkbox" v-model="big" @change="changeBig">Big enemy (one on square)</div>
         </div>
     </div>
@@ -350,6 +374,16 @@ onUnmounted(()=>save_control.unmount());
 .preview .ruler.r3 {
     left:  445px;
 }
+.preview .ruler.r4 {
+    width: auto;
+    height: 0px;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    border-bottom: 1px dashed black;
+    border-top: 1px dashed white;
+}
+
 .preview.mirror > div > div{
     transform: scaleX(-1);
 }

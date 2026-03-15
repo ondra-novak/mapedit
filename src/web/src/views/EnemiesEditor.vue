@@ -134,6 +134,12 @@ async function save_all() {
             create_soundmap();
 
             const e = enemies.value;
+            e.forEach((x,idx)=>{
+                x.cislo_vzoru = idx;
+                x.locx = 128;
+                x.locy = 128;
+                x.lives = x.vlastnosti[CharacterStats.VLS_MAXHIT];
+        });
             const s = sounds.value;
             const ebuff = enemyAndSoundToArrayBuffer(e as Enemies,s);
             
