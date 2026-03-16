@@ -2,7 +2,7 @@
 import { server, type FileItem } from '@/core/api';
 import { AssetGroup } from '@/core/asset_groups';
 import { AnimationTypeIndex, AnimationTypeLetter, AnimationTypeMirror, SeqFile, type AnimationTypeIndexType } from '@/core/seqfile';
-import { ref, watch, onMounted, computed,  shallowRef, onUnmounted } from 'vue';
+import { ref, watch, onMounted, computed,  shallowRef, onUnmounted, nextTick } from 'vue';
 import CanvasView from './CanvasView.vue';
 import { PCXProfile, PCX } from '@/core/pcx';
 import StatusBar, {type SaveRevertControl} from '@/components/statusBar'
@@ -24,15 +24,20 @@ const cur_phase = ref<AnimationTypeIndexType>(AnimationTypeIndex.WALK_FRONT);
 const cur_frame = ref<number>(0);
 const cur_face = ref<string>("");
 const cur_image = shallowRef<PCX>();
+let image_cache = new Map<string, PCX>();
 const cur_offset = ref<number>(0);
 const cur_level = ref<number>(0);
+const img_max_height = ref<number>(0);
 const list_files = ref<string[]>([]);
 const big=ref<boolean>(false);
 let play_anim = false;
-let save_control : SaveRevertControl;
+let save_control : SaveRevertControl | null = null;
 
-async function onUpdateModel() {
-    if (save_control.get_changed()) save();
+async function onUpdateModel() {    
+    if (save_control) {
+        save_control.unmount();
+    }
+    save_control = null;
     if (filename.value) {
         const f = filename.value;
         if (f.endsWith(".SEQ")) {
@@ -50,7 +55,9 @@ async function onUpdateModel() {
     });
     list_files.value = ffiles.map(f=>f.name);
 
-    
+    let mark_changed = false;
+
+
     try {
         const anim = await server.getDDLFile(selfile.value || "");
         animations.value = SeqFile.fromArrayBuffer(anim, stem);
@@ -68,7 +75,7 @@ async function onUpdateModel() {
                     a[i+6][0].offset_x = props.def.adjusting[i][0];
                 }
             }            
-            save_control.set_changed(true);
+            mark_changed = true;
         }
 
         big.value = animations.value.big;
@@ -78,12 +85,16 @@ async function onUpdateModel() {
     }
 
     onChangePhase();
+    save_control = await StatusBar.register_save_control();
+    save_control.on_save(save);
+    save_control.on_revert(()=>{
+        save_control!.set_changed(false);
+        onUpdateModel();
+    });
+    if (mark_changed) save_control.set_changed(true);
 }   
 
 async function onInit() {
-    save_control = await StatusBar.register_save_control();
-    save_control.on_save(save);
-    save_control.on_revert(onUpdateModel);
     await onUpdateModel();
 }
 
@@ -107,13 +118,22 @@ async function onChangeFrame() {
         let w = 0;
         if (frinfo) {
             cur_face.value = frinfo.name;
-            cur_image.value = PCX.fromArrayBuffer((await server.getDDLFile(frinfo.name)));
+            let img = image_cache.get(frinfo.name);
+            if (!img) {
+                img = PCX.fromArrayBuffer((await server.getDDLFile(frinfo.name)));
+                image_cache.set(frinfo.name, img);                
+            }
+            cur_image.value = img;
             w = cur_image.value.width ;
             if (frinfo.offset_x <= -1000) {
                 frinfo.offset_x = w/2;                
             }
             cur_offset.value = frinfo.offset_x;
             cur_level.value = frinfo.offset_y;
+            let height = cur_image.value.height+Math.max(0,cur_level.value);
+            if (height >= img_max_height.value) {
+                img_max_height.value = height;
+            }
         } else {
             cur_face.value = "";            
             cur_offset.value = 0;
@@ -139,7 +159,6 @@ function insert_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined) {
         animations.value.animation[cur_phase.value].splice(cur_frame.value,0,animations.value.animation[cur_phase.value][cur_frame.value]);
         while (animations.value.animation[cur_phase.value].length > 16) animations.value.animation[cur_phase.value].pop();
-        save_control.set_changed(true);
     }
     play_anim = false;
 }
@@ -147,7 +166,6 @@ function insert_frame() {
 function delete_frame() {
     if (animations.value && cur_phase.value !== undefined && cur_frame.value !== undefined && animations.value.animation[cur_phase.value].length>1) {
            animations.value.animation[cur_phase.value].splice(cur_frame.value,1);
-           save_control.set_changed(true);
     }
     play_anim = false;
 }
@@ -218,7 +236,6 @@ function onChangeFace () {
             offset_x:cur_offset.value,
             offset_y:cur_level.value
         };
-        save_control.set_changed(true);
         onChangeFrame();
     }
     play_anim = false;
@@ -264,14 +281,12 @@ function sethit() {
     if (animations.value) {
         if (animations.value && animations.value.hit_pos == cur_frame.value) animations.value.hit_pos = null;
         else animations.value.hit_pos = cur_frame.value;
-        save_control.set_changed(true);
     }
 }
 
 function changeBig() {
     if (animations.value) {
         animations.value.big =  big.value;
-        save_control.set_changed(true);
     }
 }
 
@@ -279,8 +294,9 @@ function changeBig() {
 watch([filename], onUpdateModel);
 watch([cur_phase], onChangePhase);
 watch([cur_frame], onChangeFrame);
+watch(animations, ()=>save_control?.set_changed(true),{deep:true})
 onMounted(onInit);
-onUnmounted(()=>save_control.unmount());
+onUnmounted(()=>save_control?.unmount());
 
 
 const ground_level= computed(()=>{
@@ -289,6 +305,13 @@ const ground_level= computed(()=>{
     const ofs = a.animation[cur_phase.value][cur_frame.value].offset_y;
     return (cur_image.value?.height ?? 0) - (ofs ?? 0);
     
+})
+
+const image_ypos = computed(()=>{
+    if (!cur_image.value) return 0;
+    else {
+        return img_max_height.value - cur_image.value.height - cur_level.value;
+    }
 })
 
 </script>
@@ -319,9 +342,9 @@ const ground_level= computed(()=>{
             <button @click="insert_frame">+</button>
             <button @click="delete_frame">-</button>
         </div>
-        <div class="preview checkerboard" :class="{mirror: AnimationTypeMirror[cur_phase]}" @mousedown="event=>onDragStart(event as MouseEvent)"
+        <div class="preview checkerboard" :class="{mirror: AnimationTypeMirror[cur_phase]}" :style="{height: `${img_max_height}px`}" @mousedown="event=>onDragStart(event as MouseEvent)"
             @keypress="event=>onKeyPress" tabindex="1">
-            <div class="offset" :style="{left: `${320-cur_offset}px`}" >
+            <div class="offset" :style="{left: `${320-cur_offset}px`, top: `${image_ypos}px`}" >
                 <CanvasView :canvas="cur_image?cur_image.createCanvas(PCXProfile.enemy):null" />
             </div>
             <div class="ruler r1"></div>
@@ -333,6 +356,9 @@ const ground_level= computed(()=>{
             <button @click="changeOffsetDelta(1)">&lt;</button>
             <button @click="changeOffsetDelta(-1)">&gt;</button>
             <div class="left"><input type="checkbox" v-model="big" @change="changeBig">Big enemy (one on square)</div>
+        </div>
+        <div class="bottom-panel level" >
+            <label><span>Ground level adjust</span><input type="number" v-model="cur_level" v-watch-range min="-20" max="320"></label>
         </div>
     </div>
 
@@ -398,7 +424,7 @@ const ground_level= computed(()=>{
 }
 .preview  .offset {
     width: fit-content;
-    position: relative;
+    position: absolute;
 }
 
 .left-panel {

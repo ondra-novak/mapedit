@@ -293,7 +293,7 @@ public:
         int res;
         control[1].close();
         int cnt = read(control[0],&res, sizeof(res));
-        if (cnt == res) {
+        if (cnt == sizeof(res)) {
             throw std::system_error(res, std::system_category(), "exec failed");
         }
         control[0].close();

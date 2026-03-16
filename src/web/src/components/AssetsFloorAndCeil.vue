@@ -64,7 +64,7 @@ function tile_file_changed(event: Event, which: number) {
 }
 
 async function finalize_image(imageData: ImageDataResult) {
-    const pal = findQuantizationAndGeneratePalette(imageData, 253,128,256);
+    const pal = findQuantizationAndGeneratePalette([imageData], 253,128,256);
     const lut = new ColorLUT(pal, 6);
     const pcx = new PCX(imageData.width, imageData.height);
     pal.unshift([0,0,0]);
