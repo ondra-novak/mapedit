@@ -201,11 +201,6 @@ function setOffset(value: number) {
 }
 
 
-function setLevel(value: number) {
-    let pmin = 0;
-    let pmax = 320;
-    cur_level.value = Math.min(pmax,Math.max(pmin, value));
-}
 
 function onDragMove(e: MouseEvent | TouchEvent) {
     if (!dragging) return;
@@ -269,10 +264,6 @@ function changeOffsetDelta(delta:number) {
     onChangeFace();
 }
 
-watch(cur_level, ()=>{
-    onChangeFace();
-})
-
 function onKeyPress(event: Event) {
     console.log(event);
 }
@@ -313,6 +304,23 @@ const image_ypos = computed(()=>{
         return img_max_height.value - cur_image.value.height - cur_level.value;
     }
 })
+
+const cur_level_proxy = computed({
+    get:()=>cur_level.value,
+    set:(v: number) => {
+        cur_level.value = v;
+        onChangeFace();
+    }
+})
+
+function set_level_all_frames() {
+    const a = animations.value;
+    const f = cur_phase.value;
+    if (a && f !== undefined) {
+        let x = a.animation[f];
+        x.forEach(y=>y.offset_y = cur_level.value);
+    }
+}
 
 </script>
 <template>
@@ -358,7 +366,8 @@ const image_ypos = computed(()=>{
             <div class="left"><input type="checkbox" v-model="big" @change="changeBig">Big enemy (one on square)</div>
         </div>
         <div class="bottom-panel level" >
-            <label><span>Ground level adjust</span><input type="number" v-model="cur_level" v-watch-range min="-20" max="320"></label>
+            <span>Ground level adjust</span><input type="number" v-model="cur_level_proxy" v-watch-range min="-20" max="320">
+            <button @click="set_level_all_frames">All frames</button>
         </div>
     </div>
 
@@ -484,6 +493,15 @@ const image_ypos = computed(()=>{
     position: absolute;
     left: 0;
     top: 0;
+}
+.bottom-panel.level {
+    margin: 1rem;
+    align-items: center;
+    display:flex;
+    gap: 0.2rem;
+}
+.bottom-panel.level > * {
+    text-align: center;
 }
 
 </style>

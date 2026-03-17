@@ -1,4 +1,4 @@
-import type { RGBPalette } from "./colors";
+import { rgbToHsl, type RGB, type RGBPalette } from "./colors";
 
 export type ImageDataResult = ImageData;
 
@@ -149,5 +149,19 @@ export function findQuantizationAndGeneratePalette(imageData:ImageDataResult[], 
     // Return palette as average colors
     return hist.map(c => [
         Math.round(c.sumR / c.count),Math.round(c.sumG / c.count),Math.round(c.sumB / c.count)]
-    );
+    ).sort((a,b)=> {
+        const hsla=rgbToHsl(a as RGB);
+        const hslb = rgbToHsl(b as RGB);
+        if (hsla[1] < 0.2) {
+            if (hslb[1] <0.2) {
+                return hsla[2] - hslb[2];
+            } else{
+                return -1;
+            }
+        }
+        if (hslb[1] < 0.2) {
+            return 1;
+        }
+        return ((Math.round(hsla[0]*12)+hsla[2]) - (Math.round(hslb[0]*12)+hslb[2]));
+    }) as RGBPalette;
 }

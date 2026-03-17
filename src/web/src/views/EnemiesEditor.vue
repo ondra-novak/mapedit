@@ -138,6 +138,8 @@ async function save_all() {
                 x.cislo_vzoru = idx;
                 x.locx = 128;
                 x.locy = 128;
+                x.headx = 128;
+                x.headx = 128;
                 x.lives = x.vlastnosti[CharacterStats.VLS_MAXHIT];
         });
             const s = sounds.value;

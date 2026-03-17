@@ -41,7 +41,7 @@ function onFileSelected(event: Event) {
             if (base_n === null) {
                  base_n = base_name;
             } else if (base_name != base_n) {
-                messageBoxAlert("`A file '${file.name}' has different base. Expected '${base_n}', found '${base_name}'");
+                messageBoxAlert(`A file '${file.name}' has different base. Expected '${base_n}', found '${base_name}'`);
                 selected_files.value = null;
             }
         }
@@ -116,6 +116,8 @@ async function run_files(lst: FileList, base: string) {
 
         })
         
+        pg.set_text("Converting images");
+
         for (let i = 0; i < results.length; ++i) {
             pg.set_value((i+results.length)/(2*results.length));
             const r = results[i];
@@ -126,6 +128,7 @@ async function run_files(lst: FileList, base: string) {
             }
         }
 
+        pg.set_text("Creating palette");
         const cols = new COLPaletteSet;
         cols.addPalette(pal);
         const col_name = dosname_sanitize(`${base}.COL`);
