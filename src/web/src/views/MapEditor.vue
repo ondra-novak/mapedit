@@ -637,7 +637,7 @@ async function loadMap(mapname: string)   {
     }
     curmap.value = map_document.get_current();
     const start = curmap.value.info.start_sector;
-    settings.curlevel = curmap.value.sectors[start].level;
+    settings.curlevel = curmap.value.sectors[start]?.level ?? 0;
     selection.value = [];
     redraw();        
     mapcontainer.zoom_reset();
