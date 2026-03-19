@@ -80,7 +80,7 @@ function replace(idx: number) {
                     data:d.data,
                     colorSpace:"srgb"
                 };
-                const pal = findQuantizationAndGeneratePalette(imgdata,254,128,255);
+                const pal = findQuantizationAndGeneratePalette([imgdata],254,128,255);
                 const lut = new ColorLUT(pal, 6);
                 const pcx = new PCX(imgdata.width, imgdata.height);
                 pal.unshift([0,0,0]);

@@ -8,7 +8,9 @@ import { AssetGroup } from '@/core/asset_groups';
 import { PhotoshopPicker } from 'vue-color';
 import { hslToRgb, rgbToHsl, type RGB, type RGBPalette } from '@/core/colors';
 import CanvasView from './CanvasView.vue';
-import { messageBoxConfirm } from '@/utils/messageBox';
+import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
+import type { SaveRevertControl } from './statusBar';
+import StatusBar from './statusBar';
 
 const filename = defineModel<string | null>();
 const enemy_image = shallowRef<PCX>();
@@ -18,9 +20,11 @@ const selected_ciks = ref<boolean[]>([]);
 const original_palette = ref<RGBPalette>();
 const undo_palette = ref<RGBPalette>();
 const undo_index = ref<number>();
-let change_flag = false;
+const commbutt = ref<boolean>(false);
 
 const average_colors = ref<RGB[]>([]);
+
+let save_state: SaveRevertControl | null = null;
 
 
 const emit = defineEmits<{
@@ -28,12 +32,10 @@ const emit = defineEmits<{
 }>();
 
 
-function save_col(name : string) {
+async function save_col(name : string) {
     const col = palete_col.value;
-    if (col && change_flag) {        
-        const p = server.putDDLFile(name, col.toArrayBuffer(), AssetGroup.ENEMIES);        
-        emit("upload",name, p);
-        change_flag = false;
+    if (col) {
+        return server.putDDLFile(name, col.toArrayBuffer(), AssetGroup.ENEMIES);        
     }
 }
 
@@ -46,33 +48,49 @@ async function prepareImage(fname: string) {
     }
 }
 
-function onUpdate() {
+function do_revert() {
+    save_state?.set_changed(false);
+    onUpdatePalete();
+}
+
+async function do_save() {
     if (filename.value) {
+        return save_col(filename.value);
+    }
+}
+
+async function onUpdate() {
+    if (filename.value) {
+
         if (filename.value.endsWith(".PCX")) {
             prepareImage(filename.value);
             palete_col_name.value = filename.value.substring(0,6)+".COL";
         } else if (filename.value.endsWith(".COL")) {
-            try {
-                prepareImage(filename.value.substring(0,6)+"F1.PCX");
-            } catch (e) {
-                prepareImage(filename.value.substring(0,6)+"F0.PCX");
-            }
+            const lst = (await server.getDDLFiles(AssetGroup.ENEMIES)).files.map(x=>x.name.toUpperCase());
+            const base = filename.value.substring(0,filename.value.length-4);
+            const found = lst.find(x=>x.startsWith(base) && x.endsWith(".PCX"));
+            if (found) prepareImage(found);
             palete_col_name.value = filename.value;
         }
     }
 }
 
-async function onUpdatePalete(newValue:[string|undefined], oldValue:[string|undefined]) {
+async function onUpdatePalete() {
     if (palete_col_name.value) {
+
+        if (save_state && save_state.get_changed()) save_state.unmount();
+        save_state = null;
+        save_state = await StatusBar.register_save_control();
+        save_state.on_save(do_save);
+        save_state.on_revert(do_revert);
         try {
-            if (oldValue[0]) await save_col(oldValue[0]);
             const data = await server.getDDLFile(palete_col_name.value);
             palete_col.value = COLPaletteSet.fromArrayBuffer(data);
         } catch (e) {
             palete_col.value = new COLPaletteSet();
             palete_col.value.addPalette(enemy_image.value?.get_palette());            
+            commbutt.value = true;
         }
-        change_flag = false;
     }
 }
 
@@ -164,12 +182,12 @@ function updateColors(event: Event, index: number) {
         });
         
         average_colors.value[index] = update_selected_pal(palete_col.value.palettes[index]);
-        change_flag = true;
+        if (save_state) save_state.set_changed(true);
     }
   
 }
 
-watch([palete_col_name], (newValue, oldValue) => onUpdatePalete(newValue,oldValue));
+watch([palete_col_name], onUpdatePalete);
 watch([filename], onUpdate);
 
 onMounted(()=>{
@@ -211,13 +229,13 @@ function init_undo(event: Event, index: number) {
 function add() {
     if (palete_col.value) {
         palete_col.value.addPalette(enemy_image.value?.get_palette());
-        change_flag = true;
+        if (save_state) save_state.set_changed(true);
     }
 }
 async function delete_pal(index: number) {
     if (await messageBoxConfirm("Are you sure delete this palette?")) {
         palete_col.value?.palettes.splice(index,1);
-        change_flag = true;
+        if (save_state) save_state.set_changed(true);
     }
 }
 
@@ -240,9 +258,43 @@ function select_color_from_image(event: Event) {
 }
 
 onUnmounted(()=>{
-    if (change_flag && palete_col_name.value) save_col(palete_col_name.value);
+    if (save_state) save_state.unmount();
 });
 
+
+async function create_common_palette() {
+    const col = palete_col_name.value;
+    if (!col) return;
+    const base = col.substring(0,col.length-4);
+    if (!await messageBoxConfirm("This creates common palette for all frames of the enemy. This requires to regenerate all frames. This may take a time. Continue?")){
+        return;
+    }
+    const lst =(await server.getDDLFiles(AssetGroup.ENEMIES)).files.map(x=>x.name)
+        .filter(x=>x.startsWith(base) && x.toUpperCase().endsWith('.PCX'));
+
+    if (lst.length == 0) {
+        await messageBoxAlert("No images found");
+        return;
+    }
+    const imgs : PCX[] = [];
+    for (const x of lst) {
+        const data = await server.getDDLFile(x);
+        const pcx = PCX.fromArrayBuffer(data);
+        imgs.push(pcx);
+    }
+    const new_imgs = await PCX.createCommonPalette(imgs, PCXProfile.enemy);
+    let id = 0;
+    for (const x of new_imgs) {
+        await server.putDDLFile(lst[id], x.toArrayBuffer(), AssetGroup.ENEMIES);
+        ++id;
+    }
+    palete_col.value = new COLPaletteSet();
+    palete_col.value.addPalette(new_imgs[0].get_palette());            
+    commbutt.value = false;
+    save_col(col);
+    filename.value = col;
+
+}
 
 
 </script>   
@@ -265,7 +317,7 @@ onUnmounted(()=>{
                 v-for="(col, col_index) of pal"
                 :key="col_index"
                 @click="event => select_color(event, col_index)"
-                :class="{selected: selected_ciks[col_index] || false}"                
+                :class="{selected: selected_ciks[col_index] || false, alpha: col_index>=128}"                
                 :style="{ backgroundColor: `rgb(${col[0]}, ${col[1]}, ${col[2]})`}"
             ></div>
         </div>
@@ -281,6 +333,10 @@ onUnmounted(()=>{
         </div>
     </div>
      <div class="palette"><button class="right-button" @click="add">Add</button></div>
+
+     <div class="ccpal" v-if="commbutt">
+        <button @click="create_common_palette">Create new palette</button>
+     </div>
     
 
 </template>
@@ -296,13 +352,14 @@ onUnmounted(()=>{
     height: 2vw;
     margin: 2px;
     cursor: pointer;
+    position: relative;
 }
 .grid > div.selected {
     border: 2px solid blue;
     margin: 0px;
-    position: relative;
+    
 }
-.grid > div.selected::before {
+.grid > div.selected::after {
     display: block;
     position: absolute;
     content: "";
@@ -336,5 +393,15 @@ onUnmounted(()=>{
 }
 .cross {
     cursor: crosshair;
+}
+.alpha::before {
+    position: absolute;
+    inset: 0;
+    width: fit-content;
+    height: fit-content;
+    margin: auto;
+    content: "a";
+    color:white;
+    text-shadow: 0px 0px 2px  black;
 }
 </style>

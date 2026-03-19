@@ -6,7 +6,7 @@ import  WsRpcClient, { type WsRpcResult }  from "./wsrpc"
 export interface FileItem {
   name: string;
   group: AssetGroupType;   // enum nebo číslo, 0 = vše
-  ovr: boolean;
+  ovr?: boolean;
 }
 
 export interface Stats {

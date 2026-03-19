@@ -3,6 +3,7 @@
 import { extractImageData, findQuantizationAndGeneratePalette, type ImageDataResult } from "./image_manip";
 import { ColorLUT } from "./lut";
 import type { RGBPalette } from "./colors";
+import { BinaryWriter } from "./binary";
 
 
 export const PCXProfile = {
@@ -300,10 +301,10 @@ export class PCX {
     }
 
 
-    static async fromImage(img:HTMLImageElement, profile: PCXProfileType) : Promise<PCX>{
+    static async fromImage(img:HTMLImageElement|HTMLCanvasElement, profile: PCXProfileType) : Promise<PCX>{
         const imgdata = await extractImageData(img);
         if (profile == PCXProfile.wall) {
-            const pal = findQuantizationAndGeneratePalette(imgdata,253,128,255);
+            const pal = findQuantizationAndGeneratePalette([imgdata],253,128,255);
             const lut = new ColorLUT(pal, 6);
             const pcx = new PCX(imgdata.width, imgdata.height);
             pal.unshift([0,0,0]);
@@ -315,8 +316,8 @@ export class PCX {
             return pcx;
         }
         else if (profile == PCXProfile.enemy) {
-            const pal1 = findQuantizationAndGeneratePalette(imgdata,127,173,255);
-            const pal2 = findQuantizationAndGeneratePalette(imgdata,127,85,172);
+            const pal1 = findQuantizationAndGeneratePalette([imgdata],127,173,255);
+            const pal2 = findQuantizationAndGeneratePalette([imgdata],127,85,172);
             const lut1 = new ColorLUT(pal1, 6);
             const lut2 = new ColorLUT(pal2, 6);
             pal1.unshift([0,0,0]);
@@ -327,7 +328,7 @@ export class PCX {
             pcx.convertImageData(imgdata, lut2, 128, 85, 172);
             return pcx;
         } else if (profile == PCXProfile.item) {
-            const pal = findQuantizationAndGeneratePalette(imgdata,253,128,255);
+            const pal = findQuantizationAndGeneratePalette([imgdata],253,128,255);
             const lut = new ColorLUT(pal, 6);
             const pal2 : RGBPalette= [ [1,1,1] ];
             const lut2 = new ColorLUT(pal2, 6);
@@ -339,7 +340,7 @@ export class PCX {
             pcx.convertImageData(imgdata, lut2, 1, 85, 172);
             return pcx;
         } else {
-            const pal = findQuantizationAndGeneratePalette(imgdata,254,128,255);
+            const pal = findQuantizationAndGeneratePalette([imgdata],254,128,255);
             const lut = new ColorLUT(pal, 6);
             const pcx = new PCX(imgdata.width, imgdata.height);
             pal.unshift([0,0,0]);
@@ -352,7 +353,52 @@ export class PCX {
 
     }
 
-    
+    static mergeCanvases(canvases: HTMLCanvasElement[]) : HTMLCanvasElement {
+        // spočítat výslednou velikost (např. vedle sebe)
+        let width = 0;
+        let height = 0;
+
+        for (const c of canvases) {
+            height += c.height;
+            width = Math.max(width, c.width);
+        }
+
+        const result = document.createElement("canvas");
+        result.width = width;
+        result.height = height;
+
+        const ctx = result.getContext("2d");
+        if (!ctx) throw new Error("Canvas returned NULL");
+
+        let y = 0;
+        for (const c of canvases) {
+            ctx.drawImage(c, 0, y);
+            y += c.height;
+        }
+
+        return result;
+    }
+
+    static async createCommonPalette(images: PCX[], profile: PCXProfileType) : Promise<PCX[]> {
+        const m = images.map(x=>x.createCanvas(profile));
+        const bigimg = PCX.mergeCanvases(m);
+        const large_pcx = await PCX.fromImage(bigimg,profile);
+        let y = 0;
+        const out = images.map(img=>{
+            const h = img.height;
+            const sz = h * img.width;
+            const lsz = h * large_pcx.width
+            const wr = new BinaryWriter();
+            for (let i = 0; i < h; ++i) {
+                const beg = (i + y) * large_pcx.width;
+                const buff = large_pcx.pixels.buffer.slice(beg,beg+img.width) as ArrayBuffer;
+                wr.write_buffer(buff);
+            }
+            y+=img.height;
+            return new PCX(img.width, img.height, new Uint8Array(wr.getBuffer()), large_pcx.palette);
+        })
+        return out;
+    }
 
 
 }

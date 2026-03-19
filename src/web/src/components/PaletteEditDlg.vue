@@ -99,6 +99,7 @@ function doModal(item: AssetConfiguration | null, type:type_enum) : Promise<Asse
             cur_item.value.set_name("Unnamed");
         }
         cur_item_name.value = cur_item.value.get_name();
+        cur_frame.value = 1;
         dlgref.value?.showModal();      
         updateDataList();
     });
@@ -187,7 +188,6 @@ function delFrame() {
                             <label><span>Left :</span><input type="text" v-model="cur_item.graphics[cur_frame][1]" :list="assets.id"></label>
                             <label><span>Right :</span><input type="text" v-model="cur_item.graphics[cur_frame][2]" :list="assets.id"></label>
                             <label><span title="Specifies offset from outer edge of left/right pixmap in pixels where enemies going through the wall are clipped">Clip(?)</span><input  type="number" v-model="cur_item.lclip" v-watch-range min="0" max="99"></label>
-                            <label><input  type="checkbox" v-model="cur_item.transparent"><span>Transparent (can see through)</span></label>
                             <label><input  type="checkbox" v-model="cur_item.alternate"><span>Alternating</span></label>
                             <label><input  type="checkbox" v-model="cur_item.repeat_anim"><span>Repeat animation</span></label>
                             <label><input  type="checkbox" v-model="cur_item.ping_pong"><span>Ping ping animation</span></label>

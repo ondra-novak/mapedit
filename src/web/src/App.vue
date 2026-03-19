@@ -16,6 +16,8 @@ import ShopsEditor from './views/ShopsEditor.vue';
 import { mainMenuControl, type EditorRef } from './core/services';
 import DialogsEditor from './views/DialogsEditor.vue';
 import TranslationTools from './views/TranslationTools.vue';
+import type ProgressBar from './components/tools/progressBar';
+import ProgressBarView from './components/tools/ProgressBarView.vue';
 
 const version = import.meta.env.VITE_APP_VERSION;
 
@@ -77,6 +79,7 @@ onMounted(()=>{
 </div>
 </div>
 <MessageBoxComponent/>
+<ProgressBarView />
 <MissingFiles />
 <ProjectSelectorDlg />
 <ServerConfigDlg />

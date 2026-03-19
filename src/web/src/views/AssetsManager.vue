@@ -2,10 +2,10 @@
 import AssetsPcxView from '@/components/AssetsPcxView.vue';
 import AssetsHiView from '@/components/AssetsHiView.vue';
 import AssetsList from '../components/AssetsList.vue'
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { AssetGroup } from '@/core/asset_groups';
 import type {AssetGroupType}from '@/core/asset_groups';
-import { server, type FileItem } from '@/core/api';
+import { server, type FileItem, type ModifiedFileNotify } from '@/core/api';
 import AssetsDDLManage from '@/components/AssetsDDLManage.vue';
 import AssetsToolCol from '@/components/AssetsToolCol.vue';
 import AssetToolIcons from '@/components/AssetToolIcons.vue';
@@ -22,6 +22,8 @@ import DialogDecompiler from '@/components/DialogDecompiler.vue';
 import FactEditor from '@/components/FactEditor.vue';
 import EncDecomp from '@/components/EncDecomp.vue';
 import DlgLayoutEditor from '@/components/DlgLayoutEditor.vue';
+import AssetsEnemyUploader from '@/components/AssetsEnemyUploader.vue';
+import type { WsRpcResult } from '@/core/wsrpc';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -166,6 +168,16 @@ function open_editor() {
 
 }
 
+function on_update_file(c:WsRpcResult) {
+    const info = c.data as ModifiedFileNotify;
+    if (info.name == cur_file_model.value?.name) {
+        cur_file_model.value = {name:"",group:0};
+        setTimeout(()=>cur_file_model.value = {name: info.name, group:info.group as AssetGroupType},10);
+    }
+}
+
+onMounted(()=>server.on("update",on_update_file));
+onUnmounted(()=>server.off("update",on_update_file));
 </script>
 
 
@@ -179,8 +191,9 @@ function open_editor() {
         <div class="middle-panel">
             <div class="tools-pos">
                 <div class="tools" v-if="active">
-                    <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items' || selected_tool=='enemies' || selected_tool=='uigfx'" 
+                    <AssetsPcxView v-if="selected_tool == 'walls' || selected_tool=='items'  || selected_tool=='uigfx'" 
                         v-model:file="selected_file" v-model:group="selected_group" />
+                    <AssetsEnemyUploader v-if="selected_tool == 'enemies'" v-model="selected_file" @switch_to="x=>cur_file_model = x"></AssetsEnemyUploader>
                     <AssetsHiView v-if="selected_tool == 'dialogshi'" v-model="selected_file" />
                     <AssetsToolCol v-if="selected_tool == 'coledit'"  v-model="selected_file"  />
                     <AssetToolIcons v-if="selected_tool == 'icons'"/>

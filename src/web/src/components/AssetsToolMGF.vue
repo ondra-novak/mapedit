@@ -211,7 +211,7 @@ async function start() {
         ctx.clearRect(0, 0, c.width, c.height);
         ctx.drawImage(img,0,0,c.width,c.height);
         const imgdata = ctx.getImageData(0,0,c.width,c.height);
-        const pal = findQuantizationAndGeneratePalette(imgdata,254,128,255);
+        const pal = findQuantizationAndGeneratePalette([imgdata],254,128,255);
         const lut = new ColorLUT(pal, 5);
         const pcx = new PCX(imgdata.width, imgdata.height);
         pal.unshift([0,0,0]);

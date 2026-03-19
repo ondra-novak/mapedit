@@ -66,7 +66,7 @@ export const SideFlag = {
     SOUND_IMPS: 0x10,
     ALARM: 0x20,
     PASS_ACTION: 0x40,
-    NOT_TRANSPARENT: 0x80,  //this flag is reversed in editor
+    TRANSPARENT: 0x80,  
     PRIM_ANIM: 0x100,
     PRIM_VIS: 0x200,
     PRIM_GAB: 0x400,
@@ -222,7 +222,7 @@ export class MAPGLOBAL extends WithSchema {
     fade_r:number=0;
     fade_g:number=0;
     fade_b:number=0;
-    start_sector:number=0;
+    start_sector:number=1;
     start_direction:number=0;
     map_effector:number=0;
     local_monsters:number=0;
@@ -1037,7 +1037,6 @@ export abstract class AssetConfiguration {
 export class WallConfiguration extends AssetConfiguration{
     graphics: string[][] = [["","",""]];
     position: number=0;
-    transparent: boolean = false;
     alternate: boolean = false;
     forward_dir: boolean = false;
     repeat_anim: boolean = false;
@@ -1057,7 +1056,6 @@ export class WallConfiguration extends AssetConfiguration{
         if (side_id == 0) return null;
 
         r.alternate = sec?false:((side.flags & SideFlag.DOUBLE_SIDE) != 0);
-        r.transparent = (side.flags & SideFlag.NOT_TRANSPARENT) == 0;
         let anim_frames = ((sec?side.sec_anim:side.prim_anim) & 0xF)+1;
         r.forward_dir = sec?((side.flags & SideFlag.SEC_FORV) != 0):((side.flags & SideFlag.PRIM_FORV) != 0);
         r.ping_pong = sec?((side.flags & SideFlag.SEC_GAB) != 0):((side.flags & SideFlag.PRIM_GAB) != 0);
@@ -1098,7 +1096,6 @@ export class WallConfiguration extends AssetConfiguration{
         if (this.repeat_anim) side.flags |=SideFlag.PRIM_ANIM;
         if (this.forward_dir) side.flags |= SideFlag.PRIM_FORV;
         if (this.ping_pong) side.flags |= SideFlag.PRIM_GAB;
-        if (!this.transparent && (side.flags & SideFlag.PRIM_VIS)) side.flags |=SideFlag.NOT_TRANSPARENT;
     }
     adjust_flags_sec(side: TSIDE){
         side.flags &= ~(SideFlag.SEC_ANIM|SideFlag.SEC_FORV|SideFlag.SEC_GAB|SideFlag.SPEC);
@@ -1106,7 +1103,6 @@ export class WallConfiguration extends AssetConfiguration{
         if (this.repeat_anim) side.flags |=SideFlag.SEC_ANIM;
         if (this.forward_dir) side.flags |= SideFlag.SEC_FORV;
         if (this.ping_pong) side.flags |= SideFlag.SEC_GAB;
-        if (!this.transparent && (side.flags & SideFlag.SEC_VIS)) side.flags |=SideFlag.NOT_TRANSPARENT;
         return side.flags;
     }
     get_frame_count() : number {
@@ -1364,7 +1360,7 @@ export class MapFile {
                 const place = idx * 4 +i;
                 const side = m.sides[idx*4+i];
                 const n = new MapSide();
-                side.flags = side.flags ^ (SideFlag.NOT_AUTOMAP|SideFlag.NOT_TRANSPARENT);
+                side.flags = side.flags ^ (SideFlag.NOT_AUTOMAP);
                 n.primary = w.add(WallConfiguration.from(side, m.pixmap_front,m.pixmap_left,m.pixmap_right, false));
                 n.secondary = w.add(WallConfiguration.from(side, m.pixmap_front,m.pixmap_left,m.pixmap_right, true));
                 n.arc = a.add(ArcConfiguration.from(side, m.pixmap_arc_left,m.pixmap_arc_right));
@@ -1409,38 +1405,7 @@ export class MapFile {
         q.sectors = r;        
         q.info = m.info;
 
-        MapFile.remove_transparent_walls(p.wall_palette,r)
-
         return {map:q,palette:p};
-    }
-
-    //some non-transparent walls are market as transpared because they are hidden between sectors
-    //find these walls and remove them from pallete, if non-transparent version exists
-    static remove_transparent_walls(p: ConfigurationPalette<WallConfiguration>, sect: MapSector[]) {
-        const replacement = new Map<WallConfiguration, WallConfiguration>();
-        for (const id in p.map) {
-            const w = p.map[id];
-            if (w.was_hidden && w.transparent) {
-                const altw = new WallConfiguration;
-                Object.assign(altw, w);
-                w.transparent = false;
-                const new_id = altw.get_key();
-                if (p.map[new_id]) {
-                    replacement.set(w, p.map[new_id]);
-                    delete p.map[id];
-                }
-            }
-        }
-        if (replacement.size) {
-            sect.forEach(sec=>sec.side.forEach(sid=>{
-                const p = sid.primary;
-                const s = sid.secondary;
-                const rp = p?replacement.get(p):null;
-                const rs = s?replacement.get(s):null;
-                if (rp) sid.primary = rp;
-                if (rs) sid.secondary = rs;
-            }))
-        }
     }
 
     saveToArrayBuffer() : ArrayBuffer {
@@ -1471,7 +1436,6 @@ export class MapFile {
             return sect.side.map((s,side)=>{
                 const out = new TSIDE;
                 out.action = s.action;
-                out.flags = s.flags & ~SideFlag.NOT_TRANSPARENT;
                 out.prim = walls.to_id(s.primary);
                 out.sec = walls.to_id(s.secondary);
                 out.oblouk = arc.to_id(s.arc) | ((s.primary?.position || 0) << 5) | (s.item_can_be_placed_behind?0x80:0);
@@ -1492,8 +1456,8 @@ export class MapFile {
                     out.xsec = s.secondary.offset_x>>1;
                     out.ysec = s.secondary.offset_y>>1;                        
                 }                
-                if (!sect.exit[side]) out.flags |= SideFlag.NOT_TRANSPARENT;
-                out.flags ^= SideFlag.NOT_AUTOMAP| SideFlag.NOT_TRANSPARENT
+                if (sect.exit[side]) out.flags |= SideFlag.TRANSPARENT;
+                out.flags ^= SideFlag.NOT_AUTOMAP;
                 return out;
 
             });
