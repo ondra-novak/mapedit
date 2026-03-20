@@ -1045,8 +1045,7 @@ export class WallConfiguration extends AssetConfiguration{
     secondary_front: boolean = false;
     offset_x:number = 250;
     offset_y:number = 160;
-    lclip: number = 0;    
-    was_hidden: boolean = false;
+    lclip: number = 0;        
     
 
 
@@ -1055,13 +1054,12 @@ export class WallConfiguration extends AssetConfiguration{
         let side_id = (sec?side.sec:side.prim);
         if (side_id == 0) return null;
 
-        r.alternate = sec?false:((side.flags & SideFlag.DOUBLE_SIDE) != 0);
+        r.alternate = sec?false:((side.flags & SideFlag.DOUBLE_SIDE) != 0);         
         let anim_frames = ((sec?side.sec_anim:side.prim_anim) & 0xF)+1;
         r.forward_dir = sec?((side.flags & SideFlag.SEC_FORV) != 0):((side.flags & SideFlag.PRIM_FORV) != 0);
         r.ping_pong = sec?((side.flags & SideFlag.SEC_GAB) != 0):((side.flags & SideFlag.PRIM_GAB) != 0);
         r.repeat_anim = sec?((side.flags & SideFlag.SEC_ANIM) != 0):((side.flags & SideFlag.PRIM_ANIM) != 0);
         r.position = sec?0:((side.oblouk & 0x60)>>5);
-        r.was_hidden = sec?((side.flags & SideFlag.SEC_VIS) == 0):((side.flags & SideFlag.PRIM_VIS) == 0);
         const count_graphics = anim_frames*(r.alternate?2:1);
         r.graphics = [];
         for (let l = 0; l < count_graphics; ++l) {
@@ -1436,6 +1434,7 @@ export class MapFile {
             return sect.side.map((s,side)=>{
                 const out = new TSIDE;
                 out.action = s.action;
+                out.flags = s.flags;
                 out.prim = walls.to_id(s.primary);
                 out.sec = walls.to_id(s.secondary);
                 out.oblouk = arc.to_id(s.arc) | ((s.primary?.position || 0) << 5) | (s.item_can_be_placed_behind?0x80:0);

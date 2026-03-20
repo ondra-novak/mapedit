@@ -99,7 +99,7 @@ function doModal(item: AssetConfiguration | null, type:type_enum) : Promise<Asse
             cur_item.value.set_name("Unnamed");
         }
         cur_item_name.value = cur_item.value.get_name();
-        cur_frame.value = 1;
+        cur_frame.value = 0;
         dlgref.value?.showModal();      
         updateDataList();
     });
