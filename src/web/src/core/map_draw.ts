@@ -365,7 +365,7 @@ export class MapDraw {
         }
     }
 
-    drawSelectedSectors(m: MapFile, level:number, sectors: number[]) {
+    drawSelectedSectors(m: MapFile, level:number, sectors: number[], drag_x = 0, drag_y = 0) {
         if (this.svg) {
             if (this.selection) {
                 this.svg.removeChild(this.selection);
@@ -375,8 +375,8 @@ export class MapDraw {
             sectors.forEach(n=>{
                 const s = m.sectors[n];
                 if (s && s.level == level) {
-                    const x= s.x*scl;
-                    const y= s.y*scl;
+                    const x= (s.x+drag_x)*scl;
+                    const y= (s.y+drag_y)*scl;
                     p.rctc(x,y,scl,scl);                    
                 }
             });
@@ -661,6 +661,7 @@ export class MapContainer {
     onSelectRect = (rc: DOMRectReadOnly,shift:boolean, control:boolean) => {
         console.log("Selected:", rc, shift, control);
     };
+    onDrag = (rc: DOMRectReadOnly,shift:boolean, control:boolean, done: boolean) => {return false;};
 
     constructor() {
         this.map = null;
@@ -814,7 +815,9 @@ export class MapContainer {
                         else if (dragButton == 0) {
                             const pt1 = this.clientToMap([dragStart[0], dragStart[1]], true);
                             const pt2 = this.clientToMap([event.clientX,event.clientY], true);
-                            this.map?.drawSelectionBox(...pt1,...pt2);
+                            if (!this.onDrag(new DOMRectReadOnly(...pt1,pt2[0]-pt1[0],pt2[1]-pt1[1]), event.shiftKey, event.ctrlKey,false)) {
+                                this.map?.drawSelectionBox(...pt1,...pt2);
+                            }
                         }
                     }               
                 }
@@ -836,9 +839,11 @@ export class MapContainer {
                         this.onClickXY(new DOMPointReadOnly(...pt), side, event.shiftKey, event.ctrlKey);
                     } else {
                         const pt1 = this.clientToMap([dragStart[0], dragStart[1]], true);
-                        const pt2 = this.clientToMap([event.clientX,event.clientY], true);
+                        const pt2 = this.clientToMap([event.clientX,event.clientY], true);                        
                         this.map?.removeSelectionBox();
-                        this.onSelectRect(rectFromPoints(...pt1,...pt2), event.shiftKey, event.ctrlKey);
+                        if (!this.onDrag(new DOMRectReadOnly(...pt1,pt2[0]-pt1[0],pt2[1]-pt1[1]), event.shiftKey, event.ctrlKey,true)) {
+                            this.onSelectRect(rectFromPoints(...pt1,...pt2), event.shiftKey, event.ctrlKey);
+                        }
                     
                     }                
                 }              
