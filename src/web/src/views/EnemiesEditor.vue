@@ -136,10 +136,8 @@ async function save_all() {
             const e = enemies.value;
             e.forEach((x,idx)=>{
                 x.cislo_vzoru = idx;
-                x.locx = 128;
-                x.locy = 128;
-                x.headx = 128;
-                x.headx = 128;
+                x.headx = x.locx;
+                x.heady = x.locy;
                 x.lives = x.vlastnosti[CharacterStats.VLS_MAXHIT];
         });
             const s = sounds.value;
@@ -419,6 +417,10 @@ async function laod_dialogs() : Promise<{value:number, label:string}[]> {
             <x-section>
                 <x-section-title>Other properties</x-section-title>
                 <x-form>
+                    <label><span>Position on tile</span><div>
+                        <input v-model="form.locx" v-watch-range type="number" min="0" max="255"/>
+                        <input v-model="form.locy" v-watch-range type="number" min="0" max="255"/>
+                    </div></label>
                     <label><span>Drop money</span><input v-model="form.money" v-watch-range type="number" min="0" max="65535"/></label>
                     <label><span>Total experience</span><input v-model="form.experience" v-watch-range type="number" min="0" max="999999"/></label>
                     <label><span>Kill experience</span><input v-model="form.bonus" v-watch-range type="number" min="0" max="999999"/></label>
