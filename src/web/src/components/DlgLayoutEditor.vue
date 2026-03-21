@@ -6,6 +6,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import StatusBar, { type SaveRevertControl } from './statusBar';
 import { AssetGroup } from '@/core/asset_groups';
 import { PCX, PCXProfile } from '@/core/pcx';
+import { FontList } from '@/core/fonts';
 
 
 const layout = reactive(new DialogLayout);
@@ -117,8 +118,19 @@ onUnmounted(()=>{
             <label><span class="imagearea">Picture Y</span><input type="number" v-watch-range min="0" max="360" v-model="layout.pic_y"></label>
             <label><span>Icon padding</span><input type="number" v-watch-range min="0" max="639" v-model="layout.icon_padding"></label>
             <label><span>Icon height</span><input type="number" v-watch-range min="0" max="360" v-model="layout.icon_height"></label>
+            <label><span>Icon scale (shrink)</span><select v-model.number="layout.icon_size">
+                <option :value="1">No shrink</option>
+                <option :value="2">2x</option>
+                <option :value="3">3x</option>
+                <option :value="4">4x</option>
+                <option :value="5">5x</option>
+            </select></label>
+            <label><span>Description font</span><select v-model.number="layout.desc_font"> 
+                <option v-for="(n,idx) of FontList" :key="idx" :value="idx"> {{ n }}</option></select></label>
             <label><span>Description Color</span><input type="color"  v-model="computed_colors.desc_color"></label>
             <label><span>Enable shadow</span><input type="checkbox"  v-model="computed_transp.desc_color"></label>
+            <label><span>Text font</span><select v-model.number="layout.text_font"> 
+                <option v-for="(n,idx) of FontList" :key="idx" :value="idx"> {{ n }}</option></select></label>
             <label><span>Text Color</span><input type="color"  v-model="computed_colors.text_color"></label>
             <label><span>Enable shadow</span><input type="checkbox"  v-model="computed_transp.text_color"></label>
             <label><span>Choice Color</span><input type="color"  v-model="computed_colors.choice_color"></label>

@@ -1404,6 +1404,9 @@ export class DialogLayout {
     pic_y: number = 17;
     icon_padding: number = 25;
     icon_height: number = 25;
+    icon_size: number = 3;
+    desc_font: number= 16;
+    text_font: number= 16;
     
     getSchema() : Schema {
         return {
@@ -1422,7 +1425,10 @@ export class DialogLayout {
             pic_x:"int32",
             pic_y:"int32",
             icon_padding:"int32",
-            icon_height:"int32"
+            icon_height:"int32",
+            icon_size:"int32",
+            desc_font:"int32",
+            text_font:"int32"
         };
     };
 }
