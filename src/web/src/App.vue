@@ -56,7 +56,7 @@ onMounted(()=>{
 </menu>
 <div class="workspace-outer">
   <div class="workspace-inner">
-    <x-workspace v-of="active_item == 0"><
+    <x-workspace v-of="active_item == 0">
       <div class="center">
         <div><img src="@/assets/logo.png"></div>
         <div>Alpa version: {{ version }}</div>

@@ -114,8 +114,12 @@ onUnmounted(()=>{
             <label><span class="textdescarea">Description Width</span><input type="number" v-watch-range min="0" max="639" v-model="layout.txt_desc_width"></label>
             <label><span class="textdescarea">Description X</span><input type="number" v-watch-range min="0" max="639" v-model="layout.txt_desc_x"></label>
             <label><span class="textdescarea">Description Y</span><input type="number" v-watch-range min="0" max="360" v-model="layout.txt_desc_y"></label>
-            <label><span class="imagearea">Picture X</span><input type="number" v-watch-range min="0" max="639" v-model="layout.pic_x"></label>
-            <label><span class="imagearea">Picture Y</span><input type="number" v-watch-range min="0" max="360" v-model="layout.pic_y"></label>
+            <label><span class="imagearea">Dialog image X</span><input type="number" v-watch-range min="0" max="639" v-model="layout.pic_x"></label>
+            <label><span class="imagearea">Dialog image Y</span><input type="number" v-watch-range min="0" max="360" v-model="layout.pic_y"></label>
+            <label><span class="imagearea">Layer order</span><select v-model.number="layout.draw_order">
+                <option value="0">Image in front of frame</option>
+                <option value="1">Frame overlays image (requires transparency)</option>
+            </select></label>
             <label><span>Icon padding</span><input type="number" v-watch-range min="0" max="639" v-model="layout.icon_padding"></label>
             <label><span>Icon height</span><input type="number" v-watch-range min="0" max="360" v-model="layout.icon_height"></label>
             <label><span>Icon scale (shrink)</span><select v-model.number="layout.icon_size">

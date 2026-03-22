@@ -1317,7 +1317,6 @@ class ConfigurationSaveMap {
             const pxms = v[0];
             pxms.forEach((x,idx)=>{
                 let c = x[type];
-                if (!c) c= "EMPTY.PCX";
                 lst.push([c, idx+id]);
             });
         }

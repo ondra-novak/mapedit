@@ -253,6 +253,8 @@ export class DialogDef {
         205: ["teleport_enemies", 3],
         206: ["teleport_current_enemy", 3],
         207: ["add_choice_w_icon", 3],
+        208: ["bott_disp_text",1],
+        209: ["show_desc_slow",1],
         518: ["set_flag",1],
         519: ["reset_flag",1],
         255: ["exit_dialog",0]
@@ -349,6 +351,7 @@ export const DialogBranchType = {
     selchar:3,    //ask for character and continue to target (for example cast spell on target)
     seldead:4,    //ask for dead character and continue to target (for example ressurection)
     addstory:5,   //jump but add text to story log    
+    bottext:6,    //display text on bottom and exit    
 } as const;
 
 export const DialogSpeakerType = {
@@ -420,6 +423,7 @@ export interface DialogNode {
     branches: DialogBranch[];
     node_type: typeof DlgNodeType[keyof typeof DlgNodeType];
     shop_id?: number;
+    animate_desc?: boolean;    //when true, show description slow
 }
 
 export interface DialogStory {
@@ -777,8 +781,12 @@ class DialogCompiler {
 
     compile_node(nd: DialogStory| DialogNode) : Instruction[]{
         const out : Instruction [] =[];
-        if (nd.description) {
-            out.push({value:128});
+        if (nd.description) {            
+            if ((nd as DialogNode).animate_desc) {
+                out.push({value:209});
+            } else {
+                out.push({value:128});
+            }
             out.push({text:nd.description});
         }
         if (nd.picture) {
@@ -959,6 +967,11 @@ class DialogCompiler {
                     brnch.push({value:0}); //no jump
                     brnch.push({value:141}); //if !iff goto paragraph
                     brnch.push({value:target});         
+                    break;
+                case DialogBranchType.bottext:
+                    brnch.push({value:208});    //bott_disp_text
+                    brnch.push({text});
+                    brnch.push({value:255});    //exit dialog
                     break;
             }
             if (condinstr.length) {
@@ -1407,6 +1420,7 @@ export class DialogLayout {
     icon_size: number = 3;
     desc_font: number= 16;
     text_font: number= 16;
+    draw_order:number= 0;
     
     getSchema() : Schema {
         return {
@@ -1428,7 +1442,8 @@ export class DialogLayout {
             icon_height:"int32",
             icon_size:"int32",
             desc_font:"int32",
-            text_font:"int32"
+            text_font:"int32",
+            draw_order:"int32"
         };
     };
 }
