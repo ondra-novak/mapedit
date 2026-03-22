@@ -281,9 +281,11 @@ export class MapDraw {
                     if (sd.action) this.drawAction(set.action.wall, mx);
                     if (sd.target_sector != sector) {
                         const ts = m.sectors[sd.target_sector];
-                        const tmx = this.transformByDir(ts.x, ts.y, sd.target_side);
-                        if (tmx) {
-                            this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                        if (ts) {
+                            const tmx = this.transformByDir(ts.x, ts.y, sd.target_side);
+                            if (tmx) {
+                                this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                            }
                         }
                     }
                 }
@@ -295,9 +297,11 @@ export class MapDraw {
                                 const senda = item as TMA_SEND_ACTION;
                                 if (senda.sector != sector && senda.sector) {
                                     const ts = m.sectors[senda.sector];
-                                    const tmx = this.transformByDir(ts.x, ts.y, senda.side);
-                                    if (tmx) {
-                                        this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                                    if (ts) {
+                                        const tmx = this.transformByDir(ts.x, ts.y, senda.side);
+                                        if (tmx) {
+                                            this.drawActionFromWall(ts.level == level?set.arrow.same:set.arrow.to_other,mx,tmx);
+                                        }
                                     }
                                 }                                                                
                         }

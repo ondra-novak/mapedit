@@ -24,6 +24,7 @@ import EncDecomp from '@/components/EncDecomp.vue';
 import DlgLayoutEditor from '@/components/DlgLayoutEditor.vue';
 import AssetsEnemyUploader from '@/components/AssetsEnemyUploader.vue';
 import type { WsRpcResult } from '@/core/wsrpc';
+import CombineItems from '@/components/CombineItems.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -97,6 +98,7 @@ function select_tool() : string | null {
     }
     if (cur_file_model.value.name.toUpperCase() == "DIALOGY.DAT") return "dialog_decompiler";
     if (cur_file_model.value.name.toUpperCase() == "DIALOGY.LAY") return "dialog_layout";
+    if (cur_file_model.value.name.toUpperCase() == "ITEMCOMB.DAT") return "item_comb";
     if (cur_file_model.value.name.toUpperCase() == "FACTS.JSON") return "fact_editor";
     if (cur_file_model.value.name.endsWith(".ENC")) return "enc";        
     if (cur_file_model.value.name.endsWith(".MGF")) return "mgf";        
@@ -209,6 +211,7 @@ onUnmounted(()=>server.off("update",on_update_file));
                     <EncDecomp v-if="selected_tool == 'enc'" v-model="selected_file" :group="selected_group"/>
                     <DialogDecompiler v-if="selected_tool == 'dialog_decompiler'" />
                     <DlgLayoutEditor v-if="selected_tool == 'dialog_layout'" />
+                    <CombineItems v-if="selected_tool=='item_comb'" />
                     <FactEditor v-if="selected_tool == 'fact_editor'" />
                     <div v-if="selected_tool == 'editor_exists'" class="goto-tool">
                         <button @click="open_editor">Open editor</button>
