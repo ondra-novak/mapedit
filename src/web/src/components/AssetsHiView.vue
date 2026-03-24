@@ -21,16 +21,6 @@ const emit = defineEmits<{
 }>();
 
 
-async function load_file(file: string) {
-    try {
-        const data = await server.getDDLFile(file);
-        const pic = HIFormat.fromArrayBuffer(data);
-        return pic.createCanvas();
-    } catch (e) {
-        alert(e);
-    }    
-}
-
 
 function onSelectFile(event: Event) {
   const target = event.target as HTMLInputElement
@@ -71,8 +61,7 @@ async function start_upload() {
                     const arrbuf = hi.toArrayBuffer();
                     if (new_filename.value) {
                         server.putDDLFile(new_filename.value, arrbuf, AssetGroup.DIALOGS);
-                        emit("upload",new_filename.value);                        
-                        onUpdate();
+                        filename.value = new_filename.value                        
                     }
                 } catch (e) {
                     alert(e);
