@@ -48,6 +48,7 @@ function getImageHref(s:string) {
 }
 
 let speaker_default_state = false;
+let prefer_text_type : typeof DialogBranchType[keyof typeof DialogBranchType] = DialogBranchType.npctalk;
 
 function set_default_speaker(ev: Event) {
     const t = ev.target as HTMLInputElement;
@@ -660,7 +661,6 @@ function add_node_branch() {
     const nn = DialogManager.create_node(d);
     const b = n.branches[f.branch];
     b.target = nn[0];
-    if (n.animate_desc) nn[1].animate_desc=true;
     f.node = b.target;
     delete edit_focus.value.branch;    
     return b;
@@ -671,8 +671,9 @@ function add_reaction_node() {
     if (!pb) return;
     const nb = add_branch();
     if (!nb) return;
-    if (pb.type == DialogBranchType.choice||pb.type == DialogBranchType.selchar||pb.type == DialogBranchType.seldead) nb.type = DialogBranchType.npctalk;
-    else if (pb.type == DialogBranchType.npctalk) {
+    if (pb.type == DialogBranchType.choice||pb.type == DialogBranchType.selchar||pb.type == DialogBranchType.seldead) nb.type = prefer_text_type;
+    else if (pb.type == DialogBranchType.npctalk || pb.type == DialogBranchType.animatedesc) {
+        prefer_text_type = nb.type;
         nb.type = DialogBranchType.choice;
         nb.speaker_icon = speaker_default_state;
     }
@@ -1009,10 +1010,10 @@ const node_type_icon = [
                         <label><span>Name (not visible)</span><input type="text" v-model="selected_node.name"></label>                        
                         <label><span>Action (code)</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_node.action" @focus="isEditingCode=true" @blur="isEditingCode=false"/></label>
                         <template v-if="selected_node.node_type == DlgNodeType.standard">
-                        <div class="label">
-                            <span>Description (optional, visible, <ToggleButton v-model="selected_node.animate_desc">animated</ToggleButton>)</span>
+                        <label>
+                            <span>Description (optional, visible)</span>
                             <textarea type="text" rows="4" v-model="selected_node.description"></textarea>
-                        </div>
+                        </label>
                         <label>
                             <span>Picture (optional, visible)</span>
                             <input type="text"  v-model="selected_node.picture" :list="image_list.id">
@@ -1071,6 +1072,7 @@ const node_type_icon = [
                         <label><span>Branch type: </span><select v-model.number="selected_branch.type">
                             <option :value="0">Jump</option>
                             <option :value="1">Text</option>
+                            <option :value="7">Animated description</option>
                             <option :value="2">Choice</option>
                             <option :value="3">Select character</option>
                             <option :value="4">Select dead character</option>
@@ -1352,6 +1354,12 @@ text.title {
 
 .choice.npctalk rect {
     fill:#ddd;
+}
+.choice.animatedesc rect {
+    fill:#ddd;
+}
+.choice.animatedesc text {
+    fill: purple;
 }
 .choice.seldead rect {
     fill:#ccf;

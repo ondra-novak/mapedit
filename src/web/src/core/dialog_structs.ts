@@ -256,6 +256,7 @@ export class DialogDef {
         208: ["bott_disp_text",1],
         209: ["show_desc_slow",1],
         210: ["open_book",0],
+        211: ["add_book_direct",0],
         518: ["set_flag",1],
         519: ["reset_flag",1],
         255: ["exit_dialog",0]
@@ -352,7 +353,8 @@ export const DialogBranchType = {
     selchar:3,    //ask for character and continue to target (for example cast spell on target)
     seldead:4,    //ask for dead character and continue to target (for example ressurection)
     addstory:5,   //jump but add text to story log    
-    addtobook:6   //add text to book
+    addtobook:6,   //add text to book
+    animatedesc:7 //animate description
 } as const;
 
 export const DialogSpeakerType = {
@@ -395,7 +397,9 @@ export interface DialogBranch {
     ///if true, condition is inverted
     invert_condition?: boolean;
     ///add speaker's icon to choice
-    speaker_icon?: boolean
+    speaker_icon?: boolean    
+
+
 };
 
 export interface DialogAction {
@@ -430,7 +434,6 @@ export interface DialogNode {
     action?: DialogAction;  
     branches: DialogBranch[];
     node_type: typeof DlgNodeType[keyof typeof DlgNodeType];
-    animate_desc?: boolean;    //when true, show description slow
     shop_id?: number;       //for shopping node
     load_map_info?: DlgLoadMapInfo; //for load map node
     message?:string;    //message fo node message type
@@ -791,17 +794,13 @@ class DialogCompiler {
 
     compile_node(nd: DialogStory| DialogNode) : Instruction[]{
         const out : Instruction [] =[];
-        if (nd.description) {            
-            if ((nd as DialogNode).animate_desc) {
-                out.push({value:209});
-            } else {
-                out.push({value:128});
-            }
-            out.push({text:nd.description});
-        }
         if (nd.picture) {
             out.push({value:147});
             out.push({text:nd.picture});
+        }
+        if (nd.description) {            
+            out.push({value:128});
+            out.push({text:nd.description});
         }
         if ("nodes" in nd) {
             this.compile_story(nd as DialogStory, out);
@@ -915,7 +914,19 @@ class DialogCompiler {
             }
             switch (b.type) {
                 case DialogBranchType.addstory:
+                    uncond_jump = true;
                     brnch.push({value:162}); //add to story                                        
+                    brnch.push({text:text});
+                    if (target == 0) {
+                        brnch.push({value:255}); ///exit
+                    } else {
+                        brnch.push({value:139}); //goto paragraph;
+                        brnch.push({value:target});                    
+                    }
+                    break;
+                case DialogBranchType.addtobook:
+                    uncond_jump = true;
+                    brnch.push({value:211}); //add to book 
                     brnch.push({text:text});
                     if (target == 0) {
                         brnch.push({value:255}); ///exit
@@ -938,14 +949,15 @@ class DialogCompiler {
                     ++choices;
                     break;
                 case DialogBranchType.jump_to_node:
-                    if (target ) {
+                   uncond_jump = true;
+                   if (target ) {
                         if (condinstr.length) {
                             brnch.push(...condinstr);
                             condinstr.splice(0);
                             if (inverted)  brnch.push({value:141}); //not iff  jump
                             else brnch.push({value:140}); //iff jump
+                            uncond_jump = false;
                         } else {
-                            uncond_jump = true;
                             brnch.push({value:139}); //goto paragraph;
                         }
                         brnch.push({value:target});         
@@ -955,6 +967,19 @@ class DialogCompiler {
                         brnch.push({value:255}); ///exit
                         break;
                     }                    
+                case DialogBranchType.animatedesc: {
+                    uncond_jump = true;
+                    brnch.push({value:209});
+                    brnch.push({text:text});
+                    if (target) {
+                        brnch.push({value:139})
+                        brnch.push({value:target})
+                    } else {
+                        brnch.push({value:164});
+                        brnch.push({value:255}); ///exit
+                    }
+                    break;
+                }
                 case DialogBranchType.npctalk:
                     brnch.push({value:148});
                     brnch.push({text:text});
@@ -986,8 +1011,7 @@ class DialogCompiler {
                 out.push(...condinstr);
                 out.push({value: inverted?170:169}); //if !iff jump
                 out.push({value: brnch.reduce((a,b)=>a+instruction_size(b),0)});
-            } else {
-                if (b.type == DialogBranchType.npctalk || b.type == DialogBranchType.addstory) uncond_jump = true;
+                uncond_jump = false;
             }
             out.push(...brnch);
         })

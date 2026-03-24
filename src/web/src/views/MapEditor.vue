@@ -93,6 +93,7 @@ const ApplyMode = {
     PERIMETER:{t:"Perimeter walls ☐",v:4},
     INNER_SIDES:{t:"Inner walls ",v:5},
     EDGE_SIDES:{t:"Edge walls",v:6},
+    OUTER_SIDES:{t:"Outer sides",v:9},
     ALL_SIDES:{t:"All selected walls",v:7},
     NORTH:{t:"North ↑",v:0},
     EAST:{t:"East →",v:1},
@@ -123,7 +124,8 @@ const ActionEvent = [
 const SelectionShape = {
     None: 0,
     Row: 1,
-    Block: 2
+    Block: 2,
+    Outer: 3
 }
 
 
@@ -143,7 +145,7 @@ const focused_enemies = ref(new Set<number>());
 const item_order = [0,1,3,2];
 const search_enemy = ref("");
 let last_apply_mode = [
-    ApplyMode.ACTIVE.v, ApplyMode.SELECTION_DIR.v, ApplyMode.ALL_SIDES.v
+    ApplyMode.ACTIVE.v, ApplyMode.SELECTION_DIR.v, ApplyMode.ALL_SIDES.v, ApplyMode.OUTER_SIDES.v
 ]
 let last_selection_shape = 0
 
@@ -840,7 +842,9 @@ function getSelectionShape() : number {
     if (s.length == 0 || !curmap.value) return SelectionShape.None;
     const bx = curmap.value.sectors[s[0]].x;
     const by = curmap.value.sectors[s[0]].y;
+    let focus_sel = false;
     const bbox = s.reduce((a,b)=>{
+        focus_sel = focus_sel || (focus.value?.sector == b);
         const x = curmap.value.sectors[b].x;
         const y = curmap.value.sectors[b].y;
         if (a[0] > x) a[0] = x;
@@ -849,8 +853,9 @@ function getSelectionShape() : number {
         if (a[3] < y) a[3] = y;
         return a;
     }, [bx,by,bx,by]);
-    const row = (bbox[3]-bbox[1])<=1;
-    const col = (bbox[2]-bbox[0])<=1;
+    if (!focus_sel) return SelectionShape.Outer;
+    const row = (bbox[3]-bbox[1])<1;
+    const col = (bbox[2]-bbox[0])<1;
     if ((row || col) && row != col) return SelectionShape.Row;
     return SelectionShape.Block;
 }
@@ -944,8 +949,8 @@ function applyChanges() {
                         }
                     }
                 } else if (selection.value?.length) {
-                    const selset = new Set<number>();
-                    selection.value.forEach(sect=>selset.add(sect));
+                    let sel = selection.value;
+                    const selset = new Set<number>(sel);
                     let filter : ((sect:number,sid:number)=>boolean)|null = null;
                     switch (applyMode.value) {
                         case ApplyMode.ALL_SIDES.v: filter = ()=>true;break;
@@ -957,9 +962,20 @@ function applyChanges() {
                         case ApplyMode.WEST.v: filter = (sect,sid)=>sid==1;break;
                         case ApplyMode.NORTH.v: filter = (sect,sid)=>sid==0;break;
                         case ApplyMode.SOUTH.v: filter = (sect,sid)=>sid==2;break;
+                        case ApplyMode.OUTER_SIDES.v:{
+                            const outersel = new Set<number>();
+                            m.sectors.forEach((x,idx)=>{
+                                if (idx == 0) return;  
+                                if (selset.has(idx)) return;
+                                var f = x.exit.find(y=>selset.has(y));
+                                if (f) outersel.add(idx);
+                            });
+                            sel = Array.from(outersel.values());
+                            filter = (sect, sid)=> selset.has(m.sectors[sect].exit[sid]);
+                        }break;
                     }
                     if (filter) {
-                        selection.value.forEach((sect)=>{
+                        sel.forEach((sect)=>{
                             for (let i = 0; i < 4; ++i) {
                                 if (filter(sect, i)) {
                                     const s = m.sectors[sect] = shallowClone(m.sectors[sect]);
