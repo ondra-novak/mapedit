@@ -1,6 +1,6 @@
 import { BinaryIterator, BinaryWriter, make1DArray, type Schema } from "./binary";
 import { HumanWearPlaceVariables } from "./character_structs";
-import { CharacterStatVariables, CharacterWeaponBonus, CharacterWeaponBonusVariables, type CharacterStats } from "./common_defs";
+import { CharacterStatVariables, CharacterWeaponBonus, CharacterWeaponBonusVariables, StringList1, type CharacterStats } from "./common_defs";
 import type { TranslateTable } from "./translate";
 
 export const MAX_IDENTIFIERS = 100;
@@ -255,6 +255,7 @@ export class DialogDef {
         207: ["add_choice_w_icon", 3],
         208: ["bott_disp_text",1],
         209: ["show_desc_slow",1],
+        210: ["open_book",0],
         518: ["set_flag",1],
         519: ["reset_flag",1],
         255: ["exit_dialog",0]
@@ -351,7 +352,7 @@ export const DialogBranchType = {
     selchar:3,    //ask for character and continue to target (for example cast spell on target)
     seldead:4,    //ask for dead character and continue to target (for example ressurection)
     addstory:5,   //jump but add text to story log    
-    bottext:6,    //display text on bottom and exit    
+    addtobook:6   //add text to book
 } as const;
 
 export const DialogSpeakerType = {
@@ -405,7 +406,10 @@ export interface DialogAction {
 export const DlgNodeType = {
     standard: 0,
     battle: 1,
-    shopping: 2
+    shopping: 2,
+    message: 3,
+    openbook:4,
+    loadmap:5
 } as const
 
 export const DlgNodeTypeStr = Object.entries(DlgNodeType).reduce((a,b)=>{
@@ -413,17 +417,23 @@ export const DlgNodeTypeStr = Object.entries(DlgNodeType).reduce((a,b)=>{
     return a;
 },[] as string[]);
 
-
+export interface DlgLoadMapInfo {
+    map_name: string;
+    sector: number;
+    side: 0|1|2|3;
+}
 
 export interface DialogNode {
     name: string;
     picture?: string;
     description?: string;    
-    action?: DialogAction;
+    action?: DialogAction;  
     branches: DialogBranch[];
     node_type: typeof DlgNodeType[keyof typeof DlgNodeType];
-    shop_id?: number;
     animate_desc?: boolean;    //when true, show description slow
+    shop_id?: number;       //for shopping node
+    load_map_info?: DlgLoadMapInfo; //for load map node
+    message?:string;    //message fo node message type
 }
 
 export interface DialogStory {
@@ -803,8 +813,7 @@ class DialogCompiler {
         return out;
     }
 
-    compile_story(st: DialogStory,  out: Instruction[]) {
-
+    compile_story(st: DialogStory,  out: Instruction[]) {   
         st.speakers.forEach((sp,idx)=>{
             switch (sp.type) {
                 case DialogSpeakerType.attribute:
@@ -863,6 +872,10 @@ class DialogCompiler {
         }
         let choices = 0;
         let uncond_jump = false;
+
+        if (nd.node_type != DlgNodeType.standard && nd.branches.length) {
+            this.compile_error("Branches in non-branching node are never taken");
+        }
 
         nd.branches.forEach((b,idx)=>{
             const brnch : Instruction[] = [];
@@ -968,11 +981,6 @@ class DialogCompiler {
                     brnch.push({value:141}); //if !iff goto paragraph
                     brnch.push({value:target});         
                     break;
-                case DialogBranchType.bottext:
-                    brnch.push({value:208});    //bott_disp_text
-                    brnch.push({text});
-                    brnch.push({value:255});    //exit dialog
-                    break;
             }
             if (condinstr.length) {
                 out.push(...condinstr);
@@ -993,6 +1001,26 @@ class DialogCompiler {
             case DlgNodeType.battle:
                 out.push({value:157});  //start_battle
                 break;
+            case DlgNodeType.loadmap:
+                if (!nd.load_map_info) this.compile_error("No map info for `loadmap` node");
+                else if (!nd.load_map_info.map_name)  this.compile_error("No map selected for `loadmap` node");
+                else {
+                    out.push({value:46});
+                    out.push({text: nd.load_map_info.map_name});
+                    out.push({value: nd.load_map_info.sector});
+                    out.push({value: nd.load_map_info.side});
+                }
+                break;
+            case DlgNodeType.message:
+                if (!nd.message) this.compile_error("No message for `message` node");
+                else {
+                    out.push({value:208});
+                    out.push({text: nd.message});                    
+                }
+                break;
+            case DlgNodeType.openbook:
+                out.push({value:210});
+                break;                
             default:
                 if (choices) {
                     out.push({value:144});  //dialog select

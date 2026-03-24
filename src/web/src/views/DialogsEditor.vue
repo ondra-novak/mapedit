@@ -21,6 +21,7 @@ import DlgConstsEditor from '@/components/DlgConstsEditor.vue';
 import DelayLoadedList from '@/components/DelayLoadedList.vue';
 import getGlobalShops from '@/utils/global_shop_list';
 import ToggleButton from '@/components/tools/ToggleButton.vue';
+import { directions } from '@/core/map_structs';
 
 const dialogs = reactive(new DialogManager);
 let inited = false;
@@ -454,12 +455,14 @@ function create_layout2(story: DialogStory, positions:number[] = []) : Layout{
         if (selected_node && selected_node.height !== undefined) {
             const cur_level = level_map[selected_node.node_id];    
             const node = story.nodes[selected_node.node_id];
-            node.branches.forEach((b,idx)=>{
-                const offset = selected_node.offset+node_base_height+idx+selected_node.bofs;
-                if (b.target !== null && b.target !== undefined) {
-                    add_route(cur_level, b.target, offset, selected_node.bofs, false);
-                }
-            });
+            if (node.node_type == DlgNodeType.standard) {
+                node.branches.forEach((b,idx)=>{
+                    const offset = selected_node.offset+node_base_height+idx+selected_node.bofs;
+                    if (b.target !== null && b.target !== undefined) {
+                        add_route(cur_level, b.target, offset, selected_node.bofs, false);
+                    }
+                });
+            }
         } else  if (cur_via && cur_via.target_node !== undefined) {
             add_route(cur_via.level, cur_via.target_node, cur_via.offset, 0, true);
         }    
@@ -628,16 +631,6 @@ function branch_class(type: number, final: boolean, idx: number) {
 }
 
 
-function update_optional_field(ev: Event, object: any, field: string) {
-    const t = ev.target as HTMLInputElement ;
-    if (t) {
-        if (t.value) {
-            object[field] = t.value;
-        } else {
-            delete object[field];
-        }
-    }
-}
 function add_branch() {
     const f = edit_focus.value;
     if (f.node === undefined || f.dlg === undefined) return null;
@@ -863,6 +856,64 @@ async function delete_condition() {
     }
 }
 
+const book_reference = computed({
+    get() {
+        const txt = selected_branch.value?.text ?? "";
+        if (txt.startsWith("&REF:")) {
+            return txt.split("\n")[0].substring(5);
+        } else {
+            return "";
+        }
+    },
+    set(x: string) {
+        if (!selected_branch.value) return;
+        const nonref_text = book_content.value;
+        if (x.length) {
+            selected_branch.value.text =`&REF:${x}\n`+nonref_text;
+        } else{
+            selected_branch.value.text = nonref_text;
+        }
+    }
+})
+
+const book_content = computed({
+    get() {
+        const txt = selected_branch.value?.text ?? "";
+        if (txt.startsWith("&REF:")) {
+            return txt.split("\n").slice(1).join("\n");
+        } else {
+            return txt;
+        }
+    },
+    set(x:string) {
+        const ref = book_reference.value;
+        if (!selected_branch.value) return;
+        selected_branch.value.text = x;
+        book_reference.value = ref;
+    }
+})
+
+const selected_node_map=computed(()=>{
+    let nfo = selected_node.value?.load_map_info;
+    if (!nfo) {
+        nfo = {map_name:"",sector:0,side:0};
+        selected_node.value!.load_map_info = nfo;
+    }
+    return nfo;
+})
+
+async function loadAllMaps() {
+    return (await server.getDDLFiles(AssetGroup.MAPS)).files.map(x=>x.name).filter(x=>x.toUpperCase().endsWith(".MAP"))
+        .map(x=>({value: x}));
+}
+function loadAllDirections() {
+    return directions.map((x,idx)=>({value:idx,label:x}));
+}
+
+const node_type_icon = [
+    null,"⚔","🛒","✉","🕮","🧭"
+] as const;
+
 </script>
 <template>
 <x-workspace :hidden="!active">
@@ -908,8 +959,7 @@ async function delete_condition() {
                     <g class="node" :class="{final: cur_story.nodes[n.node_id].branches.length == 0, selected: edit_focus.node == n.node_id && edit_focus.branch === undefined}" @click="edit_focus={dlg:current_index, node:n.node_id}">
                         <rect  rcx="10" ry="10" x="0" y="0" :width="x_width()" :height="y_height(n.height)" />
                         <text class="title" x="5" :y="grid_y/2" v-svg-ellipsis="grid_width-5" :key=" cur_story.nodes[n.node_id].name"> #{{ n.node_id }} {{ cur_story.nodes[n.node_id].name }}</text>
-                        <text class="battle" :x="x_width()-5" :y="y_height(1)-10" v-if="cur_story.nodes[n.node_id].node_type == DlgNodeType.battle">⚔</text>
-                        <text class="shopping" :x="x_width()-5" :y="y_height(1)-10" v-if="cur_story.nodes[n.node_id].node_type == DlgNodeType.shopping">🛒</text>
+                        <text v-if="node_type_icon[cur_story.nodes[n.node_id].node_type]" class="icon" :x="x_width()-5" :y="y_height(1)-10" >{{node_type_icon[cur_story.nodes[n.node_id].node_type]}}</text>
                         <text v-if="cur_story.nodes[n.node_id].description" class="desc" x="5" :y="grid_y" v-svg-ellipsis="grid_width-5" :key=" cur_story.nodes[n.node_id].description">{{ cur_story.nodes[n.node_id].description }}</text>
                         <image v-if="cur_story.nodes[n.node_id].picture" class="desc" x="0" :y="(cur_story.nodes[n.node_id].description?1.3:0.8)*grid_y" :key=" cur_story.nodes[n.node_id].picture"
                             :href="getImageHref(cur_story.nodes[n.node_id].picture!)" :width="x_width()" :height="y_coord(1)"></image>
@@ -947,6 +997,9 @@ async function delete_condition() {
                             <option :value="DlgNodeType.standard">Branching</option>
                             <option :value="DlgNodeType.battle">Battle</option>
                             <option :value="DlgNodeType.shopping">Shopping</option>
+                            <option :value="DlgNodeType.message">Exit with message</option>
+                            <option :value="DlgNodeType.openbook">Open book</option>
+                            <option :value="DlgNodeType.loadmap">Load map</option>
                         </select>
                          <DelayLoadedList v-if="selected_node.node_type == DlgNodeType.shopping" v-model="selected_node.shop_id" 
                             :list="getGlobalShops().then(x=>x.map(y=>({value:y[0],label:y[1]})))" />                         
@@ -955,14 +1008,35 @@ async function delete_condition() {
                         </div></div>
                         <label><span>Name (not visible)</span><input type="text" v-model="selected_node.name"></label>                        
                         <label><span>Action (code)</span><DlgCodeEditor ref="code_editor_el" class="code_edit" v-model="selected_node.action" @focus="isEditingCode=true" @blur="isEditingCode=false"/></label>
-                        <div class="label"><span>Description (optional, visible, <ToggleButton v-model="selected_node.animate_desc">animated</ToggleButton>)</span><textarea type="text" rows="3"
-                            :value="selected_node.description ??''"
-                            @change="ev=>update_optional_field(ev,dialogs._dlg[edit_focus.dlg!].nodes[edit_focus.node!],'description')"
-                            ></textarea></div>
-                        <label><span>Picture (optional, visible)</span><input type="text" 
-                            :value="selected_node.picture ??''"
-                            @change="ev=>update_optional_field(ev,dialogs._dlg[edit_focus.dlg!].nodes[edit_focus.node!],'picture')"
-                            :list="image_list.id"></label>                                                    
+                        <template v-if="selected_node.node_type == DlgNodeType.standard">
+                        <div class="label">
+                            <span>Description (optional, visible, <ToggleButton v-model="selected_node.animate_desc">animated</ToggleButton>)</span>
+                            <textarea type="text" rows="4" v-model="selected_node.description"></textarea>
+                        </div>
+                        <label>
+                            <span>Picture (optional, visible)</span>
+                            <input type="text"  v-model="selected_node.picture" :list="image_list.id">
+                        </label>                               
+                        </template>
+                        <label v-if="selected_node.node_type == DlgNodeType.message">
+                            <span>Message</span>
+                            <input type="text" v-model="selected_node.message" />
+                        </label>
+                        <template v-if="selected_node.node_type == DlgNodeType.loadmap">
+                            <label>
+                                <span>Map file</span>
+                                <DelayLoadedList v-model="selected_node_map.map_name" :list="loadAllMaps()"></DelayLoadedList>
+                            </label>
+                            <label>
+                                <span>Sector number</span>
+                                <input type="number" v-model="selected_node_map.sector">
+                            </label>
+                            <label>
+                                <span>Direction</span>
+                                <DelayLoadedList  v-model="selected_node_map.side" :list="loadAllDirections()"></DelayLoadedList>
+                            </label>
+                            
+                        </template>
                     </x-form>
                 </x-section>
             </template>
@@ -1001,7 +1075,7 @@ async function delete_condition() {
                             <option :value="3">Select character</option>
                             <option :value="4">Select dead character</option>
                             <option :value="5">Add to story log</option>
-                            <option :value="6">Exit and display message</option>
+                            <option :value="6">Add to book (direct)</option>
                         </select></label>
                         <div class="label" v-if="selected_branch.type != 0"><span>Speaker</span><div class="more">
                             <select v-model.number="selected_branch.speaker">
@@ -1013,13 +1087,19 @@ async function delete_condition() {
                                 <input type="checkbox" v-model="selected_branch.speaker_icon" @click="set_default_speaker"><span>Show speaker's icon</span>
                             </template>                            
                         </div></div>
+                        <label v-if="selected_branch.type == DialogBranchType.addtobook">
+                            <span>Page reference (optional)</span>
+                            <input type="text" v-model="book_reference">
+                        </label>
                         <label v-if="selected_branch.type != 0">
                                 <span class="text-help">Text<span>
                                 [he,she] - choosen by speaker gender<br/>
                                 %n - replace by speaker name<br/>
                                 %[ , %] - replaced by [,  ]</span></span>
-                                <textarea rows="5" v-model="selected_branch.text"></textarea></label>
-                        <div class="label" v-if="selected_branch.type != DialogBranchType.bottext"><span>Target</span>
+                                <textarea v-if="selected_branch.type==DialogBranchType.addtobook" rows="4" v-model="book_content"></textarea>
+                                <textarea v-else rows="5" v-model="selected_branch.text"></textarea>
+                        </label>
+                        <div class="label"><span>Target</span>
                             <div class="more">
                                 <select v-model.number="selected_branch.target">
                                     <option v-for="(v,k) in cur_story.nodes" :key="k" :value="k" :class="{unused: diagram!.unused[k]}">
@@ -1283,15 +1363,15 @@ text.title {
     font-style: italic;
     fill: #444;
 }
-.choice.bottext rect {
-    fill: rgb(218, 218, 191);
+.choice.addtobook rect {
+    fill: rgb(232, 187, 187);
 }
 .choice.bottext text {
     font-style: italic;
     fill: #5b3c1c;
 }
 
-.node text.battle ,.node text.shopping {
+.node text.icon  {
     text-anchor: end;
     font-size: 2rem;
 }
@@ -1337,7 +1417,7 @@ text.title {
 .code_edit {
     text-align: left;
     background-color: white;
-    height: 7rem;
+    height: 6rem;
     border: 1px solid;
 }
 .diagram {
