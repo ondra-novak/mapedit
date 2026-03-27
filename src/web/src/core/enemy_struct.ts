@@ -36,10 +36,10 @@ export class EnemyDef{
   adjusting: number[][] = make2DArray(16,6,0); // volba středu pro animace (short[16*6] = short[96])
   sector: number = 0; // pozice (word)
   dir: number = 0; // směr (word)
-  locx: number = 0; // přesná pozice (char)
-  locy: number = 0;
-  headx: number = 0; // pozice kam mob míří (char)
-  heady: number = 0;
+  locx: number = 128; // přesná pozice (char)
+  locy: number = 128;
+  headx: number = 128; // pozice kam mob míří (char)
+  heady: number = 128;
   anim_counter: number = 0; // čítač animací (word)
   vlastnosti: number[] = make1DArray(24,0); // základní vlastnosti potvory (short[24])
   inv: number[] = []; // batoh potvory (short[MOBS_INV]) – délka bude třeba určit podle definice
@@ -80,10 +80,10 @@ const EnemySchema : Schema = {
   adjusting: ["int16", 6, 16],
   sector: "uint16",
   dir: "uint16",
-  locx: "int8",
-  locy: "int8",
-  headx: "int8",
-  heady: "int8",
+  locx: "uint8",
+  locy: "uint8",
+  headx: "uint8",
+  heady: "uint8",
   anim_counter: "uint16",
   vlastnosti: ["uint16", 24],
   inv: ["int16", MOBS_INV],
@@ -124,10 +124,10 @@ const EnemySchemaNew : Schema = {
   adjusting: ["int16", 6, 16],      
   sector: "uint16",                 
   dir: "uint16",                    
-  locx: "int8",
-  locy: "int8",
-  headx: "int8",
-  heady: "int8",                    
+  locx: "uint8",
+  locy: "uint8",
+  headx: "uint8",
+  heady: "uint8",                    
   anim_counter: "uint16",           
   vlastnosti: ["uint16", 24],       
   inv: ["int16", MOBS_INV],         

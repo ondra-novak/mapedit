@@ -11,6 +11,7 @@ import svg_pointer from '@/assets/toolbar/pointer.svg'
 import svg_pencil from '@/assets/toolbar/pencil.svg'
 import svg_eraser from '@/assets/toolbar/eraser.svg'
 import svg_chest_enemy from '@/assets/toolbar/chest_enemy.svg'
+import svg_move_arrows from '@/assets/toolbar/move_arrows.svg'
 import { messageBox } from '@/utils/messageBox';
 import { create_datalist } from '@/utils/datalist';
 import NicheEditor from './NicheEditor.vue';
@@ -37,7 +38,8 @@ const EditMode = {
     Edit:0,
     Draw:1,
     Erase:2,
-    Enemies:3
+    Enemies:3,
+    Move:4
 } as const;
 
 class MapFileWithStringtable extends MapFile{
@@ -91,6 +93,7 @@ const ApplyMode = {
     PERIMETER:{t:"Perimeter walls ☐",v:4},
     INNER_SIDES:{t:"Inner walls ",v:5},
     EDGE_SIDES:{t:"Edge walls",v:6},
+    OUTER_SIDES:{t:"Outer sides",v:9},
     ALL_SIDES:{t:"All selected walls",v:7},
     NORTH:{t:"North ↑",v:0},
     EAST:{t:"East →",v:1},
@@ -121,12 +124,13 @@ const ActionEvent = [
 const SelectionShape = {
     None: 0,
     Row: 1,
-    Block: 2
+    Block: 2,
+    Outer: 3
 }
 
 
 const focus = ref<FocusItem>();
-const selection = ref<number[]>();
+const selection = ref<number[]>([]);
 const link = ref<LinkRef>();
 const applyMode = ref<number>(ApplyMode.ACTIVE.v);
 const curNiche = ref<NicheDef|null>(null);
@@ -141,7 +145,7 @@ const focused_enemies = ref(new Set<number>());
 const item_order = [0,1,3,2];
 const search_enemy = ref("");
 let last_apply_mode = [
-    ApplyMode.ACTIVE.v, ApplyMode.SELECTION_DIR.v, ApplyMode.ALL_SIDES.v
+    ApplyMode.ACTIVE.v, ApplyMode.SELECTION_DIR.v, ApplyMode.ALL_SIDES.v, ApplyMode.OUTER_SIDES.v
 ]
 let last_selection_shape = 0
 
@@ -542,12 +546,40 @@ function enumerate_enemies() {
     focused_enemies.value = s;    
 }
 
+function expand_selection() {
+    
+    const sel : number[] = selection.value;
+    const m = curmap.value;
+    const sectors: MapSector[] = m.sectors;
+
+    const expanded = new Set<number>(sel);
+    const queue = [...sel];
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        const sector = sectors[current];
+        
+        if (sector && sector.exit) {
+            sector.exit.forEach(nextSector => {
+                if (nextSector > 0 && !expanded.has(nextSector)) {
+                    expanded.add(nextSector);
+                    queue.push(nextSector);
+                }
+            });
+        }
+    }
+
+    selection.value = Array.from(expanded);            
+}
 
 function onMapSelectRect(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
     switch (settings.edit_mode) {
         case EditMode.Draw: if (control) eraseRect(rc); else drawRect(rc); break;
         case EditMode.Erase: if (control) drawRect(rc); else eraseRect(rc);break;
         case EditMode.Edit: modifySelection(rc, shift, control);break;
+        case EditMode.Move: modifySelection(rc, shift, control);
+                            if (!shift && !control) expand_selection();
+                            break;
         case EditMode.Enemies:  modifySelection(rc, shift, control);
                                 enumerate_enemies();
                                 break;
@@ -556,8 +588,71 @@ function onMapSelectRect(rc: DOMRectReadOnly,shift:boolean, control:boolean) {
     }    
 }
 
+
+function check_if_can_move(ofsx: number, ofsy: number, to_level: number) {
+    if (selection.value.length == 0) return false;
+    const m = curmap.value.sectors;
+    const s = new Set<number>(selection.value);
+    const pos = new Set<string>();
+    m.forEach((v,idx)=>{
+        if (!idx || s.has(idx) || v.level != to_level || v.type == SectorType.Empty) return;
+        pos.add(`${v.x},${v.y}`)
+    });
+    const found = m.findIndex((v,idx)=>{
+        if (!s.has(idx)) return;
+        const loc =`${v.x+ofsx},${v.y+ofsy}`;
+        return pos.has(loc);
+    })
+    return found < 0;
+}
+
+function moveSelection(ofsx: number, ofsy: number, to_level: number) {
+
+    if (!check_if_can_move(ofsx, ofsy, to_level)) return;
+
+    const new_map = begin_edit();
+    const new_sec = shallowClone(new_map.sectors);
+    selection.value.forEach(n=>{
+        const r = shallowClone(new_sec[n]);
+        r.x += ofsx;
+        r.y += ofsy;
+        r.level = to_level;
+        new_sec[n] = r
+    })
+    new_map.sectors = new_sec;
+    end_edit(new_map);
+}
+
+
+function onMapDrag(rc: DOMRectReadOnly,shift:boolean, control:boolean, done: boolean) {
+    if (settings.edit_mode != EditMode.Move) return false;
+    const m = curmap.value.sectors;
+    const idx = selection.value.findIndex(x=>m[x].x == rc.x && m[x].y == rc.y);
+    if (idx < 0) return false;
+
+    mapdraw.drawSelectedSectors(curmap.value,settings.curlevel, selection.value, rc.width,rc.height);
+
+    if (done) {
+        moveSelection(rc.width, rc.height, settings.curlevel);
+        mapdraw.drawSelectedSectors(curmap.value,settings.curlevel, selection.value, 0,0);
+    } 
+
+    return true;
+}
+
+const can_move_up = computed(()=>check_if_can_move(0,0,settings.curlevel+1));
+const can_move_down = computed(()=>check_if_can_move(0,0,settings.curlevel-1));
+
+function move_map_up_down(ofs: number) {
+    moveSelection(0,0,settings.curlevel+ofs);
+    settings.curlevel+=ofs;
+}
+
 mapcontainer.onClickXY = onMapClickXY;
 mapcontainer.onSelectRect = onMapSelectRect;
+mapcontainer.onDrag = onMapDrag;
+
+
 
 
 function updateFocus() {
@@ -569,7 +664,7 @@ function updateFocus() {
 }
 
 function updateSelection() {
-    if (selection.value && (settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Enemies)) {
+    if (selection.value && (settings.edit_mode == EditMode.Edit || settings.edit_mode == EditMode.Enemies || settings.edit_mode == EditMode.Move)) {
         mapdraw.drawSelectedSectors(curmap.value, settings.curlevel, selection.value);
         if (selection.value.length == 0 && applyMode.value >= 0) applyMode.value = -1;
     } else {
@@ -728,6 +823,7 @@ const edit_modes = [
 [svg_pencil,"Draw"],
 [svg_eraser,"Erase"],
 [svg_chest_enemy,"Items/Enemies"],
+[svg_move_arrows,"Move tool"],
 ]
 
 onMounted(init);
@@ -746,7 +842,9 @@ function getSelectionShape() : number {
     if (s.length == 0 || !curmap.value) return SelectionShape.None;
     const bx = curmap.value.sectors[s[0]].x;
     const by = curmap.value.sectors[s[0]].y;
+    let focus_sel = false;
     const bbox = s.reduce((a,b)=>{
+        focus_sel = focus_sel || (focus.value?.sector == b);
         const x = curmap.value.sectors[b].x;
         const y = curmap.value.sectors[b].y;
         if (a[0] > x) a[0] = x;
@@ -755,8 +853,9 @@ function getSelectionShape() : number {
         if (a[3] < y) a[3] = y;
         return a;
     }, [bx,by,bx,by]);
-    const row = (bbox[3]-bbox[1])<=1;
-    const col = (bbox[2]-bbox[0])<=1;
+    if (!focus_sel) return SelectionShape.Outer;
+    const row = (bbox[3]-bbox[1])<1;
+    const col = (bbox[2]-bbox[0])<1;
     if ((row || col) && row != col) return SelectionShape.Row;
     return SelectionShape.Block;
 }
@@ -850,8 +949,8 @@ function applyChanges() {
                         }
                     }
                 } else if (selection.value?.length) {
-                    const selset = new Set<number>();
-                    selection.value.forEach(sect=>selset.add(sect));
+                    let sel = selection.value;
+                    const selset = new Set<number>(sel);
                     let filter : ((sect:number,sid:number)=>boolean)|null = null;
                     switch (applyMode.value) {
                         case ApplyMode.ALL_SIDES.v: filter = ()=>true;break;
@@ -863,9 +962,20 @@ function applyChanges() {
                         case ApplyMode.WEST.v: filter = (sect,sid)=>sid==1;break;
                         case ApplyMode.NORTH.v: filter = (sect,sid)=>sid==0;break;
                         case ApplyMode.SOUTH.v: filter = (sect,sid)=>sid==2;break;
+                        case ApplyMode.OUTER_SIDES.v:{
+                            const outersel = new Set<number>();
+                            m.sectors.forEach((x,idx)=>{
+                                if (idx == 0) return;  
+                                if (selset.has(idx)) return;
+                                var f = x.exit.find(y=>selset.has(y));
+                                if (f) outersel.add(idx);
+                            });
+                            sel = Array.from(outersel.values());
+                            filter = (sect, sid)=> selset.has(m.sectors[sect].exit[sid]);
+                        }break;
                     }
                     if (filter) {
-                        selection.value.forEach((sect)=>{
+                        sel.forEach((sect)=>{
                             for (let i = 0; i < 4; ++i) {
                                 if (filter(sect, i)) {
                                     const s = m.sectors[sect] = shallowClone(m.sectors[sect]);
@@ -1520,6 +1630,10 @@ async function on_modify_ceil(item: AssetConfiguration|null, index: number) {
         <label><input type="checkbox" v-model="layers.items"><span>Items</span></label>
     </x-form>
 </div>
+<div class="moveupdown" v-if="settings.edit_mode == EditMode.Move && (can_move_down || can_move_up)">
+    <button :disabled="!can_move_up" @click="move_map_up_down(1)">To upper floor</button>
+    <button :disabled="!can_move_down" @click="move_map_up_down(-1)">To lower floor</button>
+</div>
 </template>
 <template v-else>
 <div class="open-map-hlp"><div></div></div>
@@ -1585,6 +1699,18 @@ x-workspace > * {
     box-shadow: 3px 3px 5px black;
     left: 3.1rem;
 }
+.moveupdown {
+    position: absolute;
+    border:1px solid;
+    background-color: #eee;
+    padding: 1em 1em 1em 1em;
+    box-shadow: 3px 3px 5px black;
+    right: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
 
 .mapcont {
     height: 100%;

@@ -14,13 +14,14 @@ import DelayLoadedList from './DelayLoadedList.vue';
 import getGlobalDialogs from '@/utils/global_dialog_list';
 import getGlobalShops from '@/utils/global_shop_list';
 import PlaylistEditor from './PlaylistEditor.vue';
+import { ElementTypeName } from '@/core/common_defs';
 
 
 
 const ActionEvent = [
 ["On interaction",  0x4, "Interaction with the wall - mouse click or spacebar. If there is secondary wall defined, the player must click on the secondary wall"],
 ["On wall bump",  0x2, "Attempt to walk through not passable wall (solid, blocked)"],
-["On wall attack",  0x8000, "Attempt to swing weapon on wall or hit by an item"],
+["On wall attack",  0x8000, "Attempt to swing weapon on wall or hit by an item (you can test by 'If have item')"],
 ["On locked",  0x10, "Triggered when Lock is called with no key item in the cursor"],
 ["On wrong key",  0x8, "Triggered when Lock is called with wrong key item in the cursor"],
 ["On niche interaction",  0x4000, "Interaction with niche - added or removed item"],
@@ -489,7 +490,7 @@ function create_computed_select_item(get: ()=>number|null, set:(x:number|null)=>
 }
 const if_jump_cond = computed(()=>{
     if (focused_item.value && (focused_item.value instanceof TMA_IFJMP)) {
-        return condition_proxy(focused_item.value, "param1");
+        return condition_proxy(focused_item.value, "parm1");
     } else {
         return condition_proxy({x:0}, "x");
     }
@@ -722,6 +723,7 @@ const suitable_texts = computed(()=>{
                 <template v-if="focused_item.header.action == ActionType.IFJMP">
                     <label><span>Condition</span><select v-model="if_jump_cond.cond">
                         <option v-for="x of IfJumpCondition" :key="x[0]" :value="x[0]">{{ x[1] }}</option>
+                        <option v-for="(x,y) of ElementTypeName" :key="y" :value="y+34">Current item has element damage: {{ x }}</option>
                     </select></label>
                 </template>                
                 <template v-else-if="focused_item.header.action == ActionType.ISFLG">

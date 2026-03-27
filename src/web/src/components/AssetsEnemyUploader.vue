@@ -129,6 +129,7 @@ async function run_files(lst: FileList, base: string) {
         }
 
         pg.set_text("Creating palette");
+        while (pal.length<256) pal.push([0,0,0]);
         const cols = new COLPaletteSet;
         cols.addPalette(pal);
         const col_name = dosname_sanitize(`${base}.COL`);

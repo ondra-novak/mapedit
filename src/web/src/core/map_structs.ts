@@ -1101,6 +1101,7 @@ export class WallConfiguration extends AssetConfiguration{
         if (this.repeat_anim) side.flags |=SideFlag.SEC_ANIM;
         if (this.forward_dir) side.flags |= SideFlag.SEC_FORV;
         if (this.ping_pong) side.flags |= SideFlag.SEC_GAB;
+        if (this.secondary_front) side.target_side |= 0x80;
         return side.flags;
     }
     get_frame_count() : number {
@@ -1317,7 +1318,6 @@ class ConfigurationSaveMap {
             const pxms = v[0];
             pxms.forEach((x,idx)=>{
                 let c = x[type];
-                if (!c) c= "EMPTY.PCX";
                 lst.push([c, idx+id]);
             });
         }

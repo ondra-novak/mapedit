@@ -36,6 +36,7 @@ function get_target_node(v: [number, Instruction[]]) {
        || code == 139 
        || code  == 140 
        || code == 141 
+       || code== 207
         || code == 146) {
             return v[1][0].value || null;
        }
