@@ -38,6 +38,7 @@ function getImageHref(s:string) {
     if (s == "SCREEN") return screen;
     const img = image_cache.get(s);
     if (!img) {
+        if (!s) return screen;
         server.getDDLFile(s).then(data=>{
                 const url = HIFormat.fromArrayBuffer(data).createCanvas().toDataURL();
                 image_cache.set(s,url);                

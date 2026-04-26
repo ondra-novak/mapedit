@@ -122,7 +122,7 @@ condition && {
  - **sleep(hours)** - perform party rest for hours
  - **timepass(seconds, game_hours)** - dark screen for given seconds, game time passes game_hours
  - **eat(price)** - add food and water to all characters in given dialog, price for each
- - **change_music(str)** - change music - changes current music. When music finished, continues in playlist
+ - **play_music(str)** - change music - changes current music. When music finished, continues in playlist
  - **play_sound(str)** - play sound effect
  - **replace_monster(m)** - replace current moster by different monster
  - **replace_monsters(m,n)** - replace all monsters m in level by monsters n

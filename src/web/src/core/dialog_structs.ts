@@ -154,7 +154,7 @@ export class DialogDef {
         33: ["teleport_char",3],
         34: ["stk_push xicht",0],
         35: ["stk_push sector",0],
-        36: ["change_music",1],
+        36: ["play_music",1],
         37: ["replace_monster",1],
         38: ["replace_monsters",2],
         39: ["replace_monsters_r",4],
@@ -625,7 +625,7 @@ const functionList: FunctionList =
     "sleep":[['n'],183],
     "time_skip":[['n','n'],182],
     "eat":[['n'],184],
-    "change_music":[['s'],36],
+    "play_music":[['s'],36],
     "play_sound":[['s'],190],
     "replace_monster":[['n'],37],
     "replace_monsters":[['n','n'],38],
@@ -1109,7 +1109,7 @@ class DialogCompiler {
                         const pos = args.length-idx-1;
                         const d = def[0][pos];
                         switch (d) {
-                            case "s":  arginstr.unshift(this.compile_string(a[0],pos+1,n));
+                            case "s":  arginstr.unshift(this.compile_string(a,pos+1,n));
                                     break;
                             case 'n': {
                                 const dummy : Instruction[] = [];
