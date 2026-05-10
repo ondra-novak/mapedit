@@ -175,6 +175,9 @@ export class DialogDef {
         55: ["has_spell_group",1],
         56: ["end_spell_group",1],
         57: ["stk_push game_time",0],
+        58: ["autosave",0],
+        59: ["play_music_playlist",1],
+        60: ["delay",1],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -646,6 +649,8 @@ const functionList: FunctionList =
     "has_spell_group":[['n'],55],
     "end_spell_group":[['n'],56],
     "autosave":[[],58],
+    "play_music_playlist":[['s'],59],
+    "delay":[['n'],60]
 };
 
 export class DialogCompileError extends Error {
