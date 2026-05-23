@@ -19,6 +19,7 @@
 #include <memory>
 #include <mutex>
 #include "utils/json.hpp"
+#include "utils/zip_writer.hpp"
 #include "wsrpc.hpp"
 #include "webpage.hpp"
 #include <condition_variable>
@@ -67,7 +68,8 @@ constexpr Endpoint<WebInterface> endpoints[] = {
     {Method::GET, "/command", &WebInterface::command},
     {Method::GET, "/ws", &WebInterface::websocket},
     {Method::GET, "/{}", &WebInterface::webserver},
-    {Method::GET, "/", &WebInterface::webserver_index}
+    {Method::GET, "/", &WebInterface::webserver_index},
+    {Method::POST, "/api/ddl", &WebInterface::ddl_get_multiple}
 };
 
 
@@ -1085,6 +1087,24 @@ void WebInterface::ws_import_adventure_as(const WsRpc::Request &req) {
      save_config();        
      publish_state();
      req.send_response(true);
+}
+
+bool WebInterface::ddl_get_multiple(Request &req) {
+    Json files = Json::from_string(req.body);
+    ZipWriter zip;
+    for (auto &v : files.as_array()) {
+        std::string_view name = v.as_text();
+        auto data = file_get(name,0);    
+        if (data.has_value()) {
+            zip.add_file(name, {data->data(), data->size()});
+        }
+    }
+
+    auto bytes = zip.finish();
+
+    return req.response({200}, {
+         {"Content-Type", "application/zip"},       
+    }, std::string_view(bytes.data(), bytes.size()));
 }
 
 }

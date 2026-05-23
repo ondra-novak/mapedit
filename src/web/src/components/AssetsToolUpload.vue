@@ -89,6 +89,43 @@ async function do_upload_multiple() {
 
 const not_ready_for_upload_multiple = computed(()=>!(file_list.value?.length));
 
+const multiple_files_list = ref<string[]>([]);
+const multiple_files_selected = ref<string[]>([]);
+const download_multi = ref<HTMLDialogElement>();
+const multiple_files_download_pending = ref<boolean>(false);
+
+async function begin_multiple_download() {
+    download_multi.value?.showModal();
+    multiple_files_selected.value = [];
+    multiple_files_list.value = [];    
+    const lst = await server.getDDLFiles()
+    lst.files.forEach(x=>multiple_files_list.value.push(x.name));
+    if (filename.value) multiple_files_selected.value.push(filename.value);    
+}
+
+async function download_zip() {
+    multiple_files_download_pending.value = true;
+    const response = await fetch('/api/ddl', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json' },      
+      body: JSON.stringify(multiple_files_selected.value) 
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const now = new Date();
+    const datetime = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mapedit_${datetime}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    multiple_files_download_pending.value = false;
+}
 
 onMounted(updateModel);
 
@@ -100,6 +137,9 @@ watch([group],()=>new_group.value = group.value || AssetGroup.UNKNOWN);
 <div class="download" v-if="download_link && filename">
     <h2>Download</h2>
     <a :href="download_link">Download file {{ filename }}</a>
+</div>
+<div class="download">
+    <button @click="begin_multiple_download">Multiple files download</button>
 </div>
 <div class="upload">
     <h2>Upload</h2>
@@ -132,6 +172,17 @@ watch([group],()=>new_group.value = group.value || AssetGroup.UNKNOWN);
         <div :style="{width: `${progress_percent}%`}"></div>
     </div>
 </div>
+<dialog ref="download_multi">
+    <header>Download multiple files</header>
+    <x-form>
+        <label>Select multiple files</label><select size="20" v-model="multiple_files_selected" multiple :disabled="multiple_files_download_pending">
+            <option v-for="f of multiple_files_list" :value="f"> {{ f }}</option>
+        </select>
+    </x-form>
+    <footer>
+        <button @click="download_zip" :disabled="multiple_files_download_pending"> Download ZIP </button><button @click="download_multi?.close()"> Close </button>
+    </footer>
+</dialog>
 
 </template>
 <style scoped>
