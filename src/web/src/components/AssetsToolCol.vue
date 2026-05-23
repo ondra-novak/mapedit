@@ -54,8 +54,8 @@ function do_revert() {
 }
 
 async function do_save() {
-    if (filename.value) {
-        return save_col(filename.value);
+    if (palete_col_name.value) {
+        return save_col(palete_col_name.value);
     }
 }
 
