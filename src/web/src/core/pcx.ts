@@ -400,5 +400,73 @@ export class PCX {
         return out;
     }
 
+    remap_colors(indices:number[]): PCX {
+        if (indices.length < 256) {
+            const new_indices = indices.slice();
+            while (new_indices.length<256) new_indices.push(new_indices.length);
+            return this.remap_colors(new_indices);
+        }  else if (indices.length >256) {
+            const new_indices = indices.slice(0,256);
+            return this.remap_colors(new_indices);
+        }
 
+        const nwpix = new Uint8Array(this.pixels.length);
+        for (let i = 0; i < nwpix.length; ++i) {
+            nwpix[i] = indices[this.pixels[i]];
+        }
+        const nwpal = new Uint8Array(this.palette.length);
+        for (let i = 0; i < 256; ++i) {
+            const nwidx= indices[i]*3;
+            const idx = i*3;
+            nwpal[nwidx] = this.palette[idx];
+            nwpal[nwidx+1] = this.palette[idx+1];
+            nwpal[nwidx+2] = this.palette[idx+2];   
+        }
+        return new PCX(this.width, this.height, nwpix, nwpal);        
+    }
+
+
+
+  downscaleHalf(): PCX {
+      const newWidth = Math.floor(this.width / 2);
+      const newHeight = Math.floor(this.height / 2);
+      const newPixels = new Uint8Array(newWidth * newHeight);
+      for (let y = 0; y < newHeight; y++) {
+          for (let x = 0; x < newWidth; x++) {
+              newPixels[y * newWidth + x] = this.pixels[(y * 2) * this.width + (x * 2)];
+          }
+      }
+      return new PCX(newWidth, newHeight, newPixels, new Uint8Array(this.palette));
+  }
+
+  upscale2x(): PCX {
+      const newWidth = this.width * 2;
+      const newHeight = this.height * 2;
+      const newPixels = new Uint8Array(newWidth * newHeight);
+      const get = (x: number, y: number): number => {
+          const cx = Math.max(0, Math.min(this.width - 1, x));
+          const cy = Math.max(0, Math.min(this.height - 1, y));
+          return this.pixels[cy * this.width + cx];
+      };
+      for (let y = 0; y < this.height; y++) {
+          for (let x = 0; x < this.width; x++) {
+              const P = this.pixels[y * this.width + x];
+              const A = get(x, y - 1); // above
+              const B = get(x + 1, y); // right
+              const C = get(x - 1, y); // left
+              const D = get(x, y + 1); // below
+              // Scale2x: top-left, top-right, bottom-left, bottom-right
+              const E0 = (C === A && C !== D && A !== B) ? A : P;
+              const E1 = (A === B && A !== C && B !== D) ? B : P;
+              const E2 = (C === D && C !== A && D !== B) ? C : P;
+              const E3 = (D === B && D !== C && B !== A) ? B : P;
+              const ox = x * 2, oy = y * 2;
+              newPixels[oy * newWidth + ox]         = E0;
+              newPixels[oy * newWidth + ox + 1]     = E1;
+              newPixels[(oy + 1) * newWidth + ox]   = E2;
+              newPixels[(oy + 1) * newWidth + ox + 1] = E3;
+          }
+      }
+      return new PCX(newWidth, newHeight, newPixels, new Uint8Array(this.palette));
+  }
 }
