@@ -15,6 +15,7 @@ import getGlobalDialogs from '@/utils/global_dialog_list';
 import getGlobalShops from '@/utils/global_shop_list';
 import PlaylistEditor from './PlaylistEditor.vue';
 import { ElementTypeName } from '@/core/common_defs';
+import SoundControl from '@/utils/sound.ts';
 
 
 
@@ -462,16 +463,7 @@ async function fill_sound_info() {
 async function play_sound() {
     const f = focused_item.value as TMA_SOUND
     if (!f) return;
-    try {
-        const data = await server.getDDLFile(f.filename);
-        const type = f.filename.toLocaleUpperCase().endsWith(".MP3")?"mpeg":"wav";
-        const blob = new Blob([data], { type: "audio/"+type });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.play();
-    } catch (e) {
-        console.error(e);
-    }
+    SoundControl.play(f.filename);
 }
 
 function create_computed_select_item(get: ()=>number|null, set:(x:number|null)=>void) {

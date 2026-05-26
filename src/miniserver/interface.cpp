@@ -151,7 +151,8 @@ std::optional<std::vector<char>  > WebInterface::file_get(std::string_view name,
             f = _game->get(name);
             if (!f) {
                 auto p = _game->get_path();
-                auto rs = p.parent_path()/"maps"/name;
+                auto section = name.ends_with(".MUS")?"music":"maps";
+                auto rs = p.parent_path()/section/name;
                 std::ifstream data(rs, std::ios::in|std::ios::binary);
                 if (!data) return f;
                 f.emplace();

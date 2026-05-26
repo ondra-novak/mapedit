@@ -25,6 +25,7 @@ import DlgLayoutEditor from '@/components/DlgLayoutEditor.vue';
 import AssetsEnemyUploader from '@/components/AssetsEnemyUploader.vue';
 import type { WsRpcResult } from '@/core/wsrpc';
 import CombineItems from '@/components/CombineItems.vue';
+import MusicPlayer from '@/components/MusicPlayer.vue';
 
 const selected_tool = ref<string>("");
 const selected_file = ref<string>("");
@@ -124,6 +125,8 @@ function select_tool() : string | null {
                                         return  "uigfx";
                                 else    
                                     return null;        
+        case AssetGroup.MUSIC:
+        case AssetGroup.SOUNDS: return "sounds";
         default:  return null;
     }    
 }
@@ -213,6 +216,7 @@ onUnmounted(()=>server.off("update",on_update_file));
                     <DlgLayoutEditor v-if="selected_tool == 'dialog_layout'" />
                     <CombineItems v-if="selected_tool=='item_comb'" />
                     <FactEditor v-if="selected_tool == 'fact_editor'" />
+                    <MusicPlayer v-if="selected_tool == 'sounds'" :name="selected_file" />
                     <div v-if="selected_tool == 'editor_exists'" class="goto-tool">
                         <button @click="open_editor">Open editor</button>
                     </div>

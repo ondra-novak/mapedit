@@ -4,6 +4,7 @@ import { AssetGroup } from '@/core/asset_groups';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import DelayLoadedList from './DelayLoadedList.vue';
 import { watch } from 'vue';
+import SoundControl from '@/utils/sound.ts';
 
 
 const playlist = defineModel<string>();
@@ -75,6 +76,7 @@ const music = load_music();
 watch(new_track, (nw)=>{
     if (nw && parsed_playlist) {
         parsed_playlist.tracks.push(nw);
+        SoundControl.play(nw);
         nextTick(()=>{
             new_track.value = "";
         });
@@ -84,6 +86,10 @@ watch(new_track, (nw)=>{
 function remove_track(idx:number) {
     const newlist = parsed_playlist.tracks.slice(0,idx).concat(parsed_playlist.tracks.slice(idx+1));
     parsed_playlist.tracks =newlist;
+}
+
+function stop_preview() {
+    SoundControl.stop();
 }
 
 onMounted(parse_playlist);
@@ -101,7 +107,7 @@ onMounted(parse_playlist);
         <div  v-for="(s,idx) of parsed_playlist.tracks" :key="s" @click="remove_track(idx)">
             {{ s }}
         </div>
-        <DelayLoadedList v-model="new_track" :list="music" />
+        <DelayLoadedList v-model="new_track" :list="music" @blur="stop_preview"/>
     </div>
 </div>
 </template>
