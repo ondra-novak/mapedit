@@ -64,6 +64,7 @@ protected:
  
     
     bool ddl_get(Request &req);
+    bool ddl_get_multiple(Request &req);
 
 
     bool command(Request &req);

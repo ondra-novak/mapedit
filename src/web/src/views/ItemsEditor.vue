@@ -16,6 +16,7 @@ import EffectSheet from '@/components/EffectSheet.vue';
 import { spellsFromArrayBuffer } from '@/core/spell_structs';
 import DelayLoadedList from '@/components/DelayLoadedList.vue';
 import getGlobalDialogs from '@/utils/global_dialog_list';
+import SoundControl from '@/utils/sound';
 
 const selected_item = ref<number|null>(null);
 
@@ -34,6 +35,13 @@ const allAnimationsList = shallowRef<string[]>([]);
 const left_hand_place = ref<HTMLCanvasElement|null>(null);
 const right_hand_place = ref<HTMLCanvasElement|null>(null);
 let save_state: SaveRevertControl;
+
+async function preview_sound(ev: Event ) {
+    const el = ev.target as HTMLInputElement;
+    const n = el.value;
+    if (n) SoundControl.play(n);
+
+}
 
 
 function reload() {
@@ -394,7 +402,7 @@ watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true}
                     <label><span>On ground</span><input :list="ds_graphics.id" v-model="form.vzhled_on_ground"/></label>
                     <label><span>On male</span><input :list="ds_graphics.id" v-model="form.vzhled_on_male" /></label>
                     <label><span>On female</span><input :list="ds_graphics.id" v-model="form.vzhled_on_female" /></label>
-                    <label><span>Sound on impact</span><input :list="ds_sounds.id" v-model="form.sound_file"/></label>
+                    <label><span>Sound on impact</span><input :list="ds_sounds.id" v-model="form.sound_file" @change="preview_sound"/></label>
                     <template v-if="(form.druh == ItemType.TYP_UTOC || form.druh == ItemType.TYP_STRELNA || form.druh == ItemType.TYP_VRHACI) && (form.umisteni == ItemWearPlace.PL_RUKA || form.umisteni == ItemWearPlace.PL_OBOUR)">
                     <label><span>Wpn. anim.</span><input :list="ds_animations.id"  v-model="form.weapon_animation_file"/></label>                
                     <label><span>Hit frame</span><input type="number" v-watch-range min="0" max="100" v-model="form.hitpos"></label>

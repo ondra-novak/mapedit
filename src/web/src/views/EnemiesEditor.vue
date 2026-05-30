@@ -19,6 +19,7 @@ import AbilitySheet from '@/components/AbilitySheet.vue';
 import EffectSheet from '@/components/EffectSheet.vue';
 import DelayLoadedList from '@/components/DelayLoadedList.vue';
 import getGlobalDialogs from '@/utils/global_dialog_list';
+import SoundControl from '@/utils/sound';
 
 
 
@@ -321,6 +322,13 @@ async function laod_dialogs() : Promise<{value:number, label:string}[]> {
     return  [{value:-1,label:'(none)'}].concat(lst.map(y=>({value:y[0], label:y[1]})));
 }
 
+async function preview_sound(ev: Event ) {
+    const el = ev.target as HTMLSelectElement;
+    const n = el.value;
+    if (n) SoundControl.play(n);
+
+}
+
 </script>
 
 <template>      
@@ -364,10 +372,10 @@ async function laod_dialogs() : Promise<{value:number, label:string}[]> {
                 <x-section>
                     <x-section-title>Sounds</x-section-title>
                     <x-form>
-                        <label><span>Walk</span><select v-model="form.sound_files[EnemySounds.MBS_WALK]"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                        <label><span>Walk</span><select v-model="form.sound_files[EnemySounds.MBS_WALK]" @change="preview_sound"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
                         <label><BitCheckbox v-model="form.vlajky" :mask="EnemyFlags2.MOB_SAMPLE_LOOP"  /><span>Loop</span></label>
-                        <label><span>Attack</span><select v-model="form.sound_files[EnemySounds.MBS_ATTACK]"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
-                        <label><span>Damaged</span><select v-model="form.sound_files[EnemySounds.MBS_HIT]"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                        <label><span>Attack</span><select v-model="form.sound_files[EnemySounds.MBS_ATTACK]" @change="preview_sound"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
+                        <label><span>Damaged</span><select v-model="form.sound_files[EnemySounds.MBS_HIT]" @change="preview_sound"><option></option><option v-for="s of list_sounds" :key="s" :value="s">{{ s }}</option></select></label>
                     </x-form>
                 </x-section>
             </div>

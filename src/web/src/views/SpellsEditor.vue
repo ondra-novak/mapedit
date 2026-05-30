@@ -109,6 +109,11 @@ function findItem(event: Event, params: any[], index: number) {
                 params[index] = p;
                 return;
             }
+            const q = item_list.value.findIndex((x,n)=>x.jmeno == t.value)
+            if (q != -1) {
+                params[index] = q;
+                return;
+            }
         }
         t.value = `${item_list.value.get(params[index] as number).jmeno} #${params[index]}`;
     }

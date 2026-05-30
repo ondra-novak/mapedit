@@ -2,7 +2,7 @@
 import { COLPaletteSet } from '@/core/col_palette_set';
 import { server, type FileItem } from '@/core/api';
 import { PCX, PCXProfile } from '@/core/pcx';
-import { onMounted, onUnmounted, ref, shallowReactive, shallowRef, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowReactive, shallowRef, watch } from 'vue';
 import SkeldalImage, { type ImageModel } from './SkeldalImage.vue';
 import { AssetGroup } from '@/core/asset_groups';
 import { PhotoshopPicker } from 'vue-color';
@@ -11,13 +11,15 @@ import CanvasView from './CanvasView.vue';
 import { messageBoxAlert, messageBoxConfirm } from '@/utils/messageBox';
 import type { SaveRevertControl } from './statusBar';
 import StatusBar from './statusBar';
+import { make1DArray } from '@/core/binary';
+import ProgressBar from './tools/progressBar';
+import { SeqFile } from '@/core/seqfile';
 
 const filename = defineModel<string | null>();
 const enemy_image = shallowRef<PCX>();
 const palete_col = ref<COLPaletteSet>();
 const palete_col_name = ref<string>();
 const selected_ciks = ref<boolean[]>([]);
-const original_palette = ref<RGBPalette>();
 const undo_palette = ref<RGBPalette>();
 const undo_index = ref<number>();
 const commbutt = ref<boolean>(false);
@@ -54,8 +56,8 @@ function do_revert() {
 }
 
 async function do_save() {
-    if (filename.value) {
-        return save_col(filename.value);
+    if (palete_col_name.value) {
+        return save_col(palete_col_name.value);
     }
 }
 
@@ -296,7 +298,135 @@ async function create_common_palette() {
 
 }
 
+const rebuild_dlg = ref<HTMLDialogElement>();
+const rebuild_to_base = ref<string>("");
+const rebuild_op_name = ref<string>("");
 
+function rebuild_op_delete_color(colors: number[]) {
+    const remap:number[] = [];
+    for (let i = 0; i < 256; ++i) remap.push(i);
+    colors.forEach(x=>remap[x] = 0);
+    return (img:PCX)=>{
+        return img.remap_colors(remap);
+    };
+}
+
+function rebuild_op_make_transp(colors: number[]) {
+    const remap:number[] = [];
+    for (let i = 0; i < 128; ++i) remap.push(i);
+    for (let i = 128; i < 255;++i) {
+        remap.push(i+colors.length);            
+    }
+    for (let i = 0; i < colors.length; ++i) {
+        remap[colors[i]] = i+128;
+        remap[256-colors.length+i] = colors[i];
+    }
+    return (img:PCX)=>{
+        return img.remap_colors(remap);
+    };
+}
+
+function rebuild_op_make_solid(colors: number[]) {
+    const remap:number[] = [0];
+
+    for (let i = 1; i < 128; ++i) remap.push(i+colors.length);  
+    for (let i = 128; i < 255;++i) remap.push(i);                    
+    for (let i = 0; i < colors.length; ++i) {
+        remap[colors[i]] = i+1;
+        remap[128-colors.length+i] = colors[i];
+    }
+    return (img:PCX)=>{
+        return img.remap_colors(remap);
+    };
+}
+
+function rebuild_op_upscale() {
+    return (img:PCX)=>{return img.upscale2x()};
+}
+
+function rebuild_op_downscale() {
+    return (img:PCX)=>{return img.downscaleHalf()};
+}
+
+let cur_op : ((img: PCX)=>PCX)|null = null;
+
+
+const current_base_name = computed(()=>{
+    return (palete_col_name.value?.substring(0,6) || "").toUpperCase();
+})
+
+function begin_rebuild(op_name:string, op:(img: PCX)=>PCX) {
+    cur_op = op;
+    rebuild_op_name.value = op_name;
+    rebuild_to_base.value = current_base_name.value;
+    rebuild_dlg.value?.showModal();
+}
+
+const selection_as_indices = computed(()=>{
+       return selected_ciks.value.map((x,n)=>x?n:-1).filter(x=>x>=0);    
+});
+
+const rebuild_delete_color_disabled = computed(()=>{    
+    return selection_as_indices.value.length == 0 || (selection_as_indices.value.length == 1 && selection_as_indices.value[0] == 0)});
+const rebuild_make_transparent_disabled = computed(()=>{    
+    return selection_as_indices.value.length == 0 || (selection_as_indices.value.find(x=>x>=128)?true:false);
+});
+const rebuild_make_solid_disabled = computed(()=>{    
+    return selection_as_indices.value.length == 0 || (selection_as_indices.value.find(x=>x<128)?true:false);
+});
+async function rebuild_run() {
+    const cur_base = current_base_name.value
+    const new_base = rebuild_to_base.value.toUpperCase()+("______").substring(rebuild_to_base.value.length);    
+    const pg = await ProgressBar.open();
+    pg.set_text("Converting");
+    const files = (await server.getDDLFiles(AssetGroup.ENEMIES))
+        .files.map(x=>x.name.toUpperCase()).filter(n=>n.startsWith(cur_base) && n.endsWith(".PCX"));
+    let cnt = 0;
+    if (cur_op)  {
+        for (const n of files) {
+            const pcx = PCX.fromArrayBuffer(await server.getDDLFile(n));
+            const new_pcx = cur_op(pcx);
+            const new_name = new_base + n.substring(cur_base.length);
+            await server.putDDLFile(new_name, new_pcx.toArrayBuffer(), AssetGroup.ENEMIES, false);
+            cnt++;
+            pg.set_value(cnt/files.length);
+        }
+    
+        palete_col_name.value = new_base + ".COL";
+        filename.value = new_base+ filename.value?.substring(new_base.length);    
+        if (palete_col.value) {
+            for (const p of palete_col.value.palettes) {
+                const r = new PCX(2,2);
+                r.set_palete(p);
+                const nr = cur_op(r);
+                const np = nr.get_palette();
+                p.splice(0,256, ...np);
+            }
+        }
+        save_col(palete_col_name.value);
+        if (new_base != cur_base) {
+            const old_seq = cur_base+".SEQ";
+            const new_seq = new_base + ".SEQ";
+            try {
+                const d = await server.getDDLFile(old_seq);
+                const sq = SeqFile.fromArrayBuffer(d,cur_base);                
+                if (!sq.old_format) {
+                    sq.animation.forEach(x=>x.forEach(x=> {
+                        x.name = new_base+x.name.substring(new_base.length);
+                    }))
+                    await server.putDDLFile(new_seq, sq.toArrayBuffer(), AssetGroup.ENEMIES);
+                } else {
+                    await server.putDDLFile(new_seq, d, AssetGroup.ENEMIES);
+                }
+            } catch (e) {
+
+            }
+        }
+    }
+    pg.close();
+    rebuild_dlg.value?.close();
+    onUpdate();
+}
 </script>   
 
 
@@ -306,6 +436,19 @@ async function create_common_palette() {
         <x-form>
             <label><span>File name</span><input readonly type="text" v-model="palete_col_name"></label>            
         </x-form>        
+    </div>
+    <div class="palette">
+        <div class="rbl">
+            <div>Rebuild</div>
+            <div><button :disabled="rebuild_delete_color_disabled" 
+                  @click="begin_rebuild('Delete color', rebuild_op_delete_color(selection_as_indices))">Delete color</button>
+            <button :disabled="rebuild_make_transparent_disabled"
+                  @click="begin_rebuild('Make semi-transparent', rebuild_op_make_transp(selection_as_indices))">Make semi-transparent</button>
+            <button :disabled="rebuild_make_solid_disabled"
+                  @click="begin_rebuild('Make solid', rebuild_op_make_solid(selection_as_indices))">Make solid</button>
+            <button @click="begin_rebuild('Downscale', rebuild_op_downscale())">Downscale</button>
+            <button @click="begin_rebuild('Upscale', rebuild_op_upscale())">Upscale</button></div>
+        </div>
     </div>
     <div class="palette" v-for="(pal , pal_index) of palete_col?.palettes" :key="pal_index">
         <p>Palette index {{ pal_index }}</p>
@@ -338,6 +481,16 @@ async function create_common_palette() {
         <button @click="create_common_palette">Create new palette</button>
      </div>
     
+    <dialog ref="rebuild_dlg">
+        <header>Rebuild set : {{rebuild_op_name}}<button class="close" @click="rebuild_dlg?.close()"></button></header>
+        <x-form>
+            <label><span>Rebuild to: </span><input type="text" maxlength="6" v-model="rebuild_to_base"></label>            
+        </x-form>
+        <footer>
+            <button @click="rebuild_run">Run</button><button @click="rebuild_dlg?.close()">Cancel</button>
+        </footer>
+
+    </dialog>
 
 </template>
 
@@ -403,5 +556,15 @@ async function create_common_palette() {
     content: "a";
     color:white;
     text-shadow: 0px 0px 2px  black;
+}
+.rbl {
+    display:flex;
+    gap: 1rem;
+    align-items: center;
+}
+.rbl>*:last-child {
+    display: flex;
+    gap: 0.2rem;
+    flex-wrap: wrap;
 }
 </style>
