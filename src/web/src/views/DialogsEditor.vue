@@ -1124,6 +1124,8 @@ const node_type_icon = [
                                     <option value="first visited">First visited (this node)</option>
                                     <option value="whole group">Whole group</option>
                                     <option value="is present">Speaker is present</option>
+                                    <option value="can speak">Speaker can speak</option>
+                                    <option value="is dead">Speaker is dead</option>
                                     <option value="target not visited yet">Target not visited yet</option>
                                     <option value="no choices">No active choices</option>
                                     <option v-for="(v,k) of cur_story.conditions" :key="k" :value="k">{{ k }}</option>

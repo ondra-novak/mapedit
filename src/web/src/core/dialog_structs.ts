@@ -178,6 +178,7 @@ export class DialogDef {
         58: ["autosave",0],
         59: ["play_music_playlist",1],
         60: ["delay",1],
+        61: ["is_speaker_alive",0],
         128: ["add_desc",1],
         129: ["show_emote",1],
         130: ["save_name",1],       //*
@@ -904,6 +905,12 @@ class DialogCompiler {
                             case "is present": if (b.speaker) condinstr.push({value:132},{value: b.speaker});
                                                condinstr.push({value:41});
                                                break;
+                            case "can speak": if (b.speaker) condinstr.push({value:132},{value: b.speaker});
+                                               this.compile_ast(["&&",["id","is_present"],["id","is_alive"]], condinstr);
+                                               break;
+                            case "is dead" :  if (b.speaker) condinstr.push({value:132},{value: b.speaker});
+                                               this.compile_ast(["!",["id","is_alive"]], condinstr);
+                                               break;
                             case "whole group": condinstr.push({value:185}); break;
                             case "target not visited yet": condinstr.push({value:145},{value:target}); inverted = !inverted;break;
                             case "no choices": condinstr.push({value:51});break;
@@ -1140,6 +1147,7 @@ class DialogCompiler {
                                     this.compile_error(`Argument of "${n}()" must be number: id of node. Expression is not allowed`)
                                 }
                             }
+                            break;
                             case 'd': {
                                 const dirconst = this.compile_likely_constant(a, out);
                                 if (dirconst && ("value" in dirconst)) {
@@ -1321,6 +1329,7 @@ class DialogCompiler {
             case "whole_group": out.push({value:185});return false;
             case "slot_count": out.push({value:27});return true;
             case "is_present": out.push({value:41});return false;
+            case "is_alive": out.push({value:61});return false;
             case "money": out.push({value:42});return true;
             case "gender": out.push({value:26});return true;
             case "character_sector": out.push({value:35});return true;
