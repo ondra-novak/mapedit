@@ -92,6 +92,7 @@ condition && {
 - **battle** - contains true, if currently in battle
 - **held_item** - contains id of item held before dialog started. This item is no longer held, it was put into inventory. -1 for none
 - **game_time** - containe game time (1 tick per 10 sec). Note this number is probably larger than 32768, so you will need to perform some adjustment before can be stored
+- **random** - returns random number between 0 - 10000
 
 ### Functions
 
