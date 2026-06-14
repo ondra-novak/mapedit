@@ -20,6 +20,7 @@ import EffectSheet from '@/components/EffectSheet.vue';
 import DelayLoadedList from '@/components/DelayLoadedList.vue';
 import getGlobalDialogs from '@/utils/global_dialog_list';
 import SoundControl from '@/utils/sound';
+import MagicAttackSheet from '@/components/MagicAttackSheet.vue';
 
 
 
@@ -394,6 +395,10 @@ async function preview_sound(ev: Event ) {
                 <EffectSheet v-model="form.vlastnosti[CharacterStats.VLS_KOUZLA]" />
             </x-section>
             <x-section>
+                <x-section-title>Magic Attack</x-section-title>
+                <MagicAttackSheet v-model="form.vlastnosti" />
+            </x-section>
+            <x-section>
                 <x-section-title>Behavior</x-section-title>
                 <x-form>
                     <label><BitCheckbox v-model="form.stay_strategy" :mask="EnemyFlags1.MOB_WALK"/><span>Walking</span></label>
@@ -416,10 +421,8 @@ async function preview_sound(ev: Event ) {
                         <option value="8">Attack at wimpy</option>
                         <option value="9">Held on place</option>
                     </select></label>
-                    <label><span>Dialog</span>
-                        <DelayLoadedList v-model="form.dialog" :list="laod_dialogs()" size="1"/>
-                        </label>
-                    <label><span>Kill dialog (played on defeat)</span><DelayLoadedList v-model="form.kill_dialog" :list="laod_dialogs()" size="1"/></label>
+                    <label><span>Dialog (interact)</span><DelayLoadedList v-model="form.dialog" :list="laod_dialogs()" size="1"/></label>
+                    <label><span>Dialog (defeat)</span><DelayLoadedList v-model="form.kill_dialog" :list="laod_dialogs()" size="1"/></label>
                 </x-form>
             </x-section>
             <x-section>

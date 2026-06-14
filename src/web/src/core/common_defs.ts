@@ -9,7 +9,7 @@ export const ElementType = {
 
 
 export const ElementTypeName = [
-    "Fire","Water","Earth","Air","Mind"
+    "Fire","Water","Earth","Air","Mind","(undefined #27)","(undefined #28)"
 ] ;
 
 

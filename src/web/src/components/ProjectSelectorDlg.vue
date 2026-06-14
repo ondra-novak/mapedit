@@ -37,10 +37,12 @@ async function update_elements() {
     const dec = new TextDecoder();
     const txt = keybcs2string(data);
     const stable = parse_stringtable(txt);
-    const ids = [22,23,24,25,26];
+    const ids = [22,23,24,25,26,27,28];
     ids.forEach((v,idx)=>{
         const s= stable[v];
-        ElementTypeName[idx] = s;
+        if (s) {
+            ElementTypeName[idx] = s;
+        }
     });
 }
 
