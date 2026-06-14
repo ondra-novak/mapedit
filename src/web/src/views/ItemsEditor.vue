@@ -17,6 +17,8 @@ import { spellsFromArrayBuffer } from '@/core/spell_structs';
 import DelayLoadedList from '@/components/DelayLoadedList.vue';
 import getGlobalDialogs from '@/utils/global_dialog_list';
 import SoundControl from '@/utils/sound';
+import MagicAttackSheet from '@/components/MagicAttackSheet.vue';
+
 
 const selected_item = ref<number|null>(null);
 
@@ -308,6 +310,11 @@ async function load_spells() {
 async function load_dialogs() {
     return (await getGlobalDialogs()).map(x=>({value:x[0],label:x[1]}));
 }
+
+const is_weapon = computed(()=>form.value.druh == ItemType.TYP_UTOC
+    || form.value.druh == ItemType.TYP_STRELNA 
+    || form.value.druh == ItemType.TYP_VRHACI    
+    || form.value.umisteni == ItemWearPlace.PL_SIP)
     
 watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true});
 </script>
@@ -461,11 +468,15 @@ watch(item_list, ()=>{if (save_state) save_state.set_changed(true)}, {deep:true}
         </x-section>
         <x-section>
             <x-section-title>Modified stats</x-section-title>
-            <AbilitySheet v-model="form.zmeny" :changes="true" />
+            <AbilitySheet v-model="form.zmeny" :changes="true" :weapon="is_weapon"/>
         </x-section>
         <x-section>
             <x-section-title>Effects</x-section-title>
             <EffectSheet v-model="form.zmeny[CharacterStats.VLS_KOUZLA]" />
+        </x-section>
+        <x-section v-if="is_weapon">
+            <x-section-title>Magic attack</x-section-title>
+            <MagicAttackSheet v-model="form.zmeny"/>
         </x-section>
     </div>
     </div>
